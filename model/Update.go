@@ -2,8 +2,8 @@ package model
 
 import (
 	"context"
-	"demo1/MyBlog/utils"
-	"demo1/MyBlog/utils/errmsg"
+	"github.com/yshujie/blog/utils"
+	"github.com/yshujie/blog/utils/errmsg"
 	"github.com/qiniu/api.v7/v7/auth/qbox"
 	"github.com/qiniu/api.v7/v7/storage"
 	"mime/multipart"

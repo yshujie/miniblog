@@ -1,8 +1,8 @@
 package main
 
 import (
-	"demo1/MyBlog/model"
-	"demo1/MyBlog/routes"
+	"github.com/yshujie/blog/model"
+	"github.com/yshujie/blog/routes"
 )
 
 func main() {

@@ -1,8 +1,8 @@
 package model
 
 import (
-	"demo1/MyBlog/utils"
-	"demo1/MyBlog/utils/errmsg"
+	"github.com/yshujie/blog/utils"
+	"github.com/yshujie/blog/utils/errmsg"
 	"fmt"
 	"gopkg.in/gomail.v2"
 	"strconv"

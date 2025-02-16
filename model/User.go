@@ -1,8 +1,8 @@
 package model
 
 import (
-	"demo1/MyBlog/proto"
-	"demo1/MyBlog/utils/errmsg"
+	"github.com/yshujie/blog/proto"
+	"github.com/yshujie/blog/utils/errmsg"
 	"encoding/base64"
 	"fmt"
 	"github.com/jinzhu/gorm"

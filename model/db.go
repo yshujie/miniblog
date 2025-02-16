@@ -3,7 +3,7 @@ package model
 //数据库入口
 
 import (
-	"demo1/MyBlog/utils"
+	"github.com/yshujie/blog/utils"
 	"fmt"
 	_ "github.com/garyburd/redigo/redis"
 	"github.com/go-redis/redis"

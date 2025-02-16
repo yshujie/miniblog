@@ -1,9 +1,9 @@
 package routes
 
 import (
-	v1 "demo1/MyBlog/api/v1"
-	"demo1/MyBlog/middleware"
-	"demo1/MyBlog/utils"
+	v1 "github.com/yshujie/blog/api/v1"
+	"github.com/yshujie/blog/middleware"
+	"github.com/yshujie/blog/utils"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )

@@ -1,7 +1,7 @@
 package model
 
 import (
-	"demo1/MyBlog/utils/errmsg"
+	"github.com/yshujie/blog/utils/errmsg"
 )
 
 type UserArticle struct {

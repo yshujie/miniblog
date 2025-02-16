@@ -1,11 +1,11 @@
 package v1
 
 import (
-	"demo1/MyBlog/middleware"
-	"demo1/MyBlog/model"
-	"demo1/MyBlog/utils"
-	"demo1/MyBlog/utils/errmsg"
-	"demo1/MyBlog/utils/validator"
+	"github.com/yshujie/blog/middleware"
+	"github.com/yshujie/blog/model"
+	"github.com/yshujie/blog/utils"
+	"github.com/yshujie/blog/utils/errmsg"
+	"github.com/yshujie/blog/utils/validator"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"

@@ -3,7 +3,7 @@ package model
 //分类模型
 
 import (
-	"demo1/MyBlog/utils/errmsg"
+	"github.com/yshujie/blog/utils/errmsg"
 	"github.com/jinzhu/gorm"
 )
 

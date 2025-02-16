@@ -1,4 +1,4 @@
-module demo1/MyBlog
+module github.com/yshujie/blog
 
 go 1.14
 

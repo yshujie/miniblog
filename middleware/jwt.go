@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"demo1/MyBlog/utils"
-	"demo1/MyBlog/utils/errmsg"
+	"github.com/yshujie/blog/utils"
+	"github.com/yshujie/blog/utils/errmsg"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"net/http"
