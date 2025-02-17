@@ -16,8 +16,9 @@ mkdir -p $PROJECTLOGS
 
 # 运行服务
 start() {
-    echo -e "Begin to compile the project ---$PROJECTNAME..."
+    echo -e "Begin to compile the project ---$PROJECTNAME ......"
     # 编译 Go 项目
+    echo -e "---- Starting build $PROJECTNAME ... "
     go build -o $PROJECTNAME main.go
     # 赋予权限
     chmod 777 "$CURDIR/$PROJECTNAME"
