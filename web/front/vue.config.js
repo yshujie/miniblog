@@ -2,8 +2,8 @@ module.exports = {
   transpileDependencies: [
     'vuetify'
   ],
-  lintOnSave:false,
-  publicPath:'/front',
-  outputDir:'dist',
-  assetsDir:'static',
+  lintOnSave: false,
+  publicPath: '/',
+  outputDir: 'dist',
+  assetsDir: 'static',
 }
