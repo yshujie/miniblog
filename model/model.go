@@ -3,24 +3,25 @@ package model
 //数据库入口
 
 import (
-	"github.com/yshujie/blog/utils"
 	"fmt"
+	"time"
+
 	_ "github.com/garyburd/redigo/redis"
 	"github.com/go-redis/redis"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
-	"time"
+	"github.com/yshujie/blog/utils"
 )
 
-//定义全局变量
+// 定义全局变量
 var db *gorm.DB
 var err error
 var Redis *redis.Client
 
-//初始化数据库
+// 初始化数据库
 func InitDb() {
 	//连接数据库
-	db, err = gorm.Open(utils.Db, fmt.Sprintf("%s:%s@(%s%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+	db, err = gorm.Open(utils.Db, fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		utils.DbUser,
 		utils.DbPassWord,
 		utils.DbHost,
