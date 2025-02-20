@@ -1,0 +1,18 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/main ."
+  bin = "./tmp/main"
+  include = []
+  exclude = []
+
+[watch]
+  dir = "."
+  include = ["*.go"]
+  exclude = []
+  delay = "100ms"
+
+[log]
+  time = true
+  color = true
