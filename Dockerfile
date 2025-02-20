@@ -17,7 +17,7 @@ RUN go mod tidy
 COPY . .
 
 # 安装 air 工具，用于自动热重载
-RUN go install github.com/cosmtrek/air@latest
+RUN go install github.com/air-verse/air@latest
 
 # 设置容器启动时运行 air
 CMD ["air"]
