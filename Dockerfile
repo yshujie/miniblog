@@ -1,35 +1,23 @@
-FROM golang:1.16 as builder
+# 使用官方 Golang 镜像作为基础镜像
+FROM golang:1.24
 
-WORKDIR /build
-COPY . /build
+# 设置工作目录为 /app
+WORKDIR /app
 
+# 设置代理
 ENV GOPROXY=https://goproxy.cn,direct
 
-RUN go build -a -o basic
+# 将本地 go.mod 和 go.sum 复制到容器中
+COPY go.mod go.sum ./
 
-FROM centos:latest
+# 安装依赖
+RUN go mod tidy
 
-WORKDIR /data
+# 将整个项目目录复制到容器中
+COPY . .
 
-COPY --from=builder /build/basic .
+# 安装 air 工具，用于自动热重载
+RUN go install github.com/cosmtrek/air@latest
 
-VOLUME ["/data/log"]
-
-EXPOSE 80
-ENTRYPOINT ["./basic"]
-
-#FROM golang:latest
-#
-#MAINTAINER tmnhs
-#
-#RUN go env -w GO111MODULE=on
-#RUN go env -w GOPROXY=https://goproxy.cn,direct
-#
-#WORKDIR $GOPATH/src/myblog
-#COPY . $GOPATH/src/myblog
-#
-#RUN go build -o myblog .
-#
-#EXPOSE 80
-#
-#CMD ["./myblog"]
+# 设置容器启动时运行 air
+CMD ["air"]
