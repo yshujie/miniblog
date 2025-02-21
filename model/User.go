@@ -1,14 +1,15 @@
 package model
 
 import (
-	"github.com/yshujie/blog/proto"
-	"github.com/yshujie/blog/utils/errmsg"
 	"encoding/base64"
 	"fmt"
-	"github.com/jinzhu/gorm"
-	"golang.org/x/crypto/scrypt"
 	"log"
 	"strconv"
+
+	"github.com/jinzhu/gorm"
+	"github.com/yshujie/blog/proto"
+	"github.com/yshujie/blog/utils/errmsg"
+	"golang.org/x/crypto/scrypt"
 )
 
 type User struct {
@@ -22,7 +23,7 @@ type User struct {
 	Code     string    `gorm:"type:varchar(80)"`             //激活码
 }
 
-//todo 查询用户是否存在
+// todo 查询用户是否存在
 func CheckUser(name string) (code int) {
 	var user User
 	db.Model(&user).Select("id").Where("username = ?", name).First(&user)
@@ -32,7 +33,7 @@ func CheckUser(name string) (code int) {
 	return errmsg.SUCCESS
 }
 
-//todo 添加用户
+// todo 添加用户
 func CreateUser(data *User) (*User, int) {
 	//密码加密
 	//data.Password=ScryptPw(data.Password)
@@ -43,7 +44,7 @@ func CreateUser(data *User) (*User, int) {
 	return data, errmsg.SUCCESS
 }
 
-//todo 查询用户详细信息，包括文章
+// todo 查询用户详细信息，包括文章
 func GetUserInfo(id int) (User, int) {
 	var user User
 
@@ -54,7 +55,7 @@ func GetUserInfo(id int) (User, int) {
 	return user, errmsg.SUCCESS
 }
 
-//todo 查询用户列表，带分页效果
+// todo 查询用户列表，带分页效果
 func GetUsers(IdOrName string, pageSize int, pageNum int) ([]User, int, error) {
 	var users []User
 	var total int
@@ -81,7 +82,7 @@ func GetUsers(IdOrName string, pageSize int, pageNum int) ([]User, int, error) {
 	return users, total, nil
 }
 
-//todo 编辑用户
+// todo 编辑用户
 func EditUser(id int, data *proto.ReqEditUser) int {
 	var maps = make(map[string]interface{})
 
@@ -95,7 +96,7 @@ func EditUser(id int, data *proto.ReqEditUser) int {
 	return errmsg.SUCCESS
 }
 
-//todo 删除用户
+// todo 删除用户
 func DeleteUser(id int) int {
 	//删除与该用户相关联的中间表
 	DeleteMidByUserId(id)
@@ -108,7 +109,7 @@ func DeleteUser(id int) int {
 	return errmsg.SUCCESS
 }
 
-//在调用函数之前执行
+// 在调用函数之前执行
 func (u *User) BeforeSave() {
 	u.Password = ScryptPw(u.Password)
 }
@@ -128,7 +129,7 @@ func ScryptPw(password string) string {
 	return fpw
 }
 
-//todo 登录验证
+// todo 登录验证
 func CheckLogin(username string, password string) (*User, int) {
 	var user User
 	db.Where("username = ?", username).First(&user)
@@ -152,7 +153,7 @@ func CheckLogin(username string, password string) (*User, int) {
 	return &user, errmsg.SUCCESS
 }
 
-//todo 通过用户名查找用户id
+// todo 通过用户名查找用户id
 func FindUserIdByName(username interface{}) uint {
 
 	var user User
@@ -163,7 +164,7 @@ func FindUserIdByName(username interface{}) uint {
 
 }
 
-//todo 通过激活码查找用户并且激活
+// todo 通过激活码查找用户并且激活
 func UpdateUserStatus(code string) int {
 
 	err = db.Model(&User{}).Where("code = ?", code).UpdateColumn(map[string]interface{}{
@@ -176,7 +177,7 @@ func UpdateUserStatus(code string) int {
 	return errmsg.SUCCESS
 }
 
-//todo 通过邮箱查找用户
+// todo 通过邮箱查找用户
 func GetUserByEmail(email string) (User, int) {
 	var user User
 
