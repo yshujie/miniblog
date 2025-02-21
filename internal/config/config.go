@@ -10,11 +10,15 @@ type Server struct {
 
 // 数据库配置
 type Database struct {
+	Driver   string `mapstructure:"driver"`
 	Host     string `mapstructure:"host"`
 	Port     int    `mapstructure:"port"`
-	User     string `mapstructure:"user"`
+	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
-	Name     string `mapstructure:"name"`
+	DBName   string `mapstructure:"dbname"`
+	MaxIdle  int    `mapstructure:"max_idle"`
+	MaxOpen  int    `mapstructure:"max_open"`
+	ConnMax  int    `mapstructure:"conn_max_lifetime"`
 }
 
 // Redis 配置
