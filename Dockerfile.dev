@@ -1,0 +1,28 @@
+# 使用官方 Golang 镜像作为基础镜像
+FROM golang:1.21
+
+# 设置工作目录为 /app
+WORKDIR /app
+
+# 设置代理
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GO111MODULE=on
+
+# 将本地 go.mod 和 go.sum 复制到容器中
+COPY go.mod go.sum ./
+
+# 安装依赖
+RUN go mod download
+
+# 将整个项目目录复制到容器中
+COPY . .
+
+# 安装 air 工具，用于自动热重载
+RUN go install github.com/cosmtrek/air@latest
+
+# 暴露应用端口（根据你的应用需要修改）
+EXPOSE 8080
+
+# 设置容器启动时运行 air
+# air 会监听文件变化并自动重新编译运行 /cmd/server/main.go
+CMD ["air", "-c", ".air.toml"]
