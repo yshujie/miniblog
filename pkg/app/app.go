@@ -3,7 +3,7 @@ package app
 import (
 	"github.com/yshujie/blog-serve/internal/config"
 	redis "github.com/yshujie/blog-serve/internal/repository/cache"
-	"github.com/yshujie/blog-serve/internal/repository/mysql"
+	mysql "github.com/yshujie/blog-serve/internal/repository/mysql"
 	"github.com/yshujie/blog-serve/pkg/log"
 )
 
