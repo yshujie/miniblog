@@ -1,5 +1,5 @@
 # 使用官方 Golang 镜像作为基础镜像
-FROM golang:1.21
+FROM golang:1.24
 
 # 设置工作目录为 /app
 WORKDIR /app
@@ -18,7 +18,7 @@ RUN go mod download
 COPY . .
 
 # 安装 air 工具，用于自动热重载
-RUN go install github.com/cosmtrek/air@latest
+RUN go install github.com/air-verse/air@latest
 
 # 暴露应用端口（根据你的应用需要修改）
 EXPOSE 8080
