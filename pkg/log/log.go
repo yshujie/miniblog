@@ -1,6 +1,9 @@
 package log
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type Logger struct{}
 
@@ -35,9 +38,9 @@ func (l *Logger) Warn(format string, args ...interface{}) {
 
 func (l *Logger) writeLog(level string, format string, args ...interface{}) {
 	if args == nil {
-		fmt.Println("[", level, "]", format)
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "[", level, "]", format)
 	} else {
-		fmt.Println("[", level, "]", format, args)
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "[", level, "]", format, args)
 	}
 
 }
