@@ -5,16 +5,24 @@ import (
 	"github.com/yshujie/blog-serve/api/v1/admin"
 	"github.com/yshujie/blog-serve/api/v1/common"
 	"github.com/yshujie/blog-serve/api/v1/public"
+	"github.com/yshujie/blog-serve/internal/middleware"
 )
 
 func Start(ip *string, port *int) {
 	// 初始化 router
-	router := gin.Default()
+	router := gin.Default(func(e *gin.Engine) {
+		// 设置模式
+		gin.SetMode(gin.DebugMode)
 
-	gin.SetMode(gin.ReleaseMode)
+		// 设置跨域
+		e.Use(middleware.Cors())
 
-	// // 设置跨域
-	// router.Use(middleware.Cors())
+		// 设置日志
+		e.Use(gin.Logger())
+
+		// 设置 Recovery
+		e.Use(gin.Recovery())
+	})
 
 	// // 加载 public 路由
 	initPublicRouter(router)
