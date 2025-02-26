@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/yshujie/blog-serve/internal/config"
+	router "github.com/yshujie/blog-serve/internal/delivery/http"
 	redis "github.com/yshujie/blog-serve/internal/repository/cache"
 	mysql "github.com/yshujie/blog-serve/internal/repository/mysql"
 	"github.com/yshujie/blog-serve/pkg/log"
@@ -50,11 +51,8 @@ func (a *App) prepare() {
 
 // 启动
 func (a *App) start() {
-	// // 启动 router
-	// router := gin.Default()
-
-	// // 启动 server
-	// router.Run(fmt.Sprintf("%s:%d", a.ip, a.port))
+	// 启动 router
+	router.Start(&a.ip, &a.port)
 }
 
 // 关闭
