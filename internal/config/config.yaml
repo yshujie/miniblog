@@ -20,7 +20,7 @@ database:
 redis:
   host: "47.94.204.124"      # 使用 docker-compose 中的服务名
   port: 16379
-  password: ""       # 如果没有密码则留空
+  password: "T2XFVfU3DCenEnL"       # 如果没有密码则留空
   db: 0
   pool_size: 100
   min_idle_conns: 10
