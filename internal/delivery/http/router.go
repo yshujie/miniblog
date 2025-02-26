@@ -1,6 +1,8 @@
 package http
 
 import (
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/yshujie/blog-serve/api/v1/admin"
 	"github.com/yshujie/blog-serve/api/v1/common"
@@ -28,13 +30,13 @@ func Start(ip *string, port *int) {
 	initPublicRouter(router)
 
 	// // 加载 admin 路由
-	// initAdminRouter(router)
+	initAdminRouter(router)
 
 	// // 加载 common 路由
-	// initCommonRouter(router)
+	initCommonRouter(router)
 
 	// // 启动 router
-	// router.Run(fmt.Sprintf("%s:%d", *ip, *port))
+	router.Run(fmt.Sprintf("%s:%d", *ip, *port))
 }
 
 func initPublicRouter(router *gin.Engine) {
