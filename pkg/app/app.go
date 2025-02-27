@@ -8,6 +8,7 @@ import (
 	"github.com/yshujie/blog-serve/pkg/log"
 )
 
+// App 应用结构体
 type App struct {
 	name    string
 	version string
@@ -16,9 +17,14 @@ type App struct {
 	cfg     *config.Config
 }
 
+// 创建 App 实例
 func NewApp(cfg *config.Config) *App {
 	return &App{
-		cfg: cfg,
+		name:    cfg.Server.Name,
+		version: cfg.Server.Version,
+		ip:      cfg.Server.Address,
+		port:    cfg.Server.Port,
+		cfg:     cfg,
 	}
 }
 
