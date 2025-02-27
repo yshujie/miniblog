@@ -1,22 +1,22 @@
 package mysql
 
 import (
-	"database/sql"
 	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jinzhu/gorm"
 	"github.com/yshujie/blog-serve/internal/config"
 	"github.com/yshujie/blog-serve/pkg/log"
 )
 
-var db *sql.DB
+var db *gorm.DB
 
 func Init(cfg *config.Database) {
 	logger := log.NewLogger()
 	logger.Info("Connecting to MySQL...")
 
 	// 连接数据库
-	db, err := sql.Open(cfg.Driver, fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+	db, err := gorm.Open(cfg.Driver, fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		cfg.Username,
 		cfg.Password,
 		cfg.Host,
@@ -28,14 +28,17 @@ func Init(cfg *config.Database) {
 		panic(err)
 	}
 
+	// 禁用默认表的复数形式
+	db.SingularTable(true)
+
 	// 设置最大连接数
-	db.SetMaxOpenConns(100)
+	db.DB().SetMaxOpenConns(100)
 
 	// 设置最大空闲连接数
-	db.SetMaxIdleConns(10)
+	db.DB().SetMaxIdleConns(10)
 
 	// 测试连接
-	err = db.Ping()
+	err = db.DB().Ping()
 	if err != nil {
 		logger.Error("Failed to ping MySQL: %v", err)
 		panic(err)
