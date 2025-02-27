@@ -2,10 +2,16 @@ app:
   name: "blog-serve"
   version: "1.0.0"
   mode: "development"  # development, production
+
+# 服务器配置
+server:
+  name: "blog-serve"
+  address: "0.0.0.0"
   port: 8080
   read_timeout: 60    # 秒
   write_timeout: 60   # 秒
 
+# 数据库配置
 database:
   driver: "mysql"
   host: "47.94.204.124"       # 使用 docker-compose 中的服务名
@@ -17,6 +23,7 @@ database:
   max_open_conns: 100
   conn_max_lifetime: 3600  # 秒
 
+# redis 配置
 redis:
   host: "47.94.204.124"      # 使用 docker-compose 中的服务名
   port: 16379
@@ -25,6 +32,7 @@ redis:
   pool_size: 100
   min_idle_conns: 10
 
+# 日志配置
 log:
   level: "debug"     # debug, info, warn, error
   filename: "logs/app.log"
@@ -33,10 +41,12 @@ log:
   max_backups: 7
   compress: true
 
+# jwt 配置
 jwt:
   secret: "45df45rds4"
   expire: 86400      # token 过期时间（秒）
 
+# cors 配置
 cors:
   allowed_origins:
     - "*"
