@@ -14,20 +14,17 @@ var db *sql.DB
 func Init(cfg *config.Database) {
 	logger := log.NewLogger()
 	logger.Info("Connecting to MySQL...")
+
 	// 连接数据库
-	var err error
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+	db, err := sql.Open(cfg.Driver, fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		cfg.Username,
 		cfg.Password,
 		cfg.Host,
 		cfg.Port,
 		cfg.DBName,
-	)
-	logger.Info("connect dsn: %s", dsn)
-
-	// 打开数据库
-	db, err = sql.Open(cfg.Driver, dsn)
+	))
 	if err != nil {
+		logger.Error("Failed to connect to MySQL: %v", err)
 		panic(err)
 	}
 
@@ -40,6 +37,7 @@ func Init(cfg *config.Database) {
 	// 测试连接
 	err = db.Ping()
 	if err != nil {
+		logger.Error("Failed to ping MySQL: %v", err)
 		panic(err)
 	}
 

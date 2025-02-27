@@ -19,6 +19,9 @@ type App struct {
 
 // 创建 App 实例
 func NewApp(cfg *config.Config) *App {
+	logger := log.NewLogger()
+	logger.Info("Creating app instance...")
+
 	return &App{
 		name:    cfg.Server.Name,
 		version: cfg.Server.Version,
@@ -32,9 +35,7 @@ func NewApp(cfg *config.Config) *App {
 func (a *App) Run() {
 	// 日志
 	logger := log.NewLogger()
-
-	// 记录 app 开启
-	logger.Info("%s app start, version: %s, ip: %s, port: %d", a.name, a.version, a.ip, a.port)
+	logger.Info("Starting app...")
 
 	// 准备
 	a.prepare()

@@ -16,13 +16,13 @@ func Init(cfg *config.Redis) {
 	logger := log.NewLogger()
 	logger.Info("Connecting to Redis...")
 
-	rdb = redis.NewClient(&redis.Options{
+	// 创建 redis 客户端，测试连接
+	_, err := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 		Password: cfg.Password,
 		DB:       cfg.DB,
-	})
-	// 测试连接
-	_, err := rdb.Ping(context.Background()).Result()
+	}).Ping(context.Background()).Result()
+
 	if err != nil {
 		logger.Error("Failed to connect to Redis: %v", err)
 		panic(err)
