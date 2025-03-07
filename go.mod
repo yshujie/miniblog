@@ -8,7 +8,6 @@ require (
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-sql-driver/mysql v1.9.0
 	github.com/jinzhu/gorm v1.9.16
-	github.com/qiniu/api.v7/v7 v7.8.2
 	github.com/redis/go-redis/v9 v9.7.1
 	github.com/spf13/viper v1.19.0
 	github.com/yshujie/blog v0.0.0-20250221032440-409dd8d1808c
@@ -48,6 +47,7 @@ require (
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/qiniu/api.v7/v7 v7.8.2 // indirect
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
