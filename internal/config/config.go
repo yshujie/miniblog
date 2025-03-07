@@ -1,7 +1,7 @@
 package config
 
 // config 文件地址
-var configFilePath = "/configs/config.yaml"
+var configFilePath = "configs/config.yaml"
 
 // 服务器配置
 type Server struct {
