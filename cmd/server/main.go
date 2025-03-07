@@ -7,7 +7,7 @@ import (
 
 func main() {
 	// 加载配置文件
-	cfg, err := config.LoadConfig("internal/config/config.yaml")
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		return
 	}
