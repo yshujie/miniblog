@@ -3,8 +3,8 @@ package app
 import (
 	"github.com/yshujie/blog-serve/internal/config"
 	router "github.com/yshujie/blog-serve/internal/delivery/http"
-	redis "github.com/yshujie/blog-serve/internal/repository/cache"
-	mysql "github.com/yshujie/blog-serve/internal/repository/mysql"
+	redis "github.com/yshujie/blog-serve/internal/store/cache"
+	mysql "github.com/yshujie/blog-serve/internal/store/mysql"
 	"github.com/yshujie/blog-serve/pkg/log"
 )
 
