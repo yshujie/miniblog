@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/yshujie/blog-serve/internal/config"
-	"github.com/yshujie/blog-serve/pkg/app"
+	"github.com/yshujie/miniblog/internal/config"
+	"github.com/yshujie/miniblog/pkg/app"
 )
 
 func main() {

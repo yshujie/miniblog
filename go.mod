@@ -1,4 +1,4 @@
-module github.com/yshujie/blog-serve
+module github.com/yshujie/miniblog
 
 go 1.24.0
 

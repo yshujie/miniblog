@@ -5,11 +5,11 @@
 │   └── openapi
 │       └── openapi.yaml # OpenAPI 3.0 API 接口文档
 ├── cmd # main 文件存放目录
-│   └── blog-serve
+│   └── miniblog
 │       └── main.go
 ├── configs # 配置文件存放目录
-│   ├── blog-serve.sql # 数据库初始化 SQL
-│   ├── blog-serve.yaml # miniblog 配置文件
+│   ├── miniblog.sql # 数据库初始化 SQL
+│   ├── miniblog.yaml # miniblog 配置文件
 │   └── nginx.conf # Nginx 配置
 ├── docs # 项目文档
 │   ├── devel # 开发文档

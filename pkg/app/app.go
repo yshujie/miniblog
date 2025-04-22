@@ -1,11 +1,11 @@
 package app
 
 import (
-	"github.com/yshujie/blog-serve/internal/config"
-	router "github.com/yshujie/blog-serve/internal/delivery/http"
-	redis "github.com/yshujie/blog-serve/internal/store/cache"
-	mysql "github.com/yshujie/blog-serve/internal/store/mysql"
-	"github.com/yshujie/blog-serve/pkg/log"
+	"github.com/yshujie/miniblog/internal/config"
+	router "github.com/yshujie/miniblog/internal/delivery/http"
+	redis "github.com/yshujie/miniblog/internal/store/cache"
+	mysql "github.com/yshujie/miniblog/internal/store/mysql"
+	"github.com/yshujie/miniblog/pkg/log"
 )
 
 // App 应用结构体
