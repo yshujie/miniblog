@@ -62,10 +62,10 @@
 │   │   │           ├── login.go # 用户登录
 │   │   │           ├── update.go  # 更新用户
 │   │   │           └── user.go # 用户 Controller 结构定义、创建
+│   │   ├── store # store 层代码
 │   │   ├── helper.go # 工具类代码存放文件
-│   │   ├── miniblog.go # miniblog 主业务逻辑实现代码
 │   │   ├── router.go # Gin 路由加载代码
-│   │   └── store # store 层代码
+│   │   └── miniblog.go # miniblog 主业务逻辑实现代码
 │   └── pkg # 内部包保存目录
 │       ├── core # core 包，用来保存一些核心的函数
 │       ├── errno # errno 包，实现了 miniblog 的错误码功能
