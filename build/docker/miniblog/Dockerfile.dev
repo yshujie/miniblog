@@ -1,5 +1,5 @@
 # 使用官方 Golang 镜像作为基础镜像
-FROM golang:1.24
+FROM golang:1.24-alpine
 
 # 设置工作目录为 /app
 WORKDIR /app
@@ -8,21 +8,21 @@ WORKDIR /app
 ENV GOPROXY=https://goproxy.cn,direct
 ENV GO111MODULE=on
 
-# 将本地 go.mod 和 go.sum 复制到容器中
-COPY go.mod go.sum ./
+# 安装 air 用于热重载
+RUN go install github.com/air-verse/air@latest
 
-# 安装依赖
+# 复制 go.mod 和 go.sum 文件
+COPY go.mod go.sum /app/
+
+# 下载依赖
 RUN go mod download
 
-# 将整个项目目录复制到容器中
-COPY . .
-
-# 安装 air 工具，用于自动热重载
-RUN go install github.com/air-verse/air@latest
+# 复制源代码
+COPY . /app/
 
 # 暴露应用端口（根据你的应用需要修改）
 EXPOSE 8080
 
 # 设置容器启动时运行 air
-# air 会监听文件变化并自动重新编译运行 /cmd/server/main.go
-CMD ["air", "-c", ".air.toml"]
+# air 会监听文件变化并自动重新编译运行 /cmd/miniblog/main.go
+CMD ["air"]
