@@ -1,7 +1,7 @@
 services:
   miniblog:
     build:
-      context: ../../
+      context: ../../../
       dockerfile: build/docker/miniblog/Dockerfile.dev
     volumes:
       - .:/app
