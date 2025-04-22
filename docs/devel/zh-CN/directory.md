@@ -36,7 +36,6 @@
 │   │       ├── quickstart # 快速入门
 │   │       └── README.md
 │   └── images # 项目图片存放目录
-├── examples # 示例源码
 ├── go.mod
 ├── go.sum
 ├── init # Systemd Unit 文件保存目录
