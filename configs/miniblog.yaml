@@ -1,11 +1,11 @@
 app:
-  name: "blog-serve"
+  name: "miniblog"
   version: "1.0.0"
   mode: "development"  # development, production
 
 # 服务器配置
 server:
-  name: "blog-serve"
+  name: "miniblog"
   address: "0.0.0.0"
   port: 8080
   read_timeout: 60    # 秒
