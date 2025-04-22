@@ -1,11 +1,11 @@
 root = "."
-tmp_dir = "tmp"
+tmp_dir = "_output"
 
 [build]
   # 指定构建命令，使用 /cmd/server/main.go
-  cmd = "go build -o ./tmp/main ./cmd/server/main.go"
+  cmd = "go build -o ./_output/main ./_output/server/main.go"
   # 指定二进制文件路径
-  bin = "./tmp/main"
+  bin = "./_output/main"
   include = []
   exclude = []
 
