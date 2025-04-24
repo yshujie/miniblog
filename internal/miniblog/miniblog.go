@@ -1,9 +1,11 @@
 package miniblog
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -45,6 +47,12 @@ func NewMiniBlogCommand() *cobra.Command {
 // run 函数，实际的业务代码入口
 func run() error {
 	fmt.Println("Hello, World!")
+
+	// 打印所有的配置项及其值
+	settings, _ := json.Marshal(viper.AllSettings())
+	fmt.Println(string(settings))
+	// 打印 db -> username 配置项的值
+	fmt.Println(viper.GetString("db.username"))
 
 	return nil
 }
