@@ -6,10 +6,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	cfgFile string // 配置文件路径
+)
+
 // NewMiniBlogCommand 创建博客的 *cobra.Command 对象
 // 之后可通过 Command 对象的 Execute 方法启动应用程序
 func NewMiniBlogCommand() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:          "miniblog",                                                                // 指定命令名字
 		Short:        "A good Go pratical project",                                              // 命令的简述
 		Long:         "A good Go pratical project, used to create user with basic information.", // 命令的详细描述
@@ -28,6 +32,14 @@ func NewMiniBlogCommand() *cobra.Command {
 			return nil
 		},
 	}
+
+	// 设定运行时执行 initConfig 方法
+	cobra.OnInitialize(initConfig)
+
+	// 设置 cobra 的持久化标志：设置 config 文件路径
+	cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "The path to the miniblog configuration file. Empty string for no configuration file.")
+
+	return cmd
 }
 
 // run 函数，实际的业务代码入口
