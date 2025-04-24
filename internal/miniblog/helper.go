@@ -14,6 +14,9 @@ const (
 	// 定义放置 miniblog 服务配置的默认目录
 	recommendedHomeDir = ".miniblog"
 
+	// 定义放置 miniblog 服务配置的默认目录
+	recommendedConfigDir = "configs"
+
 	// 默认的配置文件名称
 	defaultConfigName = "miniblog.yaml"
 )
@@ -83,7 +86,7 @@ func loadConfigFromDefaultDir() {
 	viper.AddConfigPath(filepath.Join(home, recommendedHomeDir))
 
 	// 第二优先级，当前工作目录
-	viper.AddConfigPath(".")
+	viper.AddConfigPath(recommendedConfigDir)
 
 	// 设置配置文件的类型
 	viper.SetConfigType("yaml")
