@@ -5,12 +5,10 @@ services:
       dockerfile: build/docker/miniblog/Dockerfile.dev
     volumes:
       - ../../../:/app
-      # 将容器内的日志目录映射到宿主机的 ./logs 目录
-      - /tmp/logs/miniblog/miniblog.log:/app/logs/miniblog.log
+      # 将容器内的日志目录映射到宿主机的 /tmp/logs/miniblog 目录
+      - /tmp/logs/miniblog:/tmp/logs/miniblog
     ports:
       - "8080:8080"
     # 如果需要其他环境变量
     environment:
       - GO_ENV=development
-      # 设置日志输出路径
-      - MINIBLOG_LOG_OUTPUT_PATHS=stdout,/app/logs/app.log
