@@ -51,7 +51,7 @@ func NewMiniBlogCommand() *cobra.Command {
 
 // run 函数，实际的业务代码入口
 func run() error {
-	fmt.Println("Hello, World!")
+	log.Infow("miniblog serve is running...")
 
 	// 打印所有的配置项及其值
 	settings, _ := json.Marshal(viper.AllSettings())
