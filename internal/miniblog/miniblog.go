@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/yshujie/miniblog/internal/pkg/log"
 )
 
 var (
@@ -22,6 +23,10 @@ func NewMiniBlogCommand() *cobra.Command {
 		SilenceUsage: true,                                                                      // 静默命令执行错误
 		// cmd.Execute() 方法执行时，会调用 RunE 方法，执行 run() 方法
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// 初始化日志
+			log.Init(logOptions())
+			defer log.Sync() // Sync 将缓存中的日志刷新到磁盘文件中
+
 			return run()
 		},
 		// 命令运行时，不需要指定命令行参数
@@ -50,9 +55,9 @@ func run() error {
 
 	// 打印所有的配置项及其值
 	settings, _ := json.Marshal(viper.AllSettings())
-	fmt.Println(string(settings))
+	log.Infow("All settings", "settings", string(settings))
 	// 打印 db -> username 配置项的值
-	fmt.Println(viper.GetString("db.username"))
+	log.Infow("db.username", "username", viper.GetString("db.username"))
 
 	return nil
 }

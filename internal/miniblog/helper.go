@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/yshujie/miniblog/internal/pkg/log"
 )
 
 const (
@@ -93,4 +94,14 @@ func loadConfigFromDefaultDir() {
 
 	// 根据默认配置文件名称进行查找
 	viper.SetConfigName(defaultConfigName)
+}
+
+func logOptions() *log.Options {
+	return &log.Options{
+		DisableCaller:     viper.GetBool("log.disable-caller"),
+		DisableStacktrace: viper.GetBool("log.disable-stacktrace"),
+		Level:             viper.GetString("log.level"),
+		Format:            viper.GetString("log.format"),
+		OutputPaths:       viper.GetStringSlice("log.output-paths"),
+	}
 }
