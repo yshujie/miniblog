@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/yshujie/miniblog/internal/pkg/log"
+	mw "github.com/yshujie/miniblog/internal/pkg/middleware"
 )
 
 var (
@@ -60,6 +61,10 @@ func run() error {
 
 	// 创建 Gin 引擎
 	g := gin.New()
+
+	// 注册中间件
+	mws := []gin.HandlerFunc{mw.RequestID()}
+	g.Use(mws...)
 
 	// 注册 404 Handler
 	g.NoRoute(func(ctx *gin.Context) {
