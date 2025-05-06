@@ -1,9 +1,11 @@
 package miniblog
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/yshujie/miniblog/internal/pkg/log"
@@ -53,11 +55,35 @@ func NewMiniBlogCommand() *cobra.Command {
 func run() error {
 	log.Infow("miniblog serve is running...")
 
-	// 打印所有的配置项及其值
-	settings, _ := json.Marshal(viper.AllSettings())
-	log.Infow("All settings", "settings", string(settings))
-	// 打印 db -> username 配置项的值
-	log.Infow("db.username", "username", viper.GetString("db.username"))
+	// 设置 Gin 模式
+	gin.SetMode(viper.GetString("runmode"))
+
+	// 创建 Gin 引擎
+	g := gin.New()
+
+	// 注册 404 Handler
+	g.NoRoute(func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code":    10003,
+			"message": "Page not found",
+		})
+	})
+
+	// 注册 /health 路由
+	g.GET("/health", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	// 创建 HTTP Server 实例
+	httpSrv := &http.Server{Addr: viper.GetString("addr"), Handler: g}
+
+	// 打印日志
+	log.Infow("Start to listening the incoming requests on port " + viper.GetString("addr"))
+
+	// 运行 HTTP Server
+	if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Fatalw("Failed to start HTTP server", "error", err)
+	}
 
 	return nil
 }
