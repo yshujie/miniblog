@@ -76,6 +76,8 @@ func run() error {
 
 	// 注册 /health 路由
 	g.GET("/health", func(ctx *gin.Context) {
+		log.C(ctx).Infow("health check")
+
 		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
