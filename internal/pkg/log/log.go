@@ -7,6 +7,8 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/yshujie/miniblog/internal/pkg/known"
 )
 
 // 定义 Logger 接口
@@ -182,8 +184,8 @@ func C(ctx context.Context) *zapLogger {
 func (l *zapLogger) C(ctx context.Context) *zapLogger {
 	lc := l.clone()
 
-	if requestID := ctx.Value("X-Request-Id"); requestID != nil {
-		lc.z = lc.z.With(zap.Any("X-Request-Id", requestID))
+	if requestID := ctx.Value(known.XRequestIDKey); requestID != nil {
+		lc.z = lc.z.With(zap.Any(known.XRequestIDKey, requestID))
 	}
 
 	return lc
