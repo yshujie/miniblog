@@ -11,6 +11,10 @@ server:
   read_timeout: 60    # 秒
   write_timeout: 60   # 秒
 
+# 通用配置
+runmode: debug               # Gin 开发模式, 可选值有：debug, release, test
+addr: :8080                  # HTTP 服务器监听地址
+
 # 数据库配置
 database:
   driver: "mysql"
