@@ -13,6 +13,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/yshujie/miniblog/internal/pkg/core"
+	"github.com/yshujie/miniblog/internal/pkg/errno"
 	"github.com/yshujie/miniblog/internal/pkg/log"
 	mw "github.com/yshujie/miniblog/internal/pkg/middleware"
 )
@@ -73,17 +75,14 @@ func run() error {
 
 	// 注册 404 Handler
 	g.NoRoute(func(ctx *gin.Context) {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code":    10003,
-			"message": "Page not found",
-		})
+		core.WriteResponse(ctx, errno.ErrPageNotFound, nil)
 	})
 
 	// 注册 /health 路由
 	g.GET("/health", func(ctx *gin.Context) {
 		log.C(ctx).Infow("health check")
 
-		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+		core.WriteResponse(ctx, nil, map[string]string{"status": "ok"})
 	})
 
 	// 创建 HTTP Server 实例
