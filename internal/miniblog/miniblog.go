@@ -63,7 +63,7 @@ func run() error {
 	g := gin.New()
 
 	// 注册中间件
-	mws := []gin.HandlerFunc{mw.RequestID(), mw.Cors}
+	mws := []gin.HandlerFunc{gin.Recovery(), mw.NoCache, mw.Cors, mw.Secure, mw.RequestID()}
 	g.Use(mws...)
 
 	// 注册 404 Handler
