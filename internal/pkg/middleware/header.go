@@ -2,6 +2,7 @@ package middleware
 
 import "github.com/gin-gonic/gin"
 
+// Cors 跨域中间件
 func Cors(ctx *gin.Context) {
 	if ctx.Request.Method != "OPTIONS" {
 		ctx.Next()
