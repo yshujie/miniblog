@@ -1,6 +1,7 @@
 package log
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -171,4 +172,25 @@ func Fatalw(msg string, keysAndValues ...interface{}) {
 
 func (l *zapLogger) Fatalw(msg string, keysAndValues ...interface{}) {
 	l.z.Sugar().Fatalw(msg, keysAndValues...)
+}
+
+// C 解析传入的 context， 尝试提取关注的键，并添加到 zap.Logger 中
+func C(ctx context.Context) *zapLogger {
+	return std.C(ctx)
+}
+
+func (l *zapLogger) C(ctx context.Context) *zapLogger {
+	lc := l.clone()
+
+	if requestID := ctx.Value("X-Request-Id"); requestID != nil {
+		lc.z = lc.z.With(zap.Any("X-Request-Id", requestID))
+	}
+
+	return lc
+}
+
+// clone 深拷贝 zapLogger 实例
+func (l *zapLogger) clone() *zapLogger {
+	lc := *l
+	return &lc
 }
