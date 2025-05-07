@@ -18,4 +18,7 @@ var (
 
 	// ErrInvalidParameter 请求参数错误
 	ErrInvalidParameter = &Errno{HTTP: 400, Code: "ErrInvalidParameter", Message: "请求参数错误"}
+
+	// ErrInvalidToken 无效的 token
+	ErrInvalidToken = &Errno{HTTP: 401, Code: "ErrInvalidToken", Message: "无效的 token"}
 )
