@@ -21,4 +21,13 @@ var (
 
 	// ErrInvalidToken 无效的 token
 	ErrInvalidToken = &Errno{HTTP: 401, Code: "ErrInvalidToken", Message: "无效的 token"}
+
+	// ErrTokenSign 签发 token 失败
+	ErrTokenSign = &Errno{HTTP: 500, Code: "ErrTokenSign", Message: "签发 token 失败"}
+
+	// ErrPasswordIncorrect 密码错误
+	ErrPasswordIncorrect = &Errno{HTTP: 401, Code: "ErrPasswordIncorrect", Message: "密码错误"}
+
+	// ErrUserNotFound 用户不存在
+	ErrUserNotFound = &Errno{HTTP: 404, Code: "ErrUserNotFound", Message: "用户不存在"}
 )

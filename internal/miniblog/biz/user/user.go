@@ -9,6 +9,8 @@ import (
 	"github.com/yshujie/miniblog/internal/pkg/errno"
 	"github.com/yshujie/miniblog/internal/pkg/model"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
+	"github.com/yshujie/miniblog/pkg/auth"
+	"github.com/yshujie/miniblog/pkg/token"
 )
 
 // UserBiz 用户业务接口
@@ -41,4 +43,27 @@ func (b *userBiz) Create(ctx context.Context, r *v1.CreateUserRequest) error {
 	}
 
 	return nil
+}
+
+// Login 登录
+func (b *userBiz) Login(ctx context.Context, r *v1.LoginRequest) (*v1.LoginResponse, error) {
+	user, err := b.ds.Users().Get(ctx, r.Username)
+	if err != nil {
+		return nil, errno.ErrUserNotFound
+	}
+
+	// 对比密码
+	if err := auth.Compare(user.Password, r.Password); err != nil {
+		return nil, errno.ErrPasswordIncorrect
+	}
+
+	// 密码正确，则签发 token
+	token, err := token.Sign(r.Username)
+	if err != nil {
+		return nil, errno.ErrTokenSign
+	}
+
+	return &v1.LoginResponse{
+		Token: token,
+	}, nil
 }
