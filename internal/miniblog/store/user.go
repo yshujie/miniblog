@@ -9,6 +9,8 @@ import (
 
 type UserStore interface {
 	Create(ctx context.Context, user *model.UserM) error
+	Get(ctx context.Context, username string) (*model.UserM, error)
+	Update(ctx context.Context, user *model.UserM) error
 }
 
 // UserStore 接口的实现
