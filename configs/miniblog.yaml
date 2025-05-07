@@ -1,3 +1,4 @@
+
 app:
   name: "miniblog"
   version: "1.0.0"
@@ -26,6 +27,8 @@ database:
   max_idle_conns: 10
   max_open_conns: 100
   conn_max_lifetime: 3600  # 秒
+  log_level: 4 # GORM log level, 1: silent, 2:error, 3:warn, 4:info
+
 
 # redis 配置
 redis:

@@ -111,15 +111,15 @@ func logOptions() *log.Options {
 // initStore 读取 db 配置，创建 gorm.DB 实例，并初始化 miniblog store 层
 func initStore() error {
 	dbOpts := &db.MySQLOptions{
-		Host:                  viper.GetString("db.host"),
-		Port:                  viper.GetString("db.port"),
-		Username:              viper.GetString("db.username"),
-		Password:              viper.GetString("db.password"),
-		Database:              viper.GetString("db.database"),
-		MaxIdleConns:          viper.GetInt("db.max-idle-conns"),
-		MaxOpenConns:          viper.GetInt("db.max-open-conns"),
-		MaxConnectionLifeTime: viper.GetDuration("db.max-connection-life-time"),
-		LogLevel:              viper.GetInt("db.log-level"),
+		Host:                  viper.GetString("database.host"),
+		Port:                  viper.GetString("database.port"),
+		Username:              viper.GetString("database.username"),
+		Password:              viper.GetString("database.password"),
+		Database:              viper.GetString("database.dbname"),
+		MaxIdleConns:          viper.GetInt("database.max_idle_conns"),
+		MaxOpenConns:          viper.GetInt("database.max_open_conns"),
+		MaxConnectionLifeTime: viper.GetDuration("database.conn_max_lifetime"),
+		LogLevel:              viper.GetInt("database.log-level"),
 	}
 
 	db, err := db.NewMySQL(dbOpts)
