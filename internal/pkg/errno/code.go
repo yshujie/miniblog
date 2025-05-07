@@ -9,4 +9,7 @@ var (
 
 	// ErrPageNotFound 页面未找到
 	ErrPageNotFound = &Errno{HTTP: 404, Code: "PageNotFound", Message: "页面未找到"}
+
+	// ErrUserAlreadyExists 用户已存在
+	ErrUserAlreadyExists = &Errno{HTTP: 400, Code: "UserAlreadyExists", Message: "用户已存在"}
 )
