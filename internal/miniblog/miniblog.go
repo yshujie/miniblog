@@ -13,8 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/yshujie/miniblog/internal/pkg/known"
 	"github.com/yshujie/miniblog/internal/pkg/log"
 	mw "github.com/yshujie/miniblog/internal/pkg/middleware"
+	"github.com/yshujie/miniblog/pkg/token"
 )
 
 var (
@@ -65,6 +67,9 @@ func run() error {
 	if err := initStore(); err != nil {
 		return err
 	}
+
+	// 初始化 token
+	token.Init(viper.GetString("jwt.secret"), known.XUsernameKey)
 
 	// 设置 Gin 模式
 	gin.SetMode(viper.GetString("runmode"))

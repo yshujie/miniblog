@@ -52,7 +52,7 @@ log:
 
 # jwt 配置
 jwt:
-  secret: "45df45rds4"
+  secret: Rtg8BPKNEf2mB4mgvKONGPZZQSaJWNLijxR42qRgq0iBb5 # JWT 签发密钥
   expire: 86400      # token 过期时间（秒）
 
 # cors 配置
