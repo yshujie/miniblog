@@ -30,4 +30,7 @@ var (
 
 	// ErrUserNotFound 用户不存在
 	ErrUserNotFound = &Errno{HTTP: 404, Code: "ErrUserNotFound", Message: "用户不存在"}
+
+	// ErrUnauthorized 未授权
+	ErrUnauthorized = &Errno{HTTP: 401, Code: "ErrUnauthorized", Message: "未授权"}
 )
