@@ -21,7 +21,7 @@ func (ctrl *UserController) ChangePassword(c *gin.Context) {
 
 	// 验证请求参数
 	if _, err := govalidator.ValidateStruct(r); err != nil {
-		core.WriteResponse(c, errno.ErrInvalidParameter.SetMessage(err.Error()), nil)
+		core.WriteResponse(c, errno.ErrInvalidParameter.SetMessage("%s", err.Error()), nil)
 
 		return
 	}
