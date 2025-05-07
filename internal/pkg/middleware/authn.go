@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/marmotedu/component-base/pkg/core"
+	"github.com/yshujie/miniblog/internal/pkg/core"
 	"github.com/yshujie/miniblog/internal/pkg/errno"
 	"github.com/yshujie/miniblog/internal/pkg/known"
 	"github.com/yshujie/miniblog/pkg/token"
