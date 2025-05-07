@@ -8,7 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/log"
+	"github.com/yshujie/miniblog/pkg/db"
 )
 
 const (
@@ -104,4 +106,28 @@ func logOptions() *log.Options {
 		Format:            viper.GetString("log.format"),
 		OutputPaths:       viper.GetStringSlice("log.output-paths"),
 	}
+}
+
+// initStore 读取 db 配置，创建 gorm.DB 实例，并初始化 miniblog store 层
+func initStore() error {
+	dbOpts := &db.MySQLOptions{
+		Host:                  viper.GetString("db.host"),
+		Port:                  viper.GetString("db.port"),
+		Username:              viper.GetString("db.username"),
+		Password:              viper.GetString("db.password"),
+		Database:              viper.GetString("db.database"),
+		MaxIdleConns:          viper.GetInt("db.max-idle-conns"),
+		MaxOpenConns:          viper.GetInt("db.max-open-conns"),
+		MaxConnectionLifeTime: viper.GetDuration("db.max-connection-life-time"),
+		LogLevel:              viper.GetInt("db.log-level"),
+	}
+
+	db, err := db.NewMySQL(dbOpts)
+	if err != nil {
+		return err
+	}
+
+	store.NewStore(db)
+
+	return nil
 }

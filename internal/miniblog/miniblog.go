@@ -63,6 +63,11 @@ func NewMiniBlogCommand() *cobra.Command {
 func run() error {
 	log.Infow("miniblog serve is running...")
 
+	// 初始化 store
+	if err := initStore(); err != nil {
+		return err
+	}
+
 	// 设置 Gin 模式
 	gin.SetMode(viper.GetString("runmode"))
 
