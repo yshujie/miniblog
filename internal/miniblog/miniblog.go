@@ -13,8 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/yshujie/miniblog/internal/pkg/core"
-	"github.com/yshujie/miniblog/internal/pkg/errno"
 	"github.com/yshujie/miniblog/internal/pkg/log"
 	mw "github.com/yshujie/miniblog/internal/pkg/middleware"
 )
@@ -78,17 +76,10 @@ func run() error {
 	mws := []gin.HandlerFunc{gin.Recovery(), mw.NoCache, mw.Cors, mw.Secure, mw.RequestID()}
 	g.Use(mws...)
 
-	// 注册 404 Handler
-	g.NoRoute(func(ctx *gin.Context) {
-		core.WriteResponse(ctx, errno.ErrPageNotFound, nil)
-	})
-
-	// 注册 /health 路由
-	g.GET("/health", func(ctx *gin.Context) {
-		log.C(ctx).Infow("health check")
-
-		core.WriteResponse(ctx, nil, map[string]string{"status": "ok"})
-	})
+	// 安装路由
+	if err := installRouters(g); err != nil {
+		return err
+	}
 
 	// 创建 HTTP Server 实例
 	httpSrv := &http.Server{Addr: viper.GetString("addr"), Handler: g}
