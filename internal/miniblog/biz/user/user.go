@@ -67,3 +67,26 @@ func (b *userBiz) Login(ctx context.Context, r *v1.LoginRequest) (*v1.LoginRespo
 		Token: token,
 	}, nil
 }
+
+// ChangePassword 修改密码
+func (b *userBiz) ChangePassword(ctx context.Context, username string, r *v1.ChangePasswordRequest) error {
+
+	// 获取用户
+	userM, err := b.ds.Users().Get(ctx, username)
+	if err != nil {
+		return err
+	}
+
+	// 对比密码
+	if err := auth.Compare(userM.Password, r.OldPassword); err != nil {
+		return errno.ErrPasswordIncorrect
+	}
+
+	// 更新密码
+	userM.Password, _ = auth.Encrypt(r.NewPassword)
+	if err := b.ds.Users().Update(ctx, userM); err != nil {
+		return err
+	}
+
+	return nil
+}
