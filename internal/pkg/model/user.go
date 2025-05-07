@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-type User struct {
+type UserM struct {
 	ID        int64     `gorm:"column:id;primary_key"`
 	Username  string    `gorm:"column:username;not null"`
 	Password  string    `gorm:"column:password;not null"`
@@ -14,6 +14,6 @@ type User struct {
 }
 
 // TableName 指定表名
-func (u *User) TableName() string {
+func (u *UserM) TableName() string {
 	return "user"
 }
