@@ -1,4 +1,6 @@
 
+
+
 app:
   name: "miniblog"
   version: "1.0.0"
@@ -19,11 +21,11 @@ addr: :8080                  # HTTP 服务器监听地址
 # 数据库配置
 database:
   driver: "mysql"
-  host: "47.94.204.124"       # 使用 docker-compose 中的服务名
-  port: 13306
-  username: "www"
-  password: "Hm6EB6Q!y2xT5T"
-  dbname: "blog_db"
+  host: "47.94.204.124"
+  port: 3285
+  username: "miniblog"
+  password: "miniblog1234"
+  dbname: "miniblog"
   max_idle_conns: 10
   max_open_conns: 100
   conn_max_lifetime: 3600  # 秒
