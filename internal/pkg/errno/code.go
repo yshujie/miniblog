@@ -12,4 +12,10 @@ var (
 
 	// ErrUserAlreadyExists 用户已存在
 	ErrUserAlreadyExists = &Errno{HTTP: 400, Code: "UserAlreadyExists", Message: "用户已存在"}
+
+	// ErrBind 请求参数错误
+	ErrBind = &Errno{HTTP: 400, Code: "ErrBind", Message: "请求参数错误"}
+
+	// ErrInvalidParameter 请求参数错误
+	ErrInvalidParameter = &Errno{HTTP: 400, Code: "ErrInvalidParameter", Message: "请求参数错误"}
 )
