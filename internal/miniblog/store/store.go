@@ -14,6 +14,7 @@ var (
 
 // IStore 数据库操作接口
 type IStore interface {
+	DB() *gorm.DB
 	Users() UserStore
 }
 
@@ -30,6 +31,11 @@ func NewStore(db *gorm.DB) *datastore {
 		S = &datastore{db}
 	})
 	return S
+}
+
+// DB 返回一个实现了 UserStore 接口的实例
+func (s *datastore) DB() *gorm.DB {
+	return s.db
 }
 
 // User 返回一个实现了 UserStore 接口的实例

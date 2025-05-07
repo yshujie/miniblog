@@ -8,6 +8,7 @@ import (
 	"github.com/yshujie/miniblog/internal/pkg/errno"
 	"github.com/yshujie/miniblog/internal/pkg/log"
 	mw "github.com/yshujie/miniblog/internal/pkg/middleware"
+	"github.com/yshujie/miniblog/pkg/auth"
 )
 
 // installRouters 安装 miniblog 的路由
@@ -24,6 +25,13 @@ func installRouters(g *gin.Engine) error {
 		core.WriteResponse(ctx, nil, map[string]string{"status": "ok"})
 	})
 
+	// 创建 authz
+	authz, err := auth.NewAuthz(store.S.DB())
+	if err != nil {
+		return err
+	}
+
+	// 创建 user controller
 	uc := user.New(store.S)
 
 	// 登录
@@ -37,7 +45,7 @@ func installRouters(g *gin.Engine) error {
 		{
 			userv1.POST("", uc.Create)
 			userv1.PUT(":name/change-password", uc.ChangePassword)
-			userv1.Use(mw.Authn())
+			userv1.Use(mw.Authn(), mw.Authz(authz))
 		}
 
 	}
