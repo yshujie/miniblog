@@ -119,7 +119,7 @@ func initStore() error {
 		MaxIdleConns:          viper.GetInt("database.max_idle_conns"),
 		MaxOpenConns:          viper.GetInt("database.max_open_conns"),
 		MaxConnectionLifeTime: viper.GetDuration("database.conn_max_lifetime"),
-		LogLevel:              viper.GetInt("database.log-level"),
+		LogLevel:              viper.GetInt("database.log_level"),
 	}
 
 	db, err := db.NewMySQL(dbOpts)
