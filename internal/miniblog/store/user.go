@@ -8,7 +8,7 @@ import (
 )
 
 type UserStore interface {
-	Create(ctx context.Context, user *model.User) error
+	Create(ctx context.Context, user *model.UserM) error
 }
 
 // UserStore 接口的实现
@@ -23,6 +23,6 @@ func newUsers(db *gorm.DB) *users {
 }
 
 // Create 创建用户
-func (u *users) Create(ctx context.Context, user *model.User) error {
+func (u *users) Create(ctx context.Context, user *model.UserM) error {
 	return u.db.Create(user).Error
 }
