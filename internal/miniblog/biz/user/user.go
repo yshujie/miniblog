@@ -16,6 +16,8 @@ import (
 // UserBiz 用户业务接口
 type UserBiz interface {
 	Create(ctx context.Context, r *v1.CreateUserRequest) error
+	Login(ctx context.Context, r *v1.LoginRequest) (*v1.LoginResponse, error)
+	ChangePassword(ctx context.Context, username string, r *v1.ChangePasswordRequest) error
 }
 
 // userBiz 用户业务实现
