@@ -87,18 +87,8 @@ func run() error {
 		return err
 	}
 
-	// 创建 HTTP Server 实例
-	httpSrv := &http.Server{Addr: viper.GetString("addr"), Handler: g}
-
-	// 打印日志
-	log.Infow("Start to listening the incoming requests on port " + viper.GetString("addr"))
-
-	// 运行 HTTP Server
-	go func() {
-		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalw(err.Error())
-		}
-	}()
+	// 启动 HTTP 服务器
+	httpSrv := startInsecureServer(g)
 
 	// 等待中断信号优雅地关闭服务器（10 秒超时)。
 	quit := make(chan os.Signal, 1)
@@ -122,4 +112,22 @@ func run() error {
 	log.Infow("Server exiting")
 
 	return nil
+}
+
+// startInsecureServer 启动 HTTP 服务器
+func startInsecureServer(g *gin.Engine) *http.Server {
+	// 创建 HTTP Server 实例
+	httpSrv := &http.Server{Addr: viper.GetString("addr"), Handler: g}
+
+	// 打印日志
+	log.Infow("Start to listening the incoming requests on port " + viper.GetString("addr"))
+
+	// 运行 HTTP Server
+	go func() {
+		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalw(err.Error())
+		}
+	}()
+
+	return httpSrv
 }
