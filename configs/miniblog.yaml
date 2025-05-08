@@ -68,3 +68,9 @@ cors:
   allowed_headers:
     - "Content-Type"
     - "Authorization"
+
+# HTTPS 服务器相关配置
+tls:
+  addr: :8443 # HTTPS 服务器监听地址
+  cert: ./_output/cert/server.crt # 服务端证书文件
+  key: ./_output/cert/server.key # 服务端私钥文件
