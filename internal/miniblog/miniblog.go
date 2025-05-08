@@ -90,6 +90,9 @@ func run() error {
 	// 启动 HTTP 服务器
 	httpSrv := startInsecureServer(g)
 
+	// 启动 HTTPS 服务器
+	httpsSrv := startSecureServer(g)
+
 	// 等待中断信号优雅地关闭服务器（10 秒超时)。
 	quit := make(chan os.Signal, 1)
 	// kill 默认会发送 syscall.SIGTERM 信号
@@ -106,6 +109,10 @@ func run() error {
 	// 10 秒内优雅关闭服务（将未处理完的请求处理完再关闭服务），超过 10 秒就超时退出
 	if err := httpSrv.Shutdown(ctx); err != nil {
 		log.Errorw("Insecure Server forced to shutdown", "err", err)
+		return err
+	}
+	if err := httpsSrv.Shutdown(ctx); err != nil {
+		log.Errorw("Secure Server forced to shutdown", "err", err)
 		return err
 	}
 
@@ -130,4 +137,33 @@ func startInsecureServer(g *gin.Engine) *http.Server {
 	}()
 
 	return httpSrv
+}
+
+func startSecureServer(g *gin.Engine) *http.Server {
+
+	// 创建 HTTPS Server 实例
+	httpsSrv := &http.Server{
+		Addr:    viper.GetString("tls.addr"),
+		Handler: g,
+	}
+
+	// 打印日志
+	log.Infow("Start to listening the incoming requests on port " + viper.GetString("tls.addr"))
+
+	// 检查证书和密钥文件是否存在
+	if _, err := os.Stat(viper.GetString("tls.cert")); os.IsNotExist(err) {
+		log.Fatalw("TLS certificate file does not exist", "file", viper.GetString("tls.cert"))
+	}
+	if _, err := os.Stat(viper.GetString("tls.key")); os.IsNotExist(err) {
+		log.Fatalw("TLS key file does not exist", "file", viper.GetString("tls.key"))
+	}
+
+	// 运行 HTTPS Server
+	go func() {
+		if err := httpsSrv.ListenAndServeTLS(viper.GetString("tls.cert"), viper.GetString("tls.key")); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalw(err.Error())
+		}
+	}()
+
+	return httpsSrv
 }
