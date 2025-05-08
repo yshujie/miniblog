@@ -13,8 +13,9 @@ type UserController struct {
 }
 
 // New 简单工厂函数，创建 UserController 实例
-func New(ds store.IStore) *UserController {
+func New(ds store.IStore, a *auth.Authz) *UserController {
 	return &UserController{
+		a: a,
 		b: biz.NewBiz(ds),
 	}
 }

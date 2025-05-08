@@ -7,6 +7,7 @@ import (
 	"github.com/jinzhu/copier"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/errno"
+	"github.com/yshujie/miniblog/internal/pkg/log"
 	"github.com/yshujie/miniblog/internal/pkg/model"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
 	"github.com/yshujie/miniblog/pkg/auth"
@@ -37,14 +38,18 @@ func (b *userBiz) Create(ctx context.Context, r *v1.CreateUserRequest) error {
 	var userM model.UserM
 	_ = copier.Copy(&userM, r)
 
+	log.C(ctx).Infow("start to create user in biz layer", "username", r.Username)
+
 	if err := b.ds.Users().Create(ctx, &userM); err != nil {
 		if match, _ := regexp.MatchString("Duplicate entry '.*' for key 'username'", err.Error()); match {
 			return errno.ErrUserAlreadyExists
 		}
 
+		log.C(ctx).Errorw("create user failed in biz layer", "error", err, "username", r.Username)
 		return err
 	}
 
+	log.C(ctx).Infow("create user success in biz layer", "username", r.Username)
 	return nil
 }
 

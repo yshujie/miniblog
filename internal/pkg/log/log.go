@@ -76,6 +76,11 @@ func NewLogger(opts *Options) *zapLogger {
 		enc.AppendFloat64(float64(d) / float64(time.Millisecond))
 	}
 
+	// 自定义日志级别序列化函数
+	encoderConfig.EncodeLevel = func(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString(l.String())
+	}
+
 	// 构建 zap.Logger 需要的配置
 	cfg := zap.Config{
 		// 是否在日志中显示调用日志所在的文件和行号，例如：`"caller":"miniblog/miniblog.go:75"`
@@ -193,6 +198,9 @@ func (l *zapLogger) C(ctx context.Context) *zapLogger {
 	if userID := ctx.Value(known.XUsernameKey); userID != nil {
 		lc.z = lc.z.With(zap.Any(known.XUsernameKey, userID))
 	}
+
+	// 保持原始的 logger 实例
+	lc.z = lc.z.With(zap.String("logger", "miniblog"))
 
 	return lc
 }

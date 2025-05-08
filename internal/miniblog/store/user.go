@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 
+	"github.com/yshujie/miniblog/internal/pkg/log"
 	"github.com/yshujie/miniblog/internal/pkg/model"
 	"gorm.io/gorm"
 )
@@ -26,7 +27,16 @@ func newUsers(db *gorm.DB) *users {
 
 // Create 创建用户
 func (u *users) Create(ctx context.Context, user *model.UserM) error {
-	return u.db.Create(user).Error
+	log.C(ctx).Infow("start to create user in store layer", "username", user.Username)
+
+	err := u.db.Create(&user).Error
+	if err != nil {
+		log.C(ctx).Errorw("create user failed in store layer", "error", err, "username", user.Username)
+		return err
+	}
+
+	log.C(ctx).Infow("create user success in store layer", "username", user.Username)
+	return nil
 }
 
 // GetUser 获取用户

@@ -32,7 +32,7 @@ func installRouters(g *gin.Engine) error {
 	}
 
 	// 创建 user controller
-	uc := user.New(store.S)
+	uc := user.New(store.S, authz)
 
 	// 登录
 	g.POST("/login", uc.Login)

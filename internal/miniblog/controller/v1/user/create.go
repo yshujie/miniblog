@@ -32,17 +32,23 @@ func (ctrl *UserController) Create(c *gin.Context) {
 
 	// 调用 Biz 层，创建用户
 	if err := ctrl.b.Users().Create(c, &r); err != nil {
+		log.C(c).Errorw("create user failed", "error", err, "username", r.Username)
 		core.WriteResponse(c, err, nil)
 		return
 	}
+
+	log.C(c).Infow("create user success", "username", r.Username)
+	log.C(c).Infow("start to add named policy", "username", r.Username)
 
 	// 创建用户后，新增用户授权策略
 	if _, err := ctrl.a.AddNamedPolicy("p", r.Username, "/v1/users/"+r.Username, defaultMethods); err != nil {
-		log.C(c).Errorw("add named policy failed: %s", err)
+		log.C(c).Errorw("add named policy failed", "error", err, "username", r.Username)
 		core.WriteResponse(c, err, nil)
 		return
 	}
 
+	log.C(c).Infow("add named policy success", "username", r.Username)
+
 	// 返回成功响应
-	core.WriteResponse(c, nil, nil)
+	core.WriteResponse(c, nil, r)
 }
