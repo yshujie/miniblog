@@ -35,6 +35,7 @@ func NewMiniBlogCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// 初始化日志
 			log.Init(logOptions())
+			log.Infow("log system initialized successfully")
 			defer log.Sync() // Sync 将缓存中的日志刷新到磁盘文件中
 
 			return run()

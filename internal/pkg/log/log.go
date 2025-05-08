@@ -2,6 +2,7 @@ package log
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -138,10 +139,12 @@ func (l *zapLogger) Debugw(msg string, keysAndValues ...interface{}) {
 
 // Infow 记录 info 级别的日志
 func Infow(msg string, keysAndValues ...interface{}) {
+	fmt.Printf("Logging info message: %s with values: %v\n", msg, keysAndValues)
 	std.z.Sugar().Infow(msg, keysAndValues...)
 }
 
 func (l *zapLogger) Infow(msg string, keysAndValues ...interface{}) {
+	fmt.Printf("Logging info message with logger: %s with values: %v\n", msg, keysAndValues)
 	l.z.Sugar().Infow(msg, keysAndValues...)
 }
 
@@ -183,10 +186,12 @@ func (l *zapLogger) Fatalw(msg string, keysAndValues ...interface{}) {
 
 // C 解析传入的 context， 尝试提取关注的键，并添加到 zap.Logger 中
 func C(ctx context.Context) *zapLogger {
+	fmt.Printf("Creating logger from context: %v\n", ctx)
 	return std.C(ctx)
 }
 
 func (l *zapLogger) C(ctx context.Context) *zapLogger {
+	fmt.Printf("Creating logger from context with logger: %v\n", ctx)
 	lc := l.clone()
 
 	// 添加请求ID

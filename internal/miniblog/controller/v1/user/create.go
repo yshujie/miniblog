@@ -1,6 +1,8 @@
 package user
 
 import (
+	"fmt"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 	"github.com/yshujie/miniblog/internal/pkg/core"
@@ -20,19 +22,21 @@ func (ctrl *UserController) Create(c *gin.Context) {
 
 	// 将请求体中的参数解析到 CreateUserRequest 实例中
 	if err := c.ShouldBindJSON(&r); err != nil {
+		log.C(c).Errorw("failed to bind request", "error", err)
 		core.WriteResponse(c, errno.ErrBind, nil)
 		return
 	}
 
 	// 验证请求参数
 	if _, err := govalidator.ValidateStruct(r); err != nil {
+		log.C(c).Errorw("invalid request parameters", "error", err)
 		core.WriteResponse(c, errno.ErrInvalidParameter.SetMessage("%s", err.Error()), nil)
 		return
 	}
 
 	// 调用 Biz 层，创建用户
 	if err := ctrl.b.Users().Create(c, &r); err != nil {
-		log.C(c).Errorw("create user failed", "error", err, "username", r.Username)
+		log.C(c).Errorw("create user failed", "error", err, "username", r.Username, "error_type", fmt.Sprintf("%T", err))
 		core.WriteResponse(c, err, nil)
 		return
 	}

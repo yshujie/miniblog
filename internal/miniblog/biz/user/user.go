@@ -42,6 +42,7 @@ func (b *userBiz) Create(ctx context.Context, r *v1.CreateUserRequest) error {
 
 	if err := b.ds.Users().Create(ctx, &userM); err != nil {
 		if match, _ := regexp.MatchString("Duplicate entry '.*' for key 'username'", err.Error()); match {
+			log.C(ctx).Warnw("user already exists", "username", r.Username, "error", err)
 			return errno.ErrUserAlreadyExists
 		}
 
