@@ -2,7 +2,8 @@ package miniblog
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/yshujie/miniblog/internal/miniblog/controller/v1/user"
+	authCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/auth"
+	userCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/user"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/core"
 	"github.com/yshujie/miniblog/internal/pkg/errno"
@@ -31,15 +32,19 @@ func installRouters(g *gin.Engine) error {
 		return err
 	}
 
-	// 创建 user controller
-	uc := user.New(store.S, authz)
-
-	// 登录
-	g.POST("/login", uc.Login)
+	// 创建 controllers
+	ac := authCtrl.New(store.S)
+	uc := userCtrl.New(store.S, authz)
 
 	// 创建 v1 路由组
 	v1 := g.Group("/v1")
 	{
+		// 创建 auth 路由分组
+		authv1 := v1.Group("/auth")
+		{
+			authv1.POST("/login", ac.Login)
+		}
+
 		// 创建 users 路由分组
 		userv1 := v1.Group("/users")
 		{

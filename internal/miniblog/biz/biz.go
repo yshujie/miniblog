@@ -1,6 +1,7 @@
 package biz
 
 import (
+	"github.com/yshujie/miniblog/internal/miniblog/biz/auth"
 	"github.com/yshujie/miniblog/internal/miniblog/biz/user"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 )
@@ -8,6 +9,7 @@ import (
 // IBiz 业务接口，定义了 Biz 层需要实现的方法
 type IBiz interface {
 	Users() user.UserBiz
+	Auth() auth.IAuthBiz
 }
 
 // biz 业务实现
@@ -26,4 +28,9 @@ func NewBiz(ds store.IStore) *biz {
 // Users 返回用户业务实例
 func (b *biz) Users() user.UserBiz {
 	return user.New(b.ds)
+}
+
+// Auth 返回认证业务实例
+func (b *biz) Auth() auth.IAuthBiz {
+	return auth.NewAuthBiz(b.ds)
 }

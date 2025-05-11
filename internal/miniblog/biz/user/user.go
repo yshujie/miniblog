@@ -11,13 +11,11 @@ import (
 	"github.com/yshujie/miniblog/internal/pkg/log"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
 	"github.com/yshujie/miniblog/pkg/auth"
-	"github.com/yshujie/miniblog/pkg/token"
 )
 
 // UserBiz 用户业务接口
 type UserBiz interface {
 	Create(ctx context.Context, r *v1.CreateUserRequest) error
-	Login(ctx context.Context, r *v1.LoginRequest) (*v1.LoginResponse, error)
 	ChangePassword(ctx context.Context, username string, r *v1.ChangePasswordRequest) error
 	Get(ctx context.Context, username string) (*v1.GetUserResponse, error)
 }
@@ -30,10 +28,12 @@ type userBiz struct {
 // 确保 userBiz 实现了 UserBiz 接口
 var _ UserBiz = (*userBiz)(nil)
 
+// New 简单工程函数，创建 userBiz 实例
 func New(ds store.IStore) *userBiz {
 	return &userBiz{ds}
 }
 
+// Create 创建用户
 func (b *userBiz) Create(ctx context.Context, r *v1.CreateUserRequest) error {
 	var userM model.UserM
 	_ = copier.Copy(&userM, r)
@@ -52,29 +52,6 @@ func (b *userBiz) Create(ctx context.Context, r *v1.CreateUserRequest) error {
 
 	log.C(ctx).Infow("create user success in biz layer", "username", r.Username)
 	return nil
-}
-
-// Login 登录
-func (b *userBiz) Login(ctx context.Context, r *v1.LoginRequest) (*v1.LoginResponse, error) {
-	user, err := b.ds.Users().Get(ctx, r.Username)
-	if err != nil {
-		return nil, errno.ErrUserNotFound
-	}
-
-	// 对比密码
-	if err := auth.Compare(user.Password, r.Password); err != nil {
-		return nil, errno.ErrPasswordIncorrect
-	}
-
-	// 密码正确，则签发 token
-	token, err := token.Sign(r.Username)
-	if err != nil {
-		return nil, errno.ErrTokenSign
-	}
-
-	return &v1.LoginResponse{
-		Token: token,
-	}, nil
 }
 
 // ChangePassword 修改密码
