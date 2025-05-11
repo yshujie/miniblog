@@ -8,8 +8,8 @@ import (
 
 // IBiz 业务接口，定义了 Biz 层需要实现的方法
 type IBiz interface {
-	Users() user.UserBiz
-	Auth() auth.IAuthBiz
+	UserBiz() user.IUserBiz
+	AuthBiz() auth.IAuthBiz
 }
 
 // biz 业务实现
@@ -26,11 +26,11 @@ func NewBiz(ds store.IStore) *biz {
 }
 
 // Users 返回用户业务实例
-func (b *biz) Users() user.UserBiz {
+func (b *biz) UserBiz() user.IUserBiz {
 	return user.New(b.ds)
 }
 
-// Auth 返回认证业务实例
-func (b *biz) Auth() auth.IAuthBiz {
+// AuthBiz 返回认证业务实例
+func (b *biz) AuthBiz() auth.IAuthBiz {
 	return auth.NewAuthBiz(b.ds)
 }

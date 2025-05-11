@@ -14,7 +14,7 @@ import (
 )
 
 // UserBiz 用户业务接口
-type UserBiz interface {
+type IUserBiz interface {
 	Create(ctx context.Context, r *v1.CreateUserRequest) error
 	ChangePassword(ctx context.Context, username string, r *v1.ChangePasswordRequest) error
 	Get(ctx context.Context, username string) (*v1.GetUserResponse, error)
@@ -26,7 +26,7 @@ type userBiz struct {
 }
 
 // 确保 userBiz 实现了 UserBiz 接口
-var _ UserBiz = (*userBiz)(nil)
+var _ IUserBiz = (*userBiz)(nil)
 
 // New 简单工程函数，创建 userBiz 实例
 func New(ds store.IStore) *userBiz {

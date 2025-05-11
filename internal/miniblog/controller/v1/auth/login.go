@@ -26,7 +26,7 @@ func (ctrl *authController) Login(ctx *gin.Context) {
 	}
 
 	// 调用业务层登录
-	resp, err := ctrl.b.Auth().Login(ctx, &req)
+	resp, err := ctrl.b.AuthBiz().Login(ctx, &req)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return

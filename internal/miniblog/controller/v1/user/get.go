@@ -9,7 +9,7 @@ import (
 func (ctrl *UserController) Get(c *gin.Context) {
 	log.C(c).Infow("Get user function called")
 
-	user, err := ctrl.b.Users().Get(c, c.Param("name"))
+	user, err := ctrl.b.UserBiz().Get(c, c.Param("name"))
 	if err != nil {
 		core.WriteResponse(c, err, nil)
 		return

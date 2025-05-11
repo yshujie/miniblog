@@ -27,7 +27,7 @@ func (ctrl *UserController) ChangePassword(c *gin.Context) {
 	}
 
 	// 调用业务层修改密码
-	if err := ctrl.b.Users().ChangePassword(c, c.Param("name"), &r); err != nil {
+	if err := ctrl.b.UserBiz().ChangePassword(c, c.Param("name"), &r); err != nil {
 		core.WriteResponse(c, err, nil)
 
 		return

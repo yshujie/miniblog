@@ -35,7 +35,7 @@ func (ctrl *UserController) Create(c *gin.Context) {
 	}
 
 	// 调用 Biz 层，创建用户
-	if err := ctrl.b.Users().Create(c, &r); err != nil {
+	if err := ctrl.b.UserBiz().Create(c, &r); err != nil {
 		log.C(c).Errorw("create user failed", "error", err, "username", r.Username, "error_type", fmt.Sprintf("%T", err))
 		core.WriteResponse(c, err, nil)
 		return
