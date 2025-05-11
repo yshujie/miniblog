@@ -6,6 +6,11 @@ pipeline {
   }
 
   stages {
+    stage('Clean workspace') {
+      steps {
+        deleteDir()
+      }
+    }
 
     stage('Init') {
       steps {
