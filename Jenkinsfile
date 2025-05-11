@@ -6,22 +6,39 @@ pipeline {
   }
 
   stages {
-    stage('Clone') {
+
+    stage('Init') {
       steps {
-        git url: 'https://github.com/yshujie/miniblog.git',
-        branch: 'main',
-        credentialsId: 'github-token'
+        echo "✔️ Jenkins 自动完成代码 Checkout，无需手动 Clone"
+        sh 'ls -lah'
       }
     }
 
-    stage('Compose Up') {
+    stage('Compose Down') {
       steps {
         dir("${COMPOSE_PATH}") {
-          sh 'docker-compose down'
+          sh 'docker-compose down || true'
+        }
+      }
+    }
+
+    stage('Compose Build & Up') {
+      steps {
+        dir("${COMPOSE_PATH}") {
           sh 'docker-compose build'
           sh 'docker-compose up -d'
         }
       }
+    }
+
+  }
+
+  post {
+    success {
+      echo '✅ 构建和部署成功'
+    }
+    failure {
+      echo '❌ 构建或部署失败，请查看日志'
     }
   }
 }
