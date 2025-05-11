@@ -8,7 +8,9 @@ pipeline {
   stages {
     stage('Clone') {
       steps {
-        git credentialsId: 'github-token', url: 'https://github.com/yshujie/miniblog.git'
+        git url: 'https://github.com/yshujie/miniblog.git',
+        branch: 'main',
+        credentialsId: 'github-token'
       }
     }
 
