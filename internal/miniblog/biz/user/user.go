@@ -5,10 +5,10 @@ import (
 	"regexp"
 
 	"github.com/jinzhu/copier"
+	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/errno"
 	"github.com/yshujie/miniblog/internal/pkg/log"
-	"github.com/yshujie/miniblog/internal/pkg/model"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
 	"github.com/yshujie/miniblog/pkg/auth"
 	"github.com/yshujie/miniblog/pkg/token"

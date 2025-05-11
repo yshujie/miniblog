@@ -3,8 +3,8 @@ package store
 import (
 	"context"
 
+	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/pkg/log"
-	"github.com/yshujie/miniblog/internal/pkg/model"
 	"gorm.io/gorm"
 )
 
