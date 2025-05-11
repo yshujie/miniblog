@@ -1,49 +1,53 @@
+# syntax=docker/dockerfile:1
+
 # ---------- Builder Stage ----------
 FROM golang:1.24-alpine AS builder
+
+# 支持构建时通过代理拉取依赖
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTPS_PROXY}
+
+# 使用国内 Go proxy，加速模块下载
+ENV GOPROXY=https://goproxy.cn,direct
 
 # 安装构建依赖
 RUN apk add --no-cache git ca-certificates
 
 WORKDIR /app
 
-# 复制 go.mod/ go.sum 并下载依赖
+# 复制 go.mod/go.sum 并下载依赖
 COPY go.mod go.sum ./
 RUN go mod download
 
-# 复制所有源代码
+# 复制全量源码
 COPY . .
 
-# 切换到你的 main 包目录
+# 切换到主程序目录，静态编译
 WORKDIR /app/cmd/miniblog
-
-# 设置为静态编译
-ENV CGO_ENABLED=0 \
-  GOOS=linux \
-  GOARCH=amd64
-
-# 编译二进制
+ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 RUN go build -o miniblog .
 
-
-
 # ---------- Production Stage ----------
-FROM scratch
+FROM alpine:latest
 
-# 从 builder 阶段拷贝可执行文件
+# 设置时区并安装证书
+ENV TZ=Asia/Shanghai
+RUN apk add --no-cache ca-certificates tzdata \
+  && cp /usr/share/zoneinfo/$TZ /etc/localtime \
+  && echo $TZ > /etc/timezone
+
+WORKDIR /app
+
+# 拷贝编译后的可执行文件
 COPY --from=builder /app/cmd/miniblog/miniblog /usr/local/bin/miniblog
+# 拷贝配置文件
+COPY --from=builder /app/configs/miniblog.yaml /etc/miniblog/config.yaml
+# （如有静态资源或模板，可按需拷贝）
 
-# 拷贝默认配置文件（可根据需要修改路径）
-COPY configs/miniblog.yaml /etc/miniblog/config.yaml
-
-# 如果需要证书（比如https），可以从 builder 带过来：
-# COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-
-# 运行所需用户（scratch 无用户，这里直接用 root）
-USER root
-
-# 暴露后端监听端口（默认 8081，可根据 miniblog 启动参数修改）
+# 暴露端口
 EXPOSE 8081
 
-# 默认执行命令，并指定配置文件位置
-ENTRYPOINT ["/usr/local/bin/miniblog", \
-  "--config", "/etc/miniblog/config.yaml"]
+# 默认执行命令
+ENTRYPOINT ["/usr/local/bin/miniblog", "--config", "/etc/miniblog/config.yaml"]
