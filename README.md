@@ -18,6 +18,10 @@
 │       └── openapi.yaml # OpenAPI 3.0 API 接口文档
 ├── build # 构建文件存放目录
 │   └──  docker # docker 构建文件存放目录
+│     └──  miniblog # miniblog 构建文件存放目录
+│         ├── docker-compose.yml # docker-compose 构建文件
+│         ├── Dockerfile.dev # 测试环境 Dockerfile 构建文件
+│         └── Dockerfile.prod # 生产环境 Dockerfile 构建文件
 ├── cmd # main 文件存放目录
 │   └── miniblog
 │       └── main.go
@@ -62,8 +66,20 @@
 │   └── version # version 包，用来保存 / 输出版本信息
 ├── scripts # 脚本文件
 ├── third_party # 第三方 Go 包存放目录
+├── web # 前端项目存放目录
+│   ├── miniblog-web # miniblog-web 前端项目存放目录
+│   │   ├── dist # 构建产物存放目录
+│   │   ├── public # 静态文件存放目录
+│   │   ├── src # 源码文件存放目录
+│   │   └── .env # 环境变量文件
+│   └── miniblog-web-admin # miniblog-web-admin 前端项目存放目录
+│       ├── dist # 构建产物存放目录
+│       ├── public # 静态文件存放目录
+│       ├── src # 源码文件存放目录
+│       └── .env # 环境变量文件
 ├── Makefile # Makefile 文件，一般大型软件系统都是采用 make 来作为编译工具
 ├── go.mod
 ├── go.sum
+├── go.work
 └── README.md # 中文 README
 ```
