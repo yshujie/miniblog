@@ -33,18 +33,23 @@ services:
       retries: 5
     restart: always
 
-  # redis:
-  #   network_mode: "host"  # 使用主机网络
-  #   image: redis:alpine
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis-data:/data
-  #   restart: always
+  redis:
+    network_mode: "host"  # 使用主机网络
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
 
 volumes:
   mysql_data:
-  # redis-data:
+  redis_data:
 
 networks:
   miniblog-network:
