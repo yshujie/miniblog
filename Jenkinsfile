@@ -54,13 +54,15 @@ pipeline {
         dir("${BASE_DIR}") {
           // 构建后端镜像（本地）
           sh """
-            docker build \
-              --network host \
-              --add-host host.docker.internal:host-gateway \
-              --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
-              --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
-              -f Dockerfile.prod.backend \
-              ../../..
+               docker build \
+                --network host \
+                --add-host=host.docker.internal:host-gateway \
+                --build-arg GOPROXY=https://goproxy.cn,direct \
+                --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
+                --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
+                --build-arg GO111MODULE=on \
+                -f Dockerfile.prod.backend \
+                ../../..
           """
         }
       }

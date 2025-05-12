@@ -8,6 +8,7 @@ services:
         - GOPROXY=https://goproxy.cn,direct
         - HTTP_PROXY=http://host.docker.internal:7890
         - HTTPS_PROXY=http://host.docker.internal:7890
+        - GO111MODULE=on
     extra_hosts:
       - "host.docker.internal:host-gateway"
     network_mode: "host"
