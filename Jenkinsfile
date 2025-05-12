@@ -65,7 +65,7 @@ pipeline {
                 --build-arg GOPROXY=https://goproxy.cn,direct \
                 --build-arg HTTP_PROXY=${HTTP_PROXY} \
                 --build-arg HTTPS_PROXY=${HTTPS_PROXY} \
-                -f Dockerfile.frontend \
+                -f Dockerfile.prod.frontend \
                 -t ${FRONTEND_IMAGE_TAG} \
                 ../../../web/miniblog-web
               """
