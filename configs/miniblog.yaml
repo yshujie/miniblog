@@ -67,5 +67,5 @@ cors:
 # HTTPS 服务器相关配置
 tls:
   addr: :8443 # HTTPS 服务器监听地址
-  cert: configs/nginx/ssl/yangshujie.com.crt # 服务端证书文件
-  key: configs/nginx/ssl/yangshujie.com.key # 服务端私钥文件
+  cert: /etc/miniblog/ssl/yangshujie.com.crt # 服务端证书文件
+  key: /etc/miniblog/ssl/yangshujie.com.key # 服务端私钥文件
