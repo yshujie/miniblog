@@ -10,9 +10,6 @@ pipeline {
     IMAGE_REGISTRY     = 'yshujie'
     BACKEND_IMAGE_TAG  = "${IMAGE_REGISTRY}/miniblog:prod"
     FRONTEND_IMAGE_TAG = "${IMAGE_REGISTRY}/miniblog-frontend:prod"
-
-    HTTP_PROXY = 'http://127.0.0.1:7890'
-    HTTPS_PROXY = 'http://127.0.0.1:7890'
   }
 
   stages {
@@ -59,9 +56,8 @@ pipeline {
           sh """
             docker build \
               --network host \
-              --build-arg GOPROXY=https://goproxy.cn,direct \
-              --build-arg HTTP_PROXY=${HTTP_PROXY} \
-              --build-arg HTTPS_PROXY=${HTTPS_PROXY} \
+              --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
+              --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
               -f Dockerfile.prod.backend \
               ../../..
           """
@@ -76,9 +72,8 @@ pipeline {
           sh """
               docker build \
                 --network host \
-                --build-arg GOPROXY=https://goproxy.cn,direct \
-                --build-arg HTTP_PROXY=${HTTP_PROXY} \
-                --build-arg HTTPS_PROXY=${HTTPS_PROXY} \
+                --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
+                --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
                 -f Dockerfile.prod.frontend \
                 -t ${FRONTEND_IMAGE_TAG} \
                 ../../../web/miniblog-web
