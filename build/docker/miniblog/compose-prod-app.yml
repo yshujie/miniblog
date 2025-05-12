@@ -6,12 +6,12 @@ services:
       - "host.docker.internal:host-gateway"
     network_mode: "host"
     environment:
-      - DB_HOST=localhost
+      - DB_HOST=127.0.0.1
       - DB_PORT=3306
       - DB_USER=miniblog
       - DB_PASSWORD=miniblog123
       - DB_NAME=miniblog
-      - REDIS_HOST=localhost
+      - REDIS_HOST=127.0.0.1
       - REDIS_PORT=6379
     restart: always
     ports:
