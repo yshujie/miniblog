@@ -20,7 +20,7 @@ services:
   backend:
     build:
       context: ../../..
-      dockerfile: build/docker/miniblog/Dockerfile.prod
+      dockerfile: build/docker/miniblog/Dockerfile.backend
     ports:
       - "8081:8081"
     depends_on:
@@ -29,8 +29,8 @@ services:
 
   frontend:
     build:
-      context: ../../.. # 项目根
-      dockerfile: build/docker/miniblog/Dockerfile.frontend
+      context: ../../../web/miniblog-web # 只打包前端代码
+      dockerfile: build/docker/miniblog/Dockerfile.frontend # 指定打包用的 Dockerfile
     depends_on:
       - backend
 
