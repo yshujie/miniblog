@@ -4,16 +4,13 @@ FROM golang:1.21-alpine
 # 安装必要的工具
 RUN apk add --no-cache git make
 
-# 设置工作目录
-WORKDIR /app
-
 # 设置 Go 环境变量
 ENV GO111MODULE=on \
   GOPROXY=https://goproxy.cn,direct \
   CGO_ENABLED=0
 
 # 安装 air
-RUN go install github.com/cosmtrek/air@latest
+RUN go install github.com/cosmtrek/air@v1.49.0
 
 # 复制 go.mod 和 go.sum
 COPY go.mod go.sum ./
