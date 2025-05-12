@@ -34,7 +34,7 @@ services:
   #     - redis-data:/data
   #   restart: always
 
-volumes:
+# volumes:
   # mysql_data:
   # redis-data:
 
