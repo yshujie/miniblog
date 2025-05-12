@@ -2,8 +2,8 @@
 pipeline {
   agent any
   environment {
-    COMPOSE_INFRA = "build/docker/miniblog/infra-compose.yml"
-    COMPOSE_APP   = "build/docker/miniblog/app-compose.yml"
+    COMPOSE_INFRA = "build/docker/miniblog/compose-infra.yml"
+    COMPOSE_APP   = "build/docker/miniblog/compose-app.yml"
   }
 
   stages {
