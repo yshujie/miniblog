@@ -1,67 +1,37 @@
+// Jenkinsfile
 pipeline {
   agent any
-
   environment {
-    // 相对项目根的 docker-compose 目录
-    COMPOSE_PATH   = "build/docker/miniblog"
-    // 本地 Clash 代理
-    HTTP_PROXY     = "http://127.0.0.1:7890"
-    HTTPS_PROXY    = "http://127.0.0.1:7890"
-    // 镜像打标签
-    BACKEND_IMAGE  = "yshujie/miniblog:prod"
+    COMPOSE_INFRA = "build/docker/miniblog/infra-compose.yml"
+    COMPOSE_APP   = "build/docker/miniblog/app-compose.yml"
   }
 
   stages {
-
-    stage('Init') {
+    stage('✅ Infra Setup') {
       steps {
-        echo "✔️ 代码已经由 Jenkins 自动拉取，无需手动 git clone"
-        sh 'ls -R .'
-      }
-    }
-
-    stage('Build Backend Image') {
-      steps {
-        echo "📦 构建后端生产镜像 ${BACKEND_IMAGE}"
-        // 在项目根目录执行 docker build
-        sh """
-          docker build --network host \
-            --build-arg HTTP_PROXY=${HTTP_PROXY} \
-            --build-arg HTTPS_PROXY=${HTTPS_PROXY} \
-            -f build/docker/miniblog/Dockerfile.prod \
-            -t ${BACKEND_IMAGE} \
-            .
-        """
-      }
-    }
-
-    stage('Compose Down') {
-      steps {
-        echo "⬇️ 停止并移除旧容器（如果在运行）"
-        dir("${COMPOSE_PATH}") {
-          sh 'docker-compose down || true'
+        dir('build/docker/miniblog') {
+          sh 'docker-compose -f ${COMPOSE_INFRA} pull || true'
+          sh 'docker-compose -f ${COMPOSE_INFRA} up -d'
         }
       }
     }
 
-    stage('Compose Build & Up') {
+    stage('🚀 Build & Deploy App') {
       steps {
-        echo "🔧 重新构建并启动所有服务"
-        dir("${COMPOSE_PATH}") {
-          sh 'docker-compose build'
-          sh 'docker-compose up -d'
+        dir('build/docker/miniblog') {
+          // 停掉旧的后端+nginx（不 touch 数据卷）
+          sh 'docker-compose -f ${COMPOSE_APP} down || true'
+          // 分别重建后端和前端打包
+          sh 'docker-compose -f ${COMPOSE_APP} build backend frontend-build'
+          // 运行后端+nginx（frontend-build 只是一次性容器，不需要 up）
+          sh 'docker-compose -f ${COMPOSE_APP} up -d backend nginx'
         }
       }
     }
-
   }
 
   post {
-    success {
-      echo '✅ 全量构建与部署完成！'
-    }
-    failure {
-      echo '❌ 构建或部署失败，请检查日志并修复'
-    }
+    success { echo '🎉 全部服务部署成功' }
+    failure { echo '❌ 部署失败，请检查日志' }
   }
 }
