@@ -23,17 +23,17 @@ services:
       context: ../../../ # 回到项目根目录
       dockerfile: build/docker/miniblog/Dockerfile.prod
     ports:
-      - "8081:8081"
+      - "8081:8081" # 独立调试端口
     depends_on:
       - mysql
       - redis
 
   frontend:
     build:
-      context: ../../../web/miniblog-web
-      dockerfile: Dockerfile.frontend # 或者 Dockerfile.frontend，看你怎么命名
+      context: ../../../web/miniblog-web # 仅打包前端代码
+      dockerfile: Dockerfile.frontend
     ports:
-      - "3000:80" # 如果需要独立调试端口
+      - "3000:80" # 独立调试端口
     depends_on:
       - backend
 
