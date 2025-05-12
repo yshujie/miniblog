@@ -49,29 +49,34 @@ pipeline {
       }
     }
 
+    // 构建后端生产镜像
     stage('Build: Backend') {
       steps {
         dir("${BASE_DIR}") {
-          // 构建后端镜像（本地）
-          sh """
-               docker build \
+          echo '📦 构建后端生产镜像'
+          // 关闭 BuildKit，构建后端服务
+          withEnv(["DOCKER_BUILDKIT=0"]) {
+            sh '''
+              docker build \
                 --network host \
                 --add-host=host.docker.internal:host-gateway \
                 --build-arg GOPROXY=https://goproxy.cn,direct \
                 --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
                 --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
-                --build-arg GO111MODULE=on \
-                -f Dockerfile.prod.backend \
-                ../../..
-          """
+                -f build/docker/miniblog/Dockerfile.prod.backend \
+                -t yshujie/miniblog:prod \
+                ../../../
+            '''
+          }
         }
       }
     }
 
+    // 构建前端生产镜像
     stage('Build & Push: Frontend') {
       steps {
         dir("${BASE_DIR}") {
-          // 构建前端镜像
+          echo '📦 构建前端生产镜像'
           sh """
               docker build \
                 --network host \
