@@ -4,9 +4,6 @@ pipeline {
   environment {
     // 项目根目录下 build/docker/miniblog
     BASE_DIR      = "build/docker/miniblog"
-    // 代理（如需要）
-    HTTP_PROXY    = "http://127.0.0.1:7890"
-    HTTPS_PROXY   = "http://127.0.0.1:7890"
     // Docker Hub 凭据 ID
     DOCKER_CREDENTIALS = 'docker-hub-credentials'
     // 镜像前缀
@@ -51,8 +48,6 @@ pipeline {
   //             docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
   //             docker build \
   //               --network host \
-  //               --build-arg HTTP_PROXY=${HTTP_PROXY} \
-  //               --build-arg HTTPS_PROXY=${HTTPS_PROXY} \
   //               -f Dockerfile.prod \
   //               -t ${BACKEND_IMAGE_TAG} \
   //               ../../..
@@ -77,8 +72,6 @@ pipeline {
   //             docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
   //             docker build \
   //               --network host \
-  //               --build-arg HTTP_PROXY=${HTTP_PROXY} \
-  //               --build-arg HTTPS_PROXY=${HTTPS_PROXY} \
   //               -f Dockerfile.frontend \
   //               -t ${FRONTEND_IMAGE_TAG} \
   //               ../../../web/miniblog-web

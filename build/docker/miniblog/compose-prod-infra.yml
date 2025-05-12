@@ -1,6 +1,7 @@
 version: '3.8'
 services:
   nginx:
+    network_mode: "host"  # 使用主机网络
     image: nginx:latest
     ports:
       - "80:80"
@@ -12,6 +13,7 @@ services:
       - miniblog-network
 
   mysql:
+    network_mode: "host"  # 使用主机网络
     image: mysql:8
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -27,6 +29,7 @@ services:
       - miniblog-network
 
   redis:
+    network_mode: "host"  # 使用主机网络
     image: redis:alpine
     ports:
       - "6379:6379"
