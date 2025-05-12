@@ -20,7 +20,6 @@ services:
       MYSQL_PASSWORD: miniblog123
     volumes:
       - mysql_data:/var/lib/mysql
-      - ../../../configs/miniblog.sql:/docker-entrypoint-initdb.d/miniblog.sql
     ports:
       - "3306:3306"
     restart: always

@@ -32,6 +32,8 @@ pipeline {
           sh 'docker-compose -f compose-prod-infra.yml pull'
           // 启动基础设施
           sh 'docker-compose -f compose-prod-infra.yml up -d'
+          // 休眠 10 秒
+          sleep 10
         }
       }
     }
