@@ -4,3 +4,4 @@ _output/*
 *.log
 .idea
 .vscode
+configs/nginx/ssl/*
