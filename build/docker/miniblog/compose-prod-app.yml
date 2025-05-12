@@ -8,6 +8,8 @@ services:
         - GOPROXY=https://goproxy.cn,direct
         - HTTP_PROXY=http://host.docker.internal:7890
         - HTTPS_PROXY=http://host.docker.internal:7890
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     network_mode: "host"
     environment:
       - DB_HOST=localhost
@@ -29,6 +31,8 @@ services:
       args:
         - HTTP_PROXY=http://host.docker.internal:7890
         - HTTPS_PROXY=http://host.docker.internal:7890
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     network_mode: "host"
     restart: always
     ports:

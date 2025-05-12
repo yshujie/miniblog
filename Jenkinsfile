@@ -56,6 +56,7 @@ pipeline {
           sh """
             docker build \
               --network host \
+              --add-host host.docker.internal:host-gateway \
               --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
               --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
               -f Dockerfile.prod.backend \
@@ -72,6 +73,7 @@ pipeline {
           sh """
               docker build \
                 --network host \
+                --add-host host.docker.internal:host-gateway \
                 --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
                 --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
                 -f Dockerfile.prod.frontend \
