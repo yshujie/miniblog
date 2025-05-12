@@ -1,12 +1,16 @@
 # build/docker/miniblog/Dockerfile.frontend
+
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-COPY package*.json ./
+# 拷贝前端代码下的 package*.json
+COPY web/miniblog-web/package*.json ./
 RUN npm install
 
-COPY . .
+# 拷贝整个前端项目
+COPY web/miniblog-web ./
 RUN npm run build
 
-# 只是 build，不做运行
-CMD ["true"]
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+EXPOSE 80
