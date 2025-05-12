@@ -42,7 +42,7 @@ pipeline {
           sh """
             docker build \
               --network host \
-              -f Dockerfile.prod \
+              -f Dockerfile.prod.backend \
               -t ${BACKEND_IMAGE_TAG} \
               ../../..
           """
