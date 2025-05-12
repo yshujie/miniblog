@@ -19,7 +19,7 @@ services:
       - "8081:8081"
     volumes:
       - /data/logs/miniblog:/data/logs/miniblog
-      - ../../../../configs/nginx/ssl:/etc/miniblog/ssl:ro
+      - /root/.config/ssl:/etc/miniblog/ssl:ro
 
   frontend:
     image: yshujie/miniblog-frontend:prod
