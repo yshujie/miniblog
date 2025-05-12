@@ -1,6 +1,4 @@
-# build/docker/miniblog/infra-compose.yml
 version: '3.8'
-
 services:
   mysql:
     image: mysql:8
@@ -9,45 +7,26 @@ services:
       MYSQL_DATABASE: miniblog
       MYSQL_USER: miniblog
       MYSQL_PASSWORD: miniblog123
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ../../../configs/miniblog.sql:/docker-entrypoint-initdb.d/miniblog.sql
-      - ./logs/mysql:/var/log/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    ports:
+      - "3306:3306"
 
   redis:
     image: redis:alpine
     ports:
       - "6379:6379"
-    volumes:
-      - redis_data:/data
-      - ./logs/redis:/var/log/redis
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   nginx:
     image: nginx:alpine
     ports:
       - "80:80"
+    # 注意：下面的相对路径是从 build/docker/miniblog 目录算起，
+    # ../../../configs/nginx.conf 会一直向上到项目根目录再进 configs
     volumes:
       - ../../../configs/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./logs/nginx:/var/log/nginx
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
+    depends_on:
+      - frontend  # 如果和 frontend 放一起编排
+      # 或者只做 infra，此处可省略 frontend
 volumes:
   mysql_data:
-  redis_data:

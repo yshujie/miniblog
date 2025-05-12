@@ -1,51 +1,20 @@
-# build/docker/miniblog/Dockerfile.prod
 # ---------- Builder ----------
-FROM golang:1.23-alpine AS builder
-
-# 支持构建时通过代理拉取依赖
-ARG HTTP_PROXY
-ARG HTTPS_PROXY
-ENV HTTP_PROXY=${HTTP_PROXY}
-ENV HTTPS_PROXY=${HTTPS_PROXY}
-
-# 使用国内 Go proxy，加速模块下载
-ENV GOPROXY=https://goproxy.cn,direct
-
-# 安装构建依赖
+FROM golang:1.24-alpine AS builder
 RUN apk add --no-cache git ca-certificates
-
-# 设置工作目录
 WORKDIR /app
-
-# 复制 go.mod/go.sum 并下载依赖
 COPY go.mod go.sum ./
 RUN go mod download
-
-# 复制全量源码
 COPY . .
 WORKDIR /app/cmd/miniblog
-
-# 设置编译参数
-ENV CGO_ENABLED=0 \
-  GOOS=linux \
-  GOARCH=amd64
-
-# 编译二进制文件
+ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 RUN go build -o miniblog .
 
-# ---------- Runtime Stage ----------
-# 使用 alpine 镜像，并安装 tzdata 时区
-FROM alpine:latest AS runtime
+# ---------- Runtime ----------
+FROM alpine:latest
 RUN apk add --no-cache ca-certificates tzdata \
   && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
   && echo Asia/Shanghai > /etc/timezone
-
-# 从 builder 阶段拷贝二进制文件
 COPY --from=builder /app/cmd/miniblog/miniblog /usr/local/bin/miniblog
-
-# 从项目根拷贝配置
-COPY configs/miniblog.yaml /etc/miniblog/config.yaml
-
-USER root
+COPY --from=builder /app/configs/miniblog.yaml /etc/miniblog/config.yaml
 EXPOSE 8081
-ENTRYPOINT ["/usr/local/bin/miniblog","--config","/etc/miniblog/config.yaml"]
+ENTRYPOINT ["/usr/local/bin/miniblog", "--config", "/etc/miniblog/config.yaml"]

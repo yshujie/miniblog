@@ -1,33 +1,24 @@
 version: '3.8'
-
 services:
   backend:
     build:
-      context: ../../../
-      dockerfile: build/docker/miniblog/Dockerfile.prod.backend
+      context: ../../..               # 回到项目根
+      dockerfile: build/docker/miniblog/Dockerfile.prod
+    image: yshujie/miniblog:prod
     ports:
       - "8081:8081"
+    environment:
+      - CONFIG=/etc/miniblog/config.yaml
     volumes:
-      - ./logs/miniblog:/data/logs/miniblog
+      - ../../../configs/miniblog.yaml:/etc/miniblog/config.yaml:ro
     depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/healthz" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - mysql
+      - redis
 
   frontend:
     build:
-      context: ../../../
-      dockerfile: build/docker/miniblog/Dockerfile.prod.frontend
-    ports:
-      - "3000:80"
-    volumes:
-      - ./logs/miniblog:/data/logs/miniblog
+      context: ../../../web/miniblog-web  # 或者你统一搬到 build/docker/miniblog
+      dockerfile: Dockerfile.frontend
+    image: yshujie/miniblog-frontend:prod
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
