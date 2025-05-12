@@ -16,6 +16,8 @@ services:
     restart: always
     ports:
       - "8081:8081"
+    volumes:
+      - /data/logs/miniblog:/data/logs/miniblog
 
   frontend:
     image: yshujie/miniblog-frontend:prod
