@@ -31,6 +31,14 @@ pipeline {
           sh '''
             chmod 600 configs/nginx/ssl/yangshujie.com.key
             chmod 644 configs/nginx/ssl/yangshujie.com.crt
+
+            # 验证证书文件
+            echo "=== 证书文件权限 ==="
+            ls -l configs/nginx/ssl/
+            
+            echo "=== 证书文件内容 ==="
+            head -n 1 configs/nginx/ssl/yangshujie.com.crt
+            head -n 1 configs/nginx/ssl/yangshujie.com.key
           '''
         }
       }
