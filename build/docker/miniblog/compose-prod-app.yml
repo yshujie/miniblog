@@ -2,28 +2,34 @@ version: '3.8'
 services:
   backend:
     build:
-      context: ../../..               # 回到项目根
+      context: ../../..  # 后端需要整个项目根目录，因为可能依赖其他目录
       dockerfile: build/docker/miniblog/Dockerfile.prod.backend
       args:
-        GOPROXY: https://goproxy.cn,direct
-        HTTP_PROXY: ${HTTP_PROXY}
-        HTTPS_PROXY: ${HTTPS_PROXY}
-    image: yshujie/miniblog-backend:prod
+        - GOPROXY=https://goproxy.cn,direct
+        - HTTP_PROXY=${HTTP_PROXY}
+        - HTTPS_PROXY=${HTTPS_PROXY}
+    network_mode: "host"
+    environment:
+      - DB_HOST=localhost
+      - DB_PORT=3306
+      - DB_USER=miniblog
+      - DB_PASSWORD=miniblog123
+      - DB_NAME=miniblog
+      - REDIS_HOST=localhost
+      - REDIS_PORT=6379
+    restart: always
     ports:
       - "8081:8081"
-    environment:
-      - CONFIG=/etc/miniblog/config.yaml
-    volumes:
-      - ../../../configs/miniblog.yaml:/etc/miniblog/config.yaml:ro
+
 
   frontend:
     build:
-      context: ../../../web/miniblog-web  # 或者你统一搬到 build/docker/miniblog
-      dockerfile: Dockerfile.prod.frontend
+      context: ../../../web/miniblog-web  # 只包含前端项目目录
+      dockerfile: ../../build/docker/miniblog/Dockerfile.prod.frontend  # 相对于前端项目目录的路径
       args:
-        GOPROXY: https://goproxy.cn,direct
-        HTTP_PROXY: ${HTTP_PROXY}
-        HTTPS_PROXY: ${HTTPS_PROXY}
-    image: yshujie/miniblog-frontend:prod
+        - HTTP_PROXY=${HTTP_PROXY}
+        - HTTPS_PROXY=${HTTPS_PROXY}
+    network_mode: "host"
+    restart: always
     ports:
       - "3000:3000"
