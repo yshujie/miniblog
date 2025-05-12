@@ -55,29 +55,23 @@ pipeline {
       }
     }
 
-  //   stage('Build & Push: Frontend') {
-  //     steps {
-  //       dir("${BASE_DIR}") {
-  //         withCredentials([usernamePassword(
-  //           credentialsId: DOCKER_CREDENTIALS,
-  //           usernameVariable: 'DOCKER_USER',
-  //           passwordVariable: 'DOCKER_PASS'
-  //         )]) {
-  //           // 构建前端镜像
-  //           sh """
-  //             docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
-  //             docker build \
-  //               --network host \
-  //               -f Dockerfile.frontend \
-  //               -t ${FRONTEND_IMAGE_TAG} \
-  //               ../../../web/miniblog-web
-  //           """
-  //           // 推送到仓库
-  //           sh "docker push ${FRONTEND_IMAGE_TAG}"
-  //         }
-  //       }
-  //     }
-  //   }
+    stage('Build & Push: Frontend') {
+      steps {
+        dir("${BASE_DIR}") {
+          // 构建前端镜像
+          sh """
+              docker build \
+                --network host \
+                --build-arg GOPROXY=https://goproxy.cn,direct \
+                --build-arg HTTP_PROXY=${HTTP_PROXY} \
+                --build-arg HTTPS_PROXY=${HTTPS_PROXY} \
+                -f Dockerfile.frontend \
+                -t ${FRONTEND_IMAGE_TAG} \
+                ../../../web/miniblog-web
+              """
+        }
+      }
+    }
 
   //   stage('App Deploy') {
   //     steps {
