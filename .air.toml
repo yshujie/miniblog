@@ -7,12 +7,12 @@ tmp_dir = "_output"
   # 指定二进制文件路径
   bin = "./_output/main"
   include = []
-  exclude = ["web/**/*"]
+  exclude = ["web/**/*", "**/node_modules/**", "**/dist/**"]
 
 [watch]
   dir = "."
   include = ["*.go"]
-  exclude = ["web/**/*"]
+  exclude = ["web/**/*", "**/node_modules/**", "**/dist/**"]
   delay = "100ms"
 
 [log]
