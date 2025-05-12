@@ -3,11 +3,11 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # 先只拷贝 package.json，利用缓存加速
-COPY ../../../web/miniblog-web/package*.json ./
+COPY package*.json ./
 RUN npm install
 
 # 拷贝剩余源码并构建
-COPY ../../../web/miniblog-web ./
+COPY . ./
 RUN npm run build
 
 # ---------- Nginx 运行阶段 ----------
@@ -15,6 +15,6 @@ FROM nginx:alpine
 # 把构建好的静态文件复制到 nginx 默认目录
 COPY --from=builder /app/dist /usr/share/nginx/html
 # 把自定义的 nginx.conf 也复制进去
-COPY ../../../configs/nginx.conf /etc/nginx/nginx.conf
+COPY configs/nginx.conf /etc/nginx/nginx.conf
 
 EXPOSE 80

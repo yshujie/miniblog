@@ -44,7 +44,7 @@ RUN apk add --no-cache ca-certificates tzdata \
 COPY --from=builder /app/cmd/miniblog/miniblog /usr/local/bin/miniblog
 
 # 从项目根拷贝配置
-COPY ../../../configs/miniblog.yaml /etc/miniblog/config.yaml
+COPY configs/miniblog.yaml /etc/miniblog/config.yaml
 
 USER root
 EXPOSE 8081
