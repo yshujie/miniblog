@@ -1,20 +1,21 @@
 # 使用官方 Golang 镜像作为基础镜像
-FROM golang:1.24-alpine
+FROM golang:1.21-alpine
 
-# 安装基础工具
+# 安装必要的工具
 RUN apk add --no-cache git make
-
-# 安装 air
-RUN go install github.com/cosmtrek/air@latest
 
 # 设置工作目录
 WORKDIR /app
 
-# 设置代理
-ENV GOPROXY=https://goproxy.cn,direct
-ENV GO111MODULE=on
+# 设置 Go 环境变量
+ENV GO111MODULE=on \
+  GOPROXY=https://goproxy.cn,direct \
+  CGO_ENABLED=0
 
-# 复制 go.mod 和 go.sum 文件
+# 安装 air
+RUN go install github.com/cosmtrek/air@latest
+
+# 复制 go.mod 和 go.sum
 COPY go.mod go.sum ./
 
 # 下载依赖

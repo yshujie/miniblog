@@ -6,13 +6,12 @@ tmp_dir = "_output"
   cmd = "go build -o ./_output/main ./cmd/miniblog/main.go"
   # 指定二进制文件路径
   bin = "./_output/main"
-  include = []
-  exclude = ["web/**/*", "**/node_modules/**", "**/dist/**"]
+  exclude_dir = ["web", "tmp", "_output"]
 
 [watch]
   dir = "."
   include = ["*.go"]
-  exclude = ["web/**/*", "**/node_modules/**", "**/dist/**"]
+  exclude_dir = ["web", "tmp", "_output"]
   delay = "100ms"
 
 [log]
