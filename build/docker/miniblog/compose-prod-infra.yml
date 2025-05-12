@@ -9,8 +9,6 @@ services:
     volumes:
       - ../../../configs/nginx.conf:/etc/nginx/nginx.conf:ro
     restart: always
-    networks:
-      - miniblog-network
 
   mysql:
     network_mode: "host"  # 使用主机网络
@@ -25,8 +23,6 @@ services:
     ports:
       - "3306:3306"
     restart: always
-    networks:
-      - miniblog-network
 
   redis:
     network_mode: "host"  # 使用主机网络
@@ -36,8 +32,6 @@ services:
     volumes:
       - redis-data:/data
     restart: always
-    networks:
-      - miniblog-network
 
 volumes:
   mysql_data:
