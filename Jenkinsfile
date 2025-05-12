@@ -3,7 +3,7 @@ pipeline {
   agent any
   environment {
     COMPOSE_INFRA = "build/docker/miniblog/compose-infra.yml"
-    COMPOSE_APP   = "build/docker/miniblog/compose-app.yml"
+    COMPOSE_APP   = "build/docker/miniblog/docker-compose.yml"
   }
 
   stages {
@@ -19,12 +19,12 @@ pipeline {
     stage('🚀 Build & Deploy App') {
       steps {
         dir('build/docker/miniblog') {
-          // 停掉旧的后端+nginx（不 touch 数据卷）
+          // 停掉旧的服务（不 touch 数据卷）
           sh 'docker-compose -f ${COMPOSE_APP} down || true'
-          // 分别重建后端和前端打包
-          sh 'docker-compose -f ${COMPOSE_APP} build backend frontend-build'
-          // 运行后端+nginx（frontend-build 只是一次性容器，不需要 up）
-          sh 'docker-compose -f ${COMPOSE_APP} up -d backend nginx'
+          // 分别重建后端和前端
+          sh 'docker-compose -f ${COMPOSE_APP} build backend frontend'
+          // 运行所有服务
+          sh 'docker-compose -f ${COMPOSE_APP} up -d'
         }
       }
     }
