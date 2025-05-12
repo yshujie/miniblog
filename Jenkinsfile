@@ -2,8 +2,8 @@
 pipeline {
   agent any
   environment {
-    COMPOSE_INFRA = "compose-infra.yml"
-    COMPOSE_APP   = "compose-app.yml"
+    COMPOSE_INFRA = "compose-prod-infra.yml"
+    COMPOSE_APP   = "compose-prod-app.yml"
   }
 
   stages {
