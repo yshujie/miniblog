@@ -1,5 +1,17 @@
 version: '3.8'
 services:
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    restart: always
+    networks:
+      - miniblog-network
+
   mysql:
     image: mysql:8
     environment:
@@ -11,22 +23,24 @@ services:
       - mysql_data:/var/lib/mysql
     ports:
       - "3306:3306"
+    restart: always
+    networks:
+      - miniblog-network
 
   redis:
     image: redis:alpine
     ports:
       - "6379:6379"
-
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-    # 注意：下面的相对路径是从 build/docker/miniblog 目录算起，
-    # ../../../configs/nginx.conf 会一直向上到项目根目录再进 configs
     volumes:
-      - ../../../configs/nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - frontend  # 如果和 frontend 放一起编排
-      # 或者只做 infra，此处可省略 frontend
+      - redis-data:/data
+    restart: always
+    networks:
+      - miniblog-network
+
 volumes:
   mysql_data:
+  redis-data:
+
+networks:
+  miniblog-network:
+    driver: bridge
