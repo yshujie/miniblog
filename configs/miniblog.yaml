@@ -7,33 +7,32 @@ app:
 server:
   name: "miniblog"
   address: "0.0.0.0"
-  port: 8080
+  port: 8081
   read_timeout: 60    # 秒
   write_timeout: 60   # 秒
 
 # 通用配置
 runmode: debug               # Gin 开发模式, 可选值有：debug, release, test
-addr: :8080                  # HTTP 服务器监听地址
+addr: :8081                  # HTTP 服务器监听地址
 
 # 数据库配置
 database:
   driver: "mysql"
-  host: "47.94.204.124"
-  port: 3285
+  host: "mysql"
+  port: 3306
   username: "miniblog"
-  password: "miniblog1234"
+  password: "miniblog123"
   dbname: "miniblog"
   max_idle_conns: 10
   max_open_conns: 100
   conn_max_lifetime: 3600  # 秒
   log_level: 4 # GORM log level, 1: silent, 2:error, 3:warn, 4:info
 
-
 # redis 配置
 redis:
-  host: "47.94.204.124"      # 使用 docker-compose 中的服务名
-  port: 16379
-  password: "T2XFVfU3DCenEnL"       # 如果没有密码则留空
+  host: "redis"      # 使用 docker-compose 中的服务名
+  port: 6379
+  password: ""       # 如果没有密码则留空
   db: 0
   pool_size: 100
   min_idle_conns: 10
@@ -45,7 +44,6 @@ log:
   level: debug # 指定日志级别，可选值：debug, info, warn, error, dpanic, panic, fatal
   format: console # 指定日志显示格式，可选值：console, json
   output-paths: [/data/logs/miniblog/miniblog.log, stdout] # 指定日志输出位置，多个输出，用 `逗号 + 空格` 分开。stdout：标准输出，
-# 指定日志输出位置，多个输出，用 `逗号 + 空格` 分开
 
 # jwt 配置
 jwt:
