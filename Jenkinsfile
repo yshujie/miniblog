@@ -38,68 +38,68 @@ pipeline {
       }
     }
 
-    stage('Build & Push: Backend') {
-      steps {
-        dir("${BASE_DIR}") {
-          withCredentials([usernamePassword(
-            credentialsId: DOCKER_CREDENTIALS,
-            usernameVariable: 'DOCKER_USER',
-            passwordVariable: 'DOCKER_PASS'
-          )]) {
-            // 构建后端镜像
-            sh """
-              docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
-              docker build \
-                --network host \
-                --build-arg HTTP_PROXY=${HTTP_PROXY} \
-                --build-arg HTTPS_PROXY=${HTTPS_PROXY} \
-                -f Dockerfile.prod \
-                -t ${BACKEND_IMAGE_TAG} \
-                ../../..
-            """
-            // 推送到仓库
-            sh "docker push ${BACKEND_IMAGE_TAG}"
-          }
-        }
-      }
-    }
+  //   stage('Build & Push: Backend') {
+  //     steps {
+  //       dir("${BASE_DIR}") {
+  //         withCredentials([usernamePassword(
+  //           credentialsId: DOCKER_CREDENTIALS,
+  //           usernameVariable: 'DOCKER_USER',
+  //           passwordVariable: 'DOCKER_PASS'
+  //         )]) {
+  //           // 构建后端镜像
+  //           sh """
+  //             docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
+  //             docker build \
+  //               --network host \
+  //               --build-arg HTTP_PROXY=${HTTP_PROXY} \
+  //               --build-arg HTTPS_PROXY=${HTTPS_PROXY} \
+  //               -f Dockerfile.prod \
+  //               -t ${BACKEND_IMAGE_TAG} \
+  //               ../../..
+  //           """
+  //           // 推送到仓库
+  //           sh "docker push ${BACKEND_IMAGE_TAG}"
+  //         }
+  //       }
+  //     }
+  //   }
 
-    stage('Build & Push: Frontend') {
-      steps {
-        dir("${BASE_DIR}") {
-          withCredentials([usernamePassword(
-            credentialsId: DOCKER_CREDENTIALS,
-            usernameVariable: 'DOCKER_USER',
-            passwordVariable: 'DOCKER_PASS'
-          )]) {
-            // 构建前端镜像
-            sh """
-              docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
-              docker build \
-                --network host \
-                --build-arg HTTP_PROXY=${HTTP_PROXY} \
-                --build-arg HTTPS_PROXY=${HTTPS_PROXY} \
-                -f Dockerfile.frontend \
-                -t ${FRONTEND_IMAGE_TAG} \
-                ../../../web/miniblog-web
-            """
-            // 推送到仓库
-            sh "docker push ${FRONTEND_IMAGE_TAG}"
-          }
-        }
-      }
-    }
+  //   stage('Build & Push: Frontend') {
+  //     steps {
+  //       dir("${BASE_DIR}") {
+  //         withCredentials([usernamePassword(
+  //           credentialsId: DOCKER_CREDENTIALS,
+  //           usernameVariable: 'DOCKER_USER',
+  //           passwordVariable: 'DOCKER_PASS'
+  //         )]) {
+  //           // 构建前端镜像
+  //           sh """
+  //             docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
+  //             docker build \
+  //               --network host \
+  //               --build-arg HTTP_PROXY=${HTTP_PROXY} \
+  //               --build-arg HTTPS_PROXY=${HTTPS_PROXY} \
+  //               -f Dockerfile.frontend \
+  //               -t ${FRONTEND_IMAGE_TAG} \
+  //               ../../../web/miniblog-web
+  //           """
+  //           // 推送到仓库
+  //           sh "docker push ${FRONTEND_IMAGE_TAG}"
+  //         }
+  //       }
+  //     }
+  //   }
 
-    stage('App Deploy') {
-      steps {
-        dir("${BASE_DIR}") {
-          // 重新拉取最新镜像并启动业务容器
-          sh 'docker-compose -f compose-prod-app.yml pull'
-          sh 'docker-compose -f compose-prod-app.yml up -d'
-        }
-      }
-    }
-  }
+  //   stage('App Deploy') {
+  //     steps {
+  //       dir("${BASE_DIR}") {
+  //         // 重新拉取最新镜像并启动业务容器
+  //         sh 'docker-compose -f compose-prod-app.yml pull'
+  //         sh 'docker-compose -f compose-prod-app.yml up -d'
+  //       }
+  //     }
+  //   }
+  // }
 
   post {
     success {
