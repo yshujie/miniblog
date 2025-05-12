@@ -3,11 +3,11 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # 先只拷贝 package.json，利用缓存加速
-COPY package*.json ./
+COPY web/miniblog-web/package*.json ./
 RUN npm install
 
 # 拷贝剩余源码并构建
-COPY . ./
+COPY web/miniblog-web ./
 RUN npm run build
 
 # ---------- Nginx 运行阶段 ----------
