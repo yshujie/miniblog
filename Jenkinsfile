@@ -94,15 +94,10 @@ pipeline {
     stage('App Deploy') {
       steps {
         dir("${BASE_DIR}") {
-          echo '🚀 部署应用（关闭 BuildKit）'
-          withEnv([
-            "DOCKER_BUILDKIT=0",
-            "COMPOSE_DOCKER_CLI_BUILD=0"
-          ]) {
-            sh '''
-              docker-compose -f compose-prod-app.yml up -d --build
-            '''
-          }
+          echo '🚀 部署应用'
+          sh '''
+            docker-compose -f compose-prod-app.yml up -d
+          '''
         }
       }
     }
