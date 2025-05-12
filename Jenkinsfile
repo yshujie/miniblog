@@ -10,9 +10,32 @@ pipeline {
     IMAGE_REGISTRY     = 'yshujie'
     BACKEND_IMAGE_TAG  = "${IMAGE_REGISTRY}/miniblog:prod"
     FRONTEND_IMAGE_TAG = "${IMAGE_REGISTRY}/miniblog-frontend:prod"
+
+    // 证书文件
+    SSL_CERT = credentials('ssl-cert')
+    SSL_KEY = credentials('ssl-key')
   }
 
   stages {
+    stage('Setup SSL') {
+      steps {
+        dir("${BASE_DIR}") {
+          // 创建证书目录
+          sh 'mkdir -p configs/nginx/ssl'
+          
+          // 写入证书文件
+          writeFile file: 'configs/nginx/ssl/yangshujie.com.crt', text: "${SSL_CERT}"
+          writeFile file: 'configs/nginx/ssl/yangshujie.com.key', text: "${SSL_KEY}"
+          
+          // 设置正确的权限
+          sh '''
+            chmod 600 configs/nginx/ssl/yangshujie.com.key
+            chmod 644 configs/nginx/ssl/yangshujie.com.crt
+          '''
+        }
+      }
+    }
+
     stage('Checkout') {
       steps {
         // 清理旧内容
