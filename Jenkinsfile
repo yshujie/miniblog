@@ -32,8 +32,22 @@ pipeline {
           sh 'docker-compose -f compose-prod-infra.yml pull'
           // 启动基础设施
           sh 'docker-compose -f compose-prod-infra.yml up -d'
-          // 休眠 10 秒
-          sleep 10
+          
+          // 等待 MySQL 就绪
+          sh '''
+            until docker exec miniblog-mysql-1 mysqladmin ping -h localhost --silent; do
+              echo "Waiting for MySQL..."
+              sleep 2
+            done
+          '''
+          
+          // 等待 Redis 就绪
+          sh '''
+            until docker exec miniblog-redis-1 redis-cli ping; do
+              echo "Waiting for Redis..."
+              sleep 2
+            done
+          '''
         }
       }
     }

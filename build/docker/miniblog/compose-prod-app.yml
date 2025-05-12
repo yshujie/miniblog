@@ -11,9 +11,6 @@ services:
       - CONFIG=/etc/miniblog/config.yaml
     volumes:
       - ../../../configs/miniblog.yaml:/etc/miniblog/config.yaml:ro
-    depends_on:
-      - mysql
-      - redis
 
   frontend:
     build:
