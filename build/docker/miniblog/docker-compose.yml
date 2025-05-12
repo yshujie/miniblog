@@ -29,8 +29,8 @@ services:
 
   frontend:
     build:
-      context: ../../../web/miniblog-web
-      dockerfile: Dockerfile.prod
+      context: ../../.. # 项目根
+      dockerfile: build/docker/miniblog/Dockerfile.frontend
     depends_on:
       - backend
 
