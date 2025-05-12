@@ -3,8 +3,12 @@ services:
   backend:
     build:
       context: ../../..               # 回到项目根
-      dockerfile: build/docker/miniblog/Dockerfile.prod
-    image: yshujie/miniblog:prod
+      dockerfile: build/docker/miniblog/Dockerfile.prod.backend
+      args:
+        GOPROXY: https://goproxy.cn,direct
+        HTTP_PROXY: ${HTTP_PROXY}
+        HTTPS_PROXY: ${HTTPS_PROXY}
+    image: yshujie/miniblog-backend:prod
     ports:
       - "8081:8081"
     environment:
@@ -15,7 +19,11 @@ services:
   frontend:
     build:
       context: ../../../web/miniblog-web  # 或者你统一搬到 build/docker/miniblog
-      dockerfile: Dockerfile.frontend
+      dockerfile: Dockerfile.prod.frontend
+      args:
+        GOPROXY: https://goproxy.cn,direct
+        HTTP_PROXY: ${HTTP_PROXY}
+        HTTPS_PROXY: ${HTTPS_PROXY}
     image: yshujie/miniblog-frontend:prod
-    depends_on:
-      - backend
+    ports:
+      - "3000:3000"
