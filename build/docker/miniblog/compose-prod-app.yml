@@ -6,8 +6,8 @@ services:
       dockerfile: build/docker/miniblog/Dockerfile.prod.backend
       args:
         - GOPROXY=https://goproxy.cn,direct
-        - HTTP_PROXY=${HTTP_PROXY}
-        - HTTPS_PROXY=${HTTPS_PROXY}
+        - HTTP_PROXY=http://host.docker.internal:7890
+        - HTTPS_PROXY=http://host.docker.internal:7890
     network_mode: "host"
     environment:
       - DB_HOST=localhost
@@ -27,8 +27,8 @@ services:
       context: ../../../web/miniblog-web  # 只包含前端项目目录
       dockerfile: ../../build/docker/miniblog/Dockerfile.prod.frontend  # 相对于前端项目目录的路径
       args:
-        - HTTP_PROXY=${HTTP_PROXY}
-        - HTTPS_PROXY=${HTTPS_PROXY}
+        - HTTP_PROXY=http://host.docker.internal:7890
+        - HTTPS_PROXY=http://host.docker.internal:7890
     network_mode: "host"
     restart: always
     ports:
