@@ -6,8 +6,8 @@ services:
   backend:
     build:
       context: ../../..                         # 回到项目根
-      dockerfile: build/docker/miniblog/Dockerfile.prod
-    image:   yshujie/miniblog:prod
+      dockerfile: build/docker/miniblog/Dockerfile.backend
+    image:   yshujie/miniblog:backend
     ports:
       - "8081:8081"
     depends_on:
@@ -18,7 +18,7 @@ services:
   frontend-build:
     build:
       context: ../../../web/miniblog-web   # 打包上下文指向源码目录
-      dockerfile: Dockerfile.frontend      # 在 build/docker/miniblog 下找到
+      dockerfile: build/docker/miniblog/Dockerfile.frontend
     volumes:
       - frontend_dist:/app/dist
     command: ["true"]  
