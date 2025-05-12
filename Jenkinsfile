@@ -73,15 +73,15 @@ pipeline {
       }
     }
 
-  //   stage('App Deploy') {
-  //     steps {
-  //       dir("${BASE_DIR}") {
-  //         // 重新拉取最新镜像并启动业务容器
-  //         sh 'docker-compose -f compose-prod-app.yml pull'
-  //         sh 'docker-compose -f compose-prod-app.yml up -d'
-  //       }
-  //     }
-  //   }
+    stage('App Deploy') {
+      steps {
+        dir("${BASE_DIR}") {
+          // 重新拉取最新镜像并启动业务容器
+          sh 'docker-compose -f compose-prod-app.yml pull'
+          sh 'docker-compose -f compose-prod-app.yml up -d'
+        }
+      }
+    }
   }
 
   post {
