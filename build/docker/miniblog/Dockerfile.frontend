@@ -1,16 +1,20 @@
-# build/docker/miniblog/Dockerfile.frontend
-
+# ---------- 前端构建阶段 ----------
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# 拷贝前端代码下的 package*.json
-COPY web/miniblog-web/package*.json ./
+# 先只拷贝 package.json，利用缓存加速
+COPY ../../../web/miniblog-web/package*.json ./
 RUN npm install
 
-# 拷贝整个前端项目
-COPY web/miniblog-web ./
+# 拷贝剩余源码并构建
+COPY ../../../web/miniblog-web ./
 RUN npm run build
 
+# ---------- Nginx 运行阶段 ----------
 FROM nginx:alpine
+# 把构建好的静态文件复制到 nginx 默认目录
 COPY --from=builder /app/dist /usr/share/nginx/html
+# 把自定义的 nginx.conf 也复制进去
+COPY ../../../configs/nginx.conf /etc/nginx/nginx.conf
+
 EXPOSE 80
