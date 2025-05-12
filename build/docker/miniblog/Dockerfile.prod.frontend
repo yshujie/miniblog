@@ -1,13 +1,38 @@
 # ---------- Builder ----------
 FROM node:20-alpine AS builder
+
+# 设置构建参数
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+
+# 设置环境变量
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTPS_PROXY}
+
+# 设置工作目录
 WORKDIR /app
+
+# 复制 package*.json
 COPY package*.json ./
+
+# 安装依赖
 RUN npm install
+
+# 复制项目文件
 COPY . .
 RUN npm run build
 
 # ---------- Runtime ----------
 FROM nginx:alpine
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制构建产物
 COPY --from=builder /app/dist /usr/share/nginx/html
-EXPOSE 80
+
+# 暴露端口  
+EXPOSE 3000
+
+# 启动命令
 CMD ["nginx", "-g", "daemon off;"]
