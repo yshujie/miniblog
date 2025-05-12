@@ -51,7 +51,7 @@ services:
   frontend:
     build:
       context: ../../../web/miniblog-web
-      dockerfile: build/docker/miniblog/Dockerfile.frontend
+      dockerfile: ../../docker/miniblog/Dockerfile.frontend
     ports:
       - "3000:80"
     depends_on:
