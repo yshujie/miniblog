@@ -18,7 +18,7 @@ addr: :8081                  # HTTP 服务器监听地址
 # 数据库配置
 database:
   driver: "mysql"
-  host: "mysql"
+  host: "127.0.0.1"
   port: 3306
   username: "miniblog"
   password: "miniblog123"
@@ -30,7 +30,7 @@ database:
 
 # redis 配置
 redis:
-  host: "redis"      # 使用 docker-compose 中的服务名
+  host: "127.0.0.1"      # 使用 127.0.0.1
   port: 6379
   password: ""       # 如果没有密码则留空
   db: 0

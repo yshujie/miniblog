@@ -13,6 +13,7 @@ services:
       - DB_NAME=miniblog
       - REDIS_HOST=127.0.0.1
       - REDIS_PORT=6379
+      - DB_DSN=miniblog:miniblog123@tcp(127.0.0.1:3306)/miniblog?charset=utf8mb4&parseTime=True&loc=Local
     restart: always
     ports:
       - "8081:8081"
