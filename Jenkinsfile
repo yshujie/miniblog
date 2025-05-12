@@ -35,29 +35,29 @@ pipeline {
       }
     }
 
-  //   stage('Build & Push: Backend') {
-  //     steps {
-  //       dir("${BASE_DIR}") {
-  //         withCredentials([usernamePassword(
-  //           credentialsId: DOCKER_CREDENTIALS,
-  //           usernameVariable: 'DOCKER_USER',
-  //           passwordVariable: 'DOCKER_PASS'
-  //         )]) {
-  //           // 构建后端镜像
-  //           sh """
-  //             docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
-  //             docker build \
-  //               --network host \
-  //               -f Dockerfile.prod \
-  //               -t ${BACKEND_IMAGE_TAG} \
-  //               ../../..
-  //           """
-  //           // 推送到仓库
-  //           sh "docker push ${BACKEND_IMAGE_TAG}"
-  //         }
-  //       }
-  //     }
-  //   }
+    stage('Build & Push: Backend') {
+      steps {
+        dir("${BASE_DIR}") {
+          withCredentials([usernamePassword(
+            credentialsId: DOCKER_CREDENTIALS,
+            usernameVariable: 'DOCKER_USER',
+            passwordVariable: 'DOCKER_PASS'
+          )]) {
+            // 构建后端镜像
+            sh """
+              docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
+              docker build \
+                --network host \
+                -f Dockerfile.prod \
+                -t ${BACKEND_IMAGE_TAG} \
+                ../../..
+            """
+            // 推送到仓库
+            sh "docker push ${BACKEND_IMAGE_TAG}"
+          }
+        }
+      }
+    }
 
   //   stage('Build & Push: Frontend') {
   //     steps {
