@@ -30,18 +30,21 @@ services:
 
   frontend:
     build:
-      context: ../../../ # 同样指向项目根
-      dockerfile: build/docker/miniblog/Dockerfile.frontend
+      context: ../../../web/miniblog-web
+      dockerfile: Dockerfile.frontend # 或者 Dockerfile.frontend，看你怎么命名
+    ports:
+      - "3000:80" # 如果需要独立调试端口
     depends_on:
       - backend
 
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-    # nginx.conf 已经打包进镜像，这里无需再挂载
-    depends_on:
-      - frontend
+nginx:
+  image: nginx:alpine
+  ports:
+    - "80:80"
+  volumes:
+    - ../../../configs/nginx.conf:/etc/nginx/nginx.conf:ro
+  depends_on:
+    - frontend
 
 volumes:
   mysql_data:
