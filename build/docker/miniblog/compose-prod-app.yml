@@ -4,7 +4,7 @@ services:
   backend:
     build:
       context: ../../../
-      dockerfile: build/docker/miniblog/Dockerfile.backend
+      dockerfile: build/docker/miniblog/Dockerfile.prod.backend
     ports:
       - "8081:8081"
     depends_on:
@@ -21,7 +21,7 @@ services:
   frontend:
     build:
       context: ../../../
-      dockerfile: build/docker/miniblog/Dockerfile.frontend
+      dockerfile: build/docker/miniblog/Dockerfile.prod.frontend
     ports:
       - "3000:80"
     depends_on:
