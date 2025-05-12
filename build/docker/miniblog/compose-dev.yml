@@ -45,6 +45,8 @@ services:
     environment:
       - GO111MODULE=on
       - GOPROXY=https://goproxy.cn,direct
+      - CGO_ENABLED=0
+    working_dir: /app
     command: air -c .air.toml
     depends_on:
       mysql:

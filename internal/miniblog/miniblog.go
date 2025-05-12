@@ -38,6 +38,7 @@ func NewMiniBlogCommand() *cobra.Command {
 			log.Infow("log system initialized successfully")
 			defer log.Sync() // Sync 将缓存中的日志刷新到磁盘文件中
 
+			// 运行服务
 			return run()
 		},
 		// 命令运行时，不需要指定命令行参数

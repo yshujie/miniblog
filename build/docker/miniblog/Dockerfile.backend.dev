@@ -1,21 +1,20 @@
+# 使用官方 Golang 镜像作为基础镜像
 FROM golang:1.24-alpine
-
-WORKDIR /app
 
 # 安装基础工具
 RUN apk add --no-cache git make
 
 # 安装 air
-RUN go install github.com/air-verse/air@latest
-
-# 复制 air 配置文件
-COPY .air.toml .
+RUN go install github.com/cosmtrek/air@latest
 
 # 设置工作目录
 WORKDIR /app
+
+# 复制 air 配置文件
+COPY .air.toml .
 
 # 暴露端口
 EXPOSE 8081
 
 # 使用 air 启动服务
-CMD ["air", "-c", ".air.toml"] 
+CMD ["air", "-c", ".air.toml"]
