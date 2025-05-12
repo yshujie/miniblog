@@ -63,8 +63,8 @@ pipeline {
                 --build-arg GOPROXY=https://goproxy.cn,direct \
                 --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
                 --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
-                -f build/docker/miniblog/Dockerfile.prod.backend \
-                -t yshujie/miniblog:prod \
+                -f Dockerfile.prod.backend \
+                -t ${BACKEND_IMAGE_TAG} \
                 ../../../
             '''
           }
@@ -73,7 +73,7 @@ pipeline {
     }
 
     // 构建前端生产镜像
-    stage('Build & Push: Frontend') {
+    stage('Build: Frontend') {
       steps {
         dir("${BASE_DIR}") {
           echo '📦 构建前端生产镜像'
