@@ -4,3 +4,5 @@ _output/*
 *.log
 .idea
 .vscode
+configs/nginx/ssl/*.crt
+configs/nginx/ssl/*.key

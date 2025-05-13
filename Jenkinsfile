@@ -39,21 +39,21 @@ pipeline {
           sh 'mkdir -p configs/nginx/ssl'
           
           // 写入证书文件
-          writeFile file: '/etc/nginx/ssl/yangshujie.com.crt', text: "${SSL_CERT}"
-          writeFile file: '/etc/nginx/ssl/yangshujie.com.key', text: "${SSL_KEY}"
+          writeFile file: 'configs/nginx/ssl/yangshujie.com.crt', text: "${SSL_CERT}"
+          writeFile file: 'configs/nginx/ssl/yangshujie.com.key', text: "${SSL_KEY}"
           
           // 设置正确的权限
           sh '''
-            chmod 600 /etc/nginx/ssl/yangshujie.com.key
-            chmod 644 /etc/nginx/ssl/yangshujie.com.crt
+            chmod 600 configs/nginx/ssl/yangshujie.com.key
+            chmod 644 configs/nginx/ssl/yangshujie.com.crt
 
             # 验证证书文件
             echo "=== 证书文件权限 ==="
-            ls -l /etc/nginx/ssl/
+            ls -l configs/nginx/ssl/
             
             echo "=== 证书文件内容 ==="
-            head -n 1 /etc/nginx/ssl/yangshujie.com.crt
-            head -n 1 /etc/nginx/ssl/yangshujie.com.key
+            head -n 1 configs/nginx/ssl/yangshujie.com.crt
+            head -n 1 configs/nginx/ssl/yangshujie.com.key
           '''
         }
       }
