@@ -24,7 +24,7 @@ pipeline {
       steps {
         dir("${SCRIPT_DIR}") {
           echo '🔧 初始化系统'
-          sh "sudo init_system.sh"        
+          sh "bash init_system.sh"        
         }
       }
     }
@@ -104,7 +104,7 @@ pipeline {
       steps {
         dir("${SCRIPT_DIR}") {
           echo '🔧 初始化 mysql 数据库'
-          sh "sudo init_mysql_schem.sh"
+          sh "bash init_mysql_schem.sh"
         }
       }
     }
