@@ -22,8 +22,10 @@ pipeline {
     // 初始化系统
     stage('Init System') {
       steps {
-        echo '🔧 初始化系统'
-        sh "sudo ${SCRIPT_DIR}/init_system.sh"        
+        dir("${SCRIPT_DIR}") {
+          echo '🔧 初始化系统'
+          sh "sudo init_system.sh"        
+        }
       }
     }
 
@@ -31,6 +33,8 @@ pipeline {
     stage('Setup SSL') {
       steps {
         dir("${BASE_DIR}") {
+          echo '🔧 设置 SSL 证书'
+
           // 创建证书目录
           sh 'mkdir -p configs/nginx/ssl'
           
@@ -69,6 +73,8 @@ pipeline {
     stage('Infra: Pull & Up') {
       steps {
         dir("${BASE_DIR}") {
+          echo '🔧 启动基础设施'
+
           // 拉取基础镜像
           sh 'docker-compose -f compose-prod-infra.yml pull'
           // 启动基础设施
@@ -96,8 +102,10 @@ pipeline {
     // 初始化 mysql 数据库
     stage('Init MySQL Schema') {
       steps {
-        echo '🔧 初始化 mysql 数据库'
-        sh "sudo ${SCRIPT_DIR}/init_mysql_schem.sh"
+        dir("${SCRIPT_DIR}") {
+          echo '🔧 初始化 mysql 数据库'
+          sh "sudo init_mysql_schem.sh"
+        }
       }
     }
 
@@ -158,6 +166,7 @@ pipeline {
     // 清理构建缓存
     stage('Cleanup') {
       steps {
+        echo '🧹 清理构建缓存'
         sh 'docker system prune -f'
       }
     }
