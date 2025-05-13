@@ -12,12 +12,17 @@ mkdir -p /etc/nginx/ssl/    # nginx ssl 证书目录
 mkdir -p /data/logs/nginx/  # nginx 日志目录
 
 # 将 nginx 配置文件复制到 /etc/nginx/
-cp ${PROJECT_ROOT}/configs/nginx/nginx.conf /etc/nginx/nginx.conf
-cp ${PROJECT_ROOT}/configs/nginx/conf.d/yangshujie.com.conf /etc/nginx/conf.d/yangshujie.com.conf
+cp -r ${PROJECT_ROOT}/configs/nginx/ /etc/nginx/
+cp ${PROJECT_ROOT}/configs/nginx/conf.d/* /etc/nginx/conf.d/
 
 # 检查 nginx 配置文件是否存在
 if [ ! -f /etc/nginx/nginx.conf ]; then
-    echo "nginx 配置文件不存在"
+    echo "nginx 配置文件 nginx.conf 不存在"
+    exit 1
+fi
+# 检查 /etc/nginx/conf.d/default.conf 文件是否存在
+if [ ! -f /etc/nginx/conf.d/default.conf ]; then
+    echo "nginx 配置文件 default.conf 不存在"
     exit 1
 fi
 
