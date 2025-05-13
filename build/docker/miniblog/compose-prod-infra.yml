@@ -9,6 +9,7 @@ services:
     volumes:
       - ../../../../configs/nginx/conf.d:/etc/nginx/conf.d:ro
       - ../../../../configs/nginx/ssl:/etc/nginx/ssl:ro
+      - /data/logs/nginx:/var/log/nginx
     restart: always
 
   # 数据库
@@ -23,6 +24,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ../../../../configs/miniblog.sql:/docker-entrypoint-initdb.d/miniblog.sql
+      - /data/logs/mysql:/var/log/mysql
     ports:
       - "3306:3306"
     healthcheck:
