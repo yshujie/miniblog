@@ -5,6 +5,10 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
+echo "当前工作目录: $(pwd)"
+echo "脚本目录: ${SCRIPT_DIR}"
+echo "项目根目录: ${PROJECT_ROOT}"
+
 # 创建 nginx 相关目录
 mkdir -p /etc/nginx/        # nginx 配置目录
 mkdir -p /etc/nginx/conf.d/ # nginx 配置文件目录
@@ -32,6 +36,7 @@ mkdir -p /data/mysql/data/ # mysql 数据目录
 mkdir -p /data/logs/mysql/ # mysql 日志目录
 
 # 将 mysql 初始化数据复制到 /data/mysql/data/
+echo "复制 miniblog.sql..."
 cp ${PROJECT_ROOT}/configs/mysql/miniblog.sql /data/mysql/data/miniblog.sql
 
 # 创建 redis 相关目录
@@ -44,13 +49,8 @@ mkdir -p /etc/miniblog/ # miniblog 安装目录
 mkdir -p /data/logs/miniblog/ # miniblog 日志目录
 
 # 将 miniblog 配置文件复制到 /etc/miniblog/config.yaml
+echo "复制 miniblog.yaml..."
 cp ${PROJECT_ROOT}/configs/miniblog.yaml /etc/miniblog/config.yaml
-
-# 检查 miniblog 配置文件是否存在
-if [ ! -f /etc/miniblog/config.yaml ]; then
-    echo "miniblog 配置文件不存在"
-    exit 1
-fi
 
 # 权限设置
 chmod 755 /data/logs/nginx/
