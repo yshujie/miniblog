@@ -15,13 +15,19 @@ mkdir -p /data/logs/nginx/  # nginx 日志目录
 cp ${PROJECT_ROOT}/configs/nginx/nginx.conf /etc/nginx/nginx.conf
 cp ${PROJECT_ROOT}/configs/nginx/conf.d/yangshujie.com.conf /etc/nginx/conf.d/yangshujie.com.conf
 
+# 检查 nginx 配置文件是否存在
+if [ ! -f /etc/nginx/nginx.conf ]; then
+    echo "nginx 配置文件不存在"
+    exit 1
+fi
+
 # 创建 mysql 相关目录
 mkdir -p /var/lib/mysql/  # mysql 安装目录
 mkdir -p /data/mysql/data/ # mysql 数据目录
 mkdir -p /data/logs/mysql/ # mysql 日志目录
 
 # 将 mysql 初始化数据复制到 /data/mysql/data/
-cp ${PROJECT_ROOT}/configs/miniblog.sql /data/mysql/data/miniblog.sql
+cp ${PROJECT_ROOT}/configs/mysql/miniblog.sql /data/mysql/data/miniblog.sql
 
 # 创建 redis 相关目录
 mkdir -p /var/lib/redis/ # redis 安装目录
@@ -34,6 +40,12 @@ mkdir -p /data/logs/miniblog/ # miniblog 日志目录
 
 # 将 miniblog 配置文件复制到 /etc/miniblog/config.yaml
 cp ${PROJECT_ROOT}/configs/miniblog.yaml /etc/miniblog/config.yaml
+
+# 检查 miniblog 配置文件是否存在
+if [ ! -f /etc/miniblog/config.yaml ]; then
+    echo "miniblog 配置文件不存在"
+    exit 1
+fi
 
 # 权限设置
 chmod 755 /data/logs/nginx/
