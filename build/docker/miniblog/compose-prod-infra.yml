@@ -7,7 +7,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ../../../../configs/nginx/:/etc/nginx/
+      - /etc/nginx/:/etc/nginx/
+      - /etc/nginx/conf.d/:/etc/nginx/conf.d/
+      - /etc/nginx/ssl/:/etc/nginx/ssl/
       - /data/logs/nginx/:/var/log/nginx/
     restart: always
 
@@ -22,7 +24,8 @@ services:
       MYSQL_PASSWORD: miniblog123
     volumes:
       - mysql_data:/var/lib/mysql
-      - ../../../../configs/miniblog.sql:/docker-entrypoint-initdb.d/miniblog.sql
+      - /data/logs/mysql/:/var/log/mysql/
+      - /etc/mysql/:/etc/mysql/
     ports:
       - "3306:3306"
     healthcheck:
@@ -39,6 +42,8 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data/redis/data
+      - /data/logs/redis/:/var/log/redis/
+      - /etc/redis/:/etc/redis/
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

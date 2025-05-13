@@ -20,6 +20,7 @@ services:
       - "8443:8443"
     volumes:
       - /data/logs/miniblog:/data/logs/miniblog
+      - /etc/miniblog/:/etc/miniblog/
       - /root/.config/ssl/:/etc/miniblog/ssl/
 
   frontend:

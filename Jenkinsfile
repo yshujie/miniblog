@@ -4,8 +4,7 @@ pipeline {
   environment {
     // 项目根目录下 build/docker/miniblog
     BASE_DIR      = "build/docker/miniblog"
-    // Docker Hub 凭据 ID
-    DOCKER_CREDENTIALS = 'docker-hub-credentials'
+
     // 镜像前缀
     IMAGE_REGISTRY     = 'yshujie'
     BACKEND_IMAGE_TAG  = "${IMAGE_REGISTRY}/miniblog:prod"
@@ -16,7 +15,17 @@ pipeline {
     SSL_KEY = credentials('ssl-key')
   }
 
+  // 阶段
   stages {
+    // 初始化系统
+    stage('Init System') {
+      steps {
+        echo '🔧 初始化系统'
+        sh 'sudo ./scripts/init_system.sh'        
+      }
+    }
+
+    // 设置 SSL 证书
     stage('Setup SSL') {
       steps {
         dir("${BASE_DIR}") {
@@ -24,26 +33,27 @@ pipeline {
           sh 'mkdir -p configs/nginx/ssl'
           
           // 写入证书文件
-          writeFile file: 'configs/nginx/ssl/yangshujie.com.crt', text: "${SSL_CERT}"
-          writeFile file: 'configs/nginx/ssl/yangshujie.com.key', text: "${SSL_KEY}"
+          writeFile file: '/etc/nginx/ssl/yangshujie.com.crt', text: "${SSL_CERT}"
+          writeFile file: '/etc/nginx/ssl/yangshujie.com.key', text: "${SSL_KEY}"
           
           // 设置正确的权限
           sh '''
-            chmod 600 configs/nginx/ssl/yangshujie.com.key
-            chmod 644 configs/nginx/ssl/yangshujie.com.crt
+            chmod 600 /etc/nginx/ssl/yangshujie.com.key
+            chmod 644 /etc/nginx/ssl/yangshujie.com.crt
 
             # 验证证书文件
             echo "=== 证书文件权限 ==="
-            ls -l configs/nginx/ssl/
+            ls -l /etc/nginx/ssl/
             
             echo "=== 证书文件内容 ==="
-            head -n 1 configs/nginx/ssl/yangshujie.com.crt
-            head -n 1 configs/nginx/ssl/yangshujie.com.key
+            head -n 1 /etc/nginx/ssl/yangshujie.com.crt
+            head -n 1 /etc/nginx/ssl/yangshujie.com.key
           '''
         }
       }
     }
 
+    // 拉取最新代码
     stage('Checkout') {
       steps {
         // 清理旧内容
@@ -53,6 +63,7 @@ pipeline {
       }
     }
 
+    // 启动基础设施
     stage('Infra: Pull & Up') {
       steps {
         dir("${BASE_DIR}") {
@@ -77,6 +88,14 @@ pipeline {
             done
           '''
         }
+      }
+    }
+
+    // 初始化 mysql 数据库
+    stage('Init MySQL Schema') {
+      steps {
+        echo '🔧 初始化 mysql 数据库'
+        sh 'sudo ./scripts/init_mysql_schem.sh'
       }
     }
 
@@ -122,6 +141,7 @@ pipeline {
       }
     }
 
+    // 部署应用
     stage('App Deploy') {
       steps {
         dir("${BASE_DIR}") {
@@ -130,6 +150,13 @@ pipeline {
             docker-compose -f compose-prod-app.yml up -d
           '''
         }
+      }
+    }
+
+    // 清理构建缓存
+    stage('Cleanup') {
+      steps {
+        sh 'docker system prune -f'
       }
     }
   }
