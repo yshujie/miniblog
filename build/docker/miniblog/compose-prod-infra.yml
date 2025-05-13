@@ -21,9 +21,8 @@ services:
       MYSQL_USER: miniblog
       MYSQL_PASSWORD: miniblog123
     volumes:
-      - mysql_data:/var/lib/mysql
+      - /data/mysql/data:/var/lib/mysql
       - /data/logs/mysql/:/var/log/mysql/
-      - /etc/mysql/:/etc/mysql/
     ports:
       - "3306:3306"
     healthcheck:
@@ -38,7 +37,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data/redis/data
+      - /data/redis/data:/data
       - /data/logs/redis/:/var/log/redis/
       - /etc/redis/:/etc/redis/
     healthcheck:
@@ -49,7 +48,6 @@ services:
     restart: always
 
 volumes:
-  mysql_data:
   redis_data:
 
 networks:

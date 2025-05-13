@@ -32,7 +32,7 @@ mkdir -p /data/logs/mysql/ # mysql 日志目录
 
 # 将 mysql 初始化数据复制到 /data/mysql/data/
 echo "复制 miniblog.sql..."
-cp ${PROJECT_ROOT}/configs/mysql/miniblog.sql /data/mysql/data/miniblog.sql
+cp ${PROJECT_ROOT}/configs/miniblog.sql /data/mysql/data/miniblog.sql
 
 # 创建 redis 相关目录
 mkdir -p /var/lib/redis/ # redis 安装目录
