@@ -4,6 +4,8 @@ pipeline {
   environment {
     // 项目根目录下 build/docker/miniblog
     BASE_DIR      = "build/docker/miniblog"
+    // 脚本目录
+    SCRIPT_DIR    = "scripts"
 
     // 镜像前缀
     IMAGE_REGISTRY     = 'yshujie'
@@ -21,7 +23,7 @@ pipeline {
     stage('Init System') {
       steps {
         echo '🔧 初始化系统'
-        sh 'sudo ./scripts/init_system.sh'        
+        sh "sudo ${SCRIPT_DIR}/init_system.sh"        
       }
     }
 
@@ -95,7 +97,7 @@ pipeline {
     stage('Init MySQL Schema') {
       steps {
         echo '🔧 初始化 mysql 数据库'
-        sh 'sudo ./scripts/init_mysql_schem.sh'
+        sh "sudo ${SCRIPT_DIR}/init_mysql_schem.sh"
       }
     }
 
