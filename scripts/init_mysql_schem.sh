@@ -4,7 +4,7 @@
 MYSQL_CONTAINER_NAME="miniblog-mysql-1"
 
 # 获取 mysql 密码
-MYSQL_PASSWORD="miniblog123"
+MYSQL_PASSWORD="root"
 
 # 检查 docker 中的 mysql 是否启动
 if ! docker exec ${MYSQL_CONTAINER_NAME} mysqladmin -u root -p${MYSQL_PASSWORD} ping; then
