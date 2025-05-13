@@ -8,7 +8,7 @@ services:
     volumes:
       - /data/nginx/ssl:/etc/nginx/ssl
       - /data/logs/nginx:/var/log/nginx
-      - ../../../configs/nginx/:/etc/nginx/:ro
+      - ../../../configs/nginx/:/etc/nginx/
     restart: always
 
   # 数据库
