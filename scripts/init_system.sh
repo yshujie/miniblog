@@ -12,7 +12,8 @@ mkdir -p /etc/nginx/ssl/    # nginx ssl 证书目录
 mkdir -p /data/logs/nginx/  # nginx 日志目录
 
 # 将 nginx 配置文件复制到 /etc/nginx/
-cp -r ${PROJECT_ROOT}/configs/nginx/ /etc/nginx/
+cp ${PROJECT_ROOT}/configs/nginx/nginx.conf /etc/nginx/nginx.conf
+cp ${PROJECT_ROOT}/configs/nginx/conf.d/yangshujie.com.conf /etc/nginx/conf.d/yangshujie.com.conf
 
 # 创建 mysql 相关目录
 mkdir -p /var/lib/mysql/  # mysql 安装目录
@@ -39,3 +40,5 @@ chmod 755 /data/logs/nginx/
 chmod 755 /data/logs/mysql/
 chmod 755 /data/logs/redis/
 chmod 755 /data/logs/miniblog/
+chmod 644 /etc/nginx/nginx.conf
+chmod 644 /etc/nginx/conf.d/yangshujie.com.conf
