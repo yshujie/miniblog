@@ -19,6 +19,16 @@ pipeline {
 
   // 阶段
   stages {
+    // 拉取最新代码
+    stage('Checkout') {
+      steps {
+        // 清理旧内容
+        deleteDir()
+        // 拉取最新代码
+        checkout scm
+      }
+    }
+
     // 初始化系统
     stage('Init System') {
       steps {
@@ -58,17 +68,7 @@ pipeline {
         }
       }
     }
-
-    // 拉取最新代码
-    stage('Checkout') {
-      steps {
-        // 清理旧内容
-        deleteDir()
-        // 拉取最新代码
-        checkout scm
-      }
-    }
-
+    
     // 启动基础设施
     stage('Infra: Pull & Up') {
       steps {

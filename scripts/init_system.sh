@@ -24,11 +24,6 @@ if [ ! -f /etc/nginx/nginx.conf ]; then
     echo "nginx 配置文件 nginx.conf 不存在"
     exit 1
 fi
-# 检查 /etc/nginx/conf.d/default.conf 文件是否存在
-if [ ! -f /etc/nginx/conf.d/default.conf ]; then
-    echo "nginx 配置文件 default.conf 不存在"
-    exit 1
-fi
 
 # 创建 mysql 相关目录
 mkdir -p /var/lib/mysql/  # mysql 安装目录
