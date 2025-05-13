@@ -7,9 +7,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ../../../../configs/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ../../../../configs/nginx/ssl:/etc/nginx/ssl:ro
-      - /data/logs/nginx:/var/log/nginx
+      - ../../../../configs/nginx/conf.d/:/etc/nginx/conf.d/
+      - ../../../../configs/nginx/ssl/:/etc/nginx/ssl/
+      - /data/logs/nginx/:/var/log/nginx/
     restart: always
 
   # 数据库
@@ -39,7 +39,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_data:/data/redis/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
