@@ -19,7 +19,7 @@ mkdir -p /data/logs/nginx    # nginx 日志目录
 echo "复制 nginx 配置文件"
 cp ${PROJECT_ROOT}/configs/nginx/nginx.conf /data/nginx/nginx.conf
 cp ${PROJECT_ROOT}/configs/nginx/conf.d/default.conf /data/nginx/conf.d/default.conf
-cp /root/.config/ssl/* /data/nginx/ssl/
+cp /data/ssl/* /data/nginx/ssl/
 
 echo "查看 nginx 配置文件"
 ls -l /data/nginx/nginx.conf
