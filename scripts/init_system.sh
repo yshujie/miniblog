@@ -14,16 +14,16 @@ mkdir -p /data/nginx/conf.d  # nginx 配置文件目录
 mkdir -p /data/nginx/ssl     # nginx ssl 证书目录
 mkdir -p /data/logs/nginx    # nginx 日志目录
 
-# 将 nginx 配置文件复制到 /data/nginx/conf.d/
+# 复制 nginx 配置文件
 cp ${PROJECT_ROOT}/configs/nginx/conf.d/* /data/nginx/conf.d/
+cp ${PROJECT_ROOT}/configs/nginx/ssl/* /data/nginx/ssl/
 
 # 创建 mysql 相关目录
 mkdir -p /data/mysql/data    # mysql 数据目录
 mkdir -p /data/logs/mysql    # mysql 日志目录
 
-# 将 mysql 初始化数据复制到 /data/mysql/data/
-echo "复制 miniblog.sql..."
-cp ${PROJECT_ROOT}/configs/miniblog.sql /data/mysql/data/miniblog.sql
+# 复制 mysql 初始化数据
+cp ${PROJECT_ROOT}/configs/mysql/miniblog.sql /data/mysql/miniblog.sql
 
 # 创建 redis 相关目录
 mkdir -p /data/redis/data    # redis 数据目录
@@ -33,8 +33,7 @@ mkdir -p /data/logs/redis    # redis 日志目录
 mkdir -p /etc/miniblog       # miniblog 安装目录
 mkdir -p /data/logs/miniblog # miniblog 日志目录
 
-# 将 miniblog 配置文件复制到 /etc/miniblog/config.yaml
-echo "复制 miniblog.yaml..."
+# 复制 miniblog 配置文件
 cp ${PROJECT_ROOT}/configs/miniblog.yaml /etc/miniblog/config.yaml
 
 # 权限设置

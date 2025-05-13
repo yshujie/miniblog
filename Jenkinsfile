@@ -107,16 +107,6 @@ pipeline {
       }
     }
 
-    // 初始化 mysql 数据库
-    stage('Init MySQL Schema') {
-      steps {
-        dir("${SCRIPT_DIR}") {
-          echo '🔧 初始化 mysql 数据库'
-          sh "bash init_mysql_schem.sh"
-        }
-      }
-    }
-
     // 构建后端生产镜像
     stage('Build: Backend') {
       steps {

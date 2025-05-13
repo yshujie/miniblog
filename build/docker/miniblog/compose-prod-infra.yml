@@ -22,6 +22,7 @@ services:
     volumes:
       - /data/mysql/data:/var/lib/mysql
       - /data/logs/mysql/:/var/log/mysql/
+      - /data/mysql/miniblog.sql:/docker-entrypoint-initdb.d/miniblog.sql:ro
     ports:
       - "3306:3306"
     healthcheck:
@@ -38,17 +39,9 @@ services:
     volumes:
       - /data/redis/data:/data
       - /data/logs/redis/:/var/log/redis/
-      - /etc/redis/:/etc/redis/
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: always
-
-volumes:
-  redis_data:
-
-networks:
-  miniblog-network:
-    driver: bridge
