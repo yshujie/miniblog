@@ -80,6 +80,14 @@ pipeline {
           // 启动基础设施
           sh 'docker-compose -f compose-prod-infra.yml up -d'
           
+          // 等待 Nginx 就绪
+          sh '''
+            until docker exec miniblog-nginx-1 nginx -t; do
+              echo "Waiting for Nginx..."
+              sleep 2
+            done
+          '''
+
           // 等待 MySQL 就绪
           sh '''
             until docker exec miniblog-mysql-1 mysqladmin ping -h localhost --silent; do
