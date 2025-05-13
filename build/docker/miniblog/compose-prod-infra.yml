@@ -24,7 +24,6 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ../../../../configs/miniblog.sql:/docker-entrypoint-initdb.d/miniblog.sql
-      - /data/logs/mysql:/var/log/mysql
     ports:
       - "3306:3306"
     healthcheck:
