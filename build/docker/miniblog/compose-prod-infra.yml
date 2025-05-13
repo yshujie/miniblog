@@ -6,10 +6,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - /etc/nginx/:/etc/nginx/
-      - /etc/nginx/conf.d/:/etc/nginx/conf.d/
-      - /etc/nginx/ssl/:/etc/nginx/ssl/
-      - /data/logs/nginx/:/var/log/nginx/
+      - /data/nginx/conf.d:/etc/nginx/conf.d
+      - /data/nginx/ssl:/etc/nginx/ssl
+      - /data/logs/nginx:/var/log/nginx
     restart: always
 
   # 数据库
