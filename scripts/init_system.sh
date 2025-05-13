@@ -15,8 +15,9 @@ mkdir -p /data/nginx/ssl     # nginx ssl 证书目录
 mkdir -p /data/logs/nginx    # nginx 日志目录
 
 # 复制 nginx 配置文件
-cp ${PROJECT_ROOT}/configs/nginx/conf.d/* /data/nginx/conf.d/
-cp ${PROJECT_ROOT}/configs/nginx/ssl/* /data/nginx/ssl/
+cp ${PROJECT_ROOT}/configs/nginx/nginx.conf /data/nginx/nginx.conf
+cp ${PROJECT_ROOT}/configs/nginx/conf.d/default.conf /data/nginx/conf.d/default.conf
+cp /root/.config/ssl/* /data/nginx/ssl/
 
 # 创建 mysql 相关目录
 mkdir -p /data/mysql/data    # mysql 数据目录
