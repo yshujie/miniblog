@@ -65,6 +65,12 @@ pipeline {
         dir("${BASE_DIR}") {
           echo '🔧 启动基础设施'
 
+          sh 'ls -l ../../../configs/nginx'
+          sh 'ls -l ../../../configs/nginx/nginx.conf || echo "FILE MISSING"'
+          sh 'ls -l ../../../configs/nginx/conf.d/default.conf || echo "FILE MISSING"'
+          sh 'ls -l ../../../configs/mysql'
+          sh 'ls -l ../../../configs/mysql/miniblog.sql || echo "FILE MISSING"'
+
           // 拉取基础镜像
           sh 'docker-compose -f compose-prod-infra.yml pull'
           // 启动基础设施
