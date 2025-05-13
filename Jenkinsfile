@@ -29,16 +29,6 @@ pipeline {
       }
     }
 
-    // 初始化系统
-    stage('Init System') {
-      steps {
-        dir("${SCRIPT_DIR}") {
-          echo '🔧 初始化系统'
-          sh "bash init_system.sh"        
-        }
-      }
-    }
-
     // 设置 SSL 证书
     stage('Setup SSL') {
       steps {
