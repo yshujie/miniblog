@@ -16,7 +16,7 @@ server:
 # 数据库配置
 database:
   driver: "mysql"
-  host: "127.0.0.1"
+  host: "mysql"  # 使用容器名称作为主机名
   port: 3306
   username: "miniblog"
   password: "miniblog123"
@@ -28,7 +28,7 @@ database:
 
 # redis 配置
 redis:
-  host: "127.0.0.1"      # 使用 127.0.0.1
+  host: "redis"  # 使用容器名称作为主机名
   port: 6379
   password: ""       # 如果没有密码则留空
   db: 0
