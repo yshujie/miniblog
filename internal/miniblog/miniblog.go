@@ -74,7 +74,7 @@ func run() error {
 	token.Init(viper.GetString("jwt.secret"), known.XUsernameKey)
 
 	// 设置 Gin 模式
-	gin.SetMode(viper.GetString("runmode"))
+	gin.SetMode(viper.GetString("server.run_mode"))
 
 	// 创建 Gin 引擎
 	g := gin.New()
@@ -125,10 +125,13 @@ func run() error {
 // startInsecureServer 启动 HTTP 服务器
 func startInsecureServer(g *gin.Engine) *http.Server {
 	// 创建 HTTP Server 实例
-	httpSrv := &http.Server{Addr: viper.GetString("addr"), Handler: g}
+	httpSrv := &http.Server{
+		Addr:    viper.GetString("server.address") + ":" + viper.GetString("server.port"),
+		Handler: g,
+	}
 
 	// 打印日志
-	log.Infow("Start to listening the incoming requests on port " + viper.GetString("addr"))
+	log.Infow("Start to listening the incoming requests on port " + viper.GetString("server.address"))
 
 	// 运行 HTTP Server
 	go func() {
@@ -140,16 +143,16 @@ func startInsecureServer(g *gin.Engine) *http.Server {
 	return httpSrv
 }
 
+// startSecureServer 启动 HTTPS 服务器
 func startSecureServer(g *gin.Engine) *http.Server {
-
 	// 创建 HTTPS Server 实例
 	httpsSrv := &http.Server{
-		Addr:    viper.GetString("tls.addr"),
+		Addr:    viper.GetString("server.address") + ":" + viper.GetString("server.port_ssl"),
 		Handler: g,
 	}
 
 	// 打印日志
-	log.Infow("Start to listening the incoming requests on port " + viper.GetString("tls.addr"))
+	log.Infow("Start to listening the incoming requests on port " + viper.GetString("server.address"))
 
 	// 检查证书和密钥文件是否存在
 	if _, err := os.Stat(viper.GetString("tls.cert")); os.IsNotExist(err) {

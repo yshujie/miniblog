@@ -17,6 +17,7 @@ services:
     restart: always
     ports:
       - "8081:8081"
+      - "8443:8443"
     volumes:
       - /data/logs/miniblog:/data/logs/miniblog
       - /root/.config/ssl:/etc/miniblog/ssl:ro

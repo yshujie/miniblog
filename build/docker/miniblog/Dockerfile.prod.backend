@@ -52,6 +52,7 @@ COPY --from=builder /app/configs/miniblog.yaml /etc/miniblog/config.yaml
 
 # 暴露端口
 EXPOSE 8081
+EXPOSE 8443
 
 # 启动命令
 ENTRYPOINT ["/usr/local/bin/miniblog", "--config", "/etc/miniblog/config.yaml"]

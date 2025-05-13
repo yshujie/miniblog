@@ -8,12 +8,10 @@ server:
   name: "miniblog"
   address: "0.0.0.0"
   port: 8081
+  port_ssl: 8443
   read_timeout: 60    # 秒
   write_timeout: 60   # 秒
-
-# 通用配置
-runmode: debug               # Gin 开发模式, 可选值有：debug, release, test
-addr: :8081                  # HTTP 服务器监听地址
+  run_mode: "debug"   # Gin 开发模式, 可选值有：debug, release, test
 
 # 数据库配置
 database:
@@ -66,6 +64,5 @@ cors:
 
 # HTTPS 服务器相关配置
 tls:
-  addr: :8443 # HTTPS 服务器监听地址
   cert: /etc/miniblog/ssl/yangshujie.com.crt # 服务端证书文件
   key: /etc/miniblog/ssl/yangshujie.com.key # 服务端私钥文件
