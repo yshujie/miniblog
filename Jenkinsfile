@@ -45,9 +45,9 @@ pipeline {
           // 创建证书目录
           sh 'mkdir -p configs/nginx/ssl'
 
-          // 写入证书文件
-          sh "cp ${SSL_CERT} configs/nginx/ssl/yangshujie.com.crt"
-          sh "cp ${SSL_KEY} configs/nginx/ssl/yangshujie.com.key"
+           // 写入证书文件
+          writeFile file: 'configs/nginx/ssl/yangshujie.com.crt', text: "${SSL_CERT}"
+          writeFile file: 'configs/nginx/ssl/yangshujie.com.key', text: "${SSL_KEY}"
 
           // 设置正确的权限
           sh '''
