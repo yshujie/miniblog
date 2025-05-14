@@ -36,9 +36,11 @@ pipeline {
     // 停止旧容器
     stage('Stop Old Containers') {
       steps {
-        echo '🔧 停止旧容器'
-        sh 'docker-compose -f compose-prod-infra.yml down'
-        sh 'docker-compose -f compose-prod-app.yml down'
+        dir("${BASE_DIR}") {
+          echo '🔧 停止旧容器'
+          sh 'docker-compose -f compose-prod-infra.yml down'
+          sh 'docker-compose -f compose-prod-app.yml down'
+        }
       }
     }
 
