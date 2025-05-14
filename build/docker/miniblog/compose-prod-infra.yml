@@ -9,7 +9,6 @@ services:
       - "443:443"
     volumes:
       - /data/logs/nginx:/var/log/nginx
-      - /data/nginx/ssl:/etc/nginx/ssl:ro
     networks:
       - miniblog-network
     restart: always

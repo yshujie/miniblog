@@ -29,14 +29,39 @@ pipeline {
       }
     }
 
+    // 设置 SSL 证书，由 Jenkins 管理，写到 configs/nginx/ssl 目录下
+    stage('Setup SSL') {
+      steps {
+        dir("${env.WORKSPACE}") {
+          echo '🔧 设置 SSL 证书'
+
+          // 从全局凭据中拉出两个 Secret File
+          withCredentials([
+            file(credentialsId: 'ssl-crt',  variable: 'SSL_CRT_FILE'),
+            file(credentialsId: 'ssl-key',  variable: 'SSL_KEY_FILE'),
+          ]) {
+            sh '''
+              # 把凭据放到构建上下文里
+              mkdir -p build/docker/miniblog/configs/nginx/ssl
+              cp "$SSL_CRT_FILE" build/docker/miniblog/configs/nginx/ssl/yangshujie.com.crt
+              cp "$SSL_KEY_FILE" build/docker/miniblog/configs/nginx/ssl/yangshujie.com.key
+              chmod 644 build/docker/miniblog/configs/nginx/ssl/yangshujie.com.crt
+              chmod 600 build/docker/miniblog/configs/nginx/ssl/yangshujie.com.key
+            '''
+          }
+        }
+      }
+    }
+
     // 构建基础设施镜像
     stage('Infra: build') {
       steps {
         dir("${env.WORKSPACE}") {
           echo '🔧 构建基础设施镜像'
-          sh "docker build -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
-          sh "docker build -f ${BASE_DIR}/Dockerfile.infra.mysql -t ${MYSQL_IMAGE} ."
-          sh "docker build -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
+
+          sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
+          sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.mysql -t ${MYSQL_IMAGE} ."
+          sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
 
           // 查看镜像
           sh "docker images | grep ${IMAGE_REGISTRY}"
