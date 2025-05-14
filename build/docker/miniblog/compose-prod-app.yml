@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   backend:
-    image: yshujie/miniblog:prod      # 不再 build，只用已构建好的镜像
+    image: miniblog-backend:prod 
     extra_hosts:
       - "host.docker.internal:host-gateway"
     network_mode: "host"
@@ -24,7 +24,7 @@ services:
       - /root/.config/ssl/:/etc/miniblog/ssl/
 
   frontend:
-    image: yshujie/miniblog-frontend:prod
+    image: miniblog-frontend:prod
     extra_hosts:
       - "host.docker.internal:host-gateway"
     network_mode: "host"
