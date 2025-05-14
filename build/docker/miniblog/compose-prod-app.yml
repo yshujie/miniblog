@@ -25,4 +25,5 @@ services:
 
 networks:
   miniblog-network:
-    external: true      
+    external: true
+    name: miniblog-network
