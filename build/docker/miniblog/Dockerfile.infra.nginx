@@ -3,9 +3,9 @@
 FROM nginx:alpine
 
 # 拷贝主配置和站点；SSL 由 Jenkinsfile 写入 configs/nginx/ssl
-COPY configs/nginx/nginx.conf /etc/nginx/nginx.conf
-COPY configs/nginx/conf.d /etc/nginx/conf.d
-COPY configs/nginx/ssl /etc/nginx/ssl
+COPY ../../../configs/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY ../../../configs/nginx/conf.d /etc/nginx/conf.d
+COPY ../../../configs/nginx/ssl /etc/nginx/ssl
 
 RUN chmod 644 /etc/nginx/ssl/*.crt \
   && chmod 600 /etc/nginx/ssl/*.key
