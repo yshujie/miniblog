@@ -39,8 +39,6 @@ services:
     depends_on:
       - backend
       - frontend
-    extra_hosts:
-      - "api.blog.yangshujie.com:127.0.0.1"
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
