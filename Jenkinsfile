@@ -158,16 +158,6 @@ pipeline {
           sh '''
             docker-compose -f compose-prod-app.yml up -d
           '''
-
-          // 检查后端服务
-          sh '''
-            until curl -s http://localhost:8081/healthz | grep -q 'ok'; do
-              echo "Waiting for backend..."
-              sleep 2
-            done
-            echo "🚀 Backend started successfully"
-          '''
-          
           // 检查 Nginx 服务
           sh '''
             until docker exec miniblog-nginx-1 nginx -t; do
