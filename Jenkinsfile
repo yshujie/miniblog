@@ -68,9 +68,9 @@ pipeline {
       steps {
         dir("${BASE_DIR}") {
           echo '🔧 构建基础设施镜像'
-          sh "docker build -f Dockerfile.infra.nginx -t ${NGINX_IMAGE} ../../../"
-          sh "docker build -f Dockerfile.infra.mysql -t ${MYSQL_IMAGE} ../../../"
-          sh "docker build -f Dockerfile.infra.redis -t ${REDIS_IMAGE} ../../../"
+          sh "docker build -f Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
+          sh "docker build -f Dockerfile.infra.mysql -t ${MYSQL_IMAGE} ."
+          sh "docker build -f Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
 
           // 查看镜像
           sh "docker images | grep ${IMAGE_REGISTRY}"

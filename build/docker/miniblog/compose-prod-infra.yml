@@ -3,9 +3,6 @@ version: '3.8'
 
 services:
   nginx:
-    build:
-      context: ../../../       # 回到项目根
-      dockerfile: build/docker/miniblog/Dockerfile.infra.nginx
     image: miniblog-nginx:prod
     ports:
       - "80:80"
@@ -22,9 +19,6 @@ services:
       retries: 3
 
   mysql:
-    build:
-      context: ../../../
-      dockerfile: build/docker/miniblog/Dockerfile.infra.mysql
     image: miniblog-mysql:prod
     ports:
       - "3306:3306"
@@ -43,9 +37,6 @@ services:
       retries: 5
 
   redis:
-    build:
-      context: ../../../
-      dockerfile: build/docker/miniblog/Dockerfile.infra.redis
     image: miniblog-redis:prod
     ports:
       - "6379:6379"
