@@ -5,10 +5,6 @@ pipeline {
     // 项目根目录下 build/docker/miniblog
     BASE_DIR      = "build/docker/miniblog"
 
-    // 证书文件
-    SSL_CERT = credentials('ssl-cert')
-    SSL_KEY = credentials('ssl-key')
-
     // 镜像前缀
     IMAGE_REGISTRY     = 'miniblog'
     // 基础设施镜像
@@ -30,40 +26,6 @@ pipeline {
         deleteDir()
         // 拉取最新代码
         checkout scm
-      }
-    }
-
-    // 设置 SSL 证书，由 Jenkins 管理，写到 configs/nginx/ssl 目录下
-    stage('Setup SSL') {
-      steps {
-        dir("${env.WORKSPACE}") {
-          echo '🔧 设置 SSL 证书'
-
-        // 创建证书目录
-        sh 'mkdir -p configs/nginx/ssl'
-        
-        // 写入证书文件
-        writeFile file: 'configs/nginx/ssl/yangshujie.com.crt', text: "${SSL_CERT}"
-        writeFile file: 'configs/nginx/ssl/yangshujie.com.key', text: "${SSL_KEY}"
-        
-        // 设置正确的权限
-        sh '''
-          chmod 644 configs/nginx/ssl/yangshujie.com.key
-          chmod 644 configs/nginx/ssl/yangshujie.com.crt
-        '''
-
-        // 验证证书文件
-        sh '''
-          echo "=== 证书文件权限 ==="
-          ls -l configs/nginx/ssl/
-          
-          echo "=== 证书文件内容 ==="
-          head -n 1 configs/nginx/ssl/yangshujie.com.crt
-          cat configs/nginx/ssl/yangshujie.com.crt
-          head -n 1 configs/nginx/ssl/yangshujie.com.key
-          cat configs/nginx/ssl/yangshujie.com.key
-        '''
-        }
       }
     }
 
