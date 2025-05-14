@@ -2,18 +2,10 @@
 # 以官方 nginx 镜像为基础
 FROM nginx:alpine
 
-# 打印当前目录
-RUN pwd
-RUN ls -al ./
-RUN ls -al ../../../configs/nginx
-RUN ls -al ../../../configs/nginx/nginx.conf
-RUN ls -al ../../../configs/nginx/conf.d
-RUN ls -al ../../../configs/nginx/ssl
-
 # 拷贝主配置和站点；SSL 由 Jenkinsfile 写入 configs/nginx/ssl
-COPY ../../../configs/nginx/nginx.conf /etc/nginx/nginx.conf
-COPY ../../../configs/nginx/conf.d /etc/nginx/conf.d
-COPY ../../../configs/nginx/ssl /etc/nginx/ssl
+COPY configs/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY configs/nginx/conf.d /etc/nginx/conf.d
+COPY configs/nginx/ssl /etc/nginx/ssl
 
 RUN chmod 644 /etc/nginx/ssl/*.crt \
   && chmod 600 /etc/nginx/ssl/*.key
