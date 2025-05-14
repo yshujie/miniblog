@@ -141,9 +141,11 @@ pipeline {
     // 构建 Nginx 镜像
     stage('Build: Nginx') {
       steps {
-        dir("${BASE_DIR}") {
+        dir("${env.WORKSPACE}") {
           echo '📦 构建 Nginx 生产镜像'
           sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
+
+          sh "docker images | grep ${IMAGE_REGISTRY}"
         }
       }
     }
