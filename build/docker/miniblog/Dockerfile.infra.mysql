@@ -1,12 +1,21 @@
-# build/docker/miniblog/Dockerfile.mysql
+# build/docker/miniblog/Dockerfile.infra.mysql
 FROM mysql:8
 
-# 将初始化脚本打包到镜像里（可选，也可以继续 bind-mount）
-COPY configs/mysql/miniblog.sql /docker-entrypoint-initdb.d/miniblog.sql
+# 设置时区
+ENV TZ=Asia/Shanghai
+
+# 复制初始化脚本
+COPY scripts/init-mysql.sh /docker-entrypoint-initdb.d/
+RUN chmod +x /docker-entrypoint-initdb.d/init-mysql.sh
+
+# 复制 SQL 文件
+COPY configs/mysql/miniblog.sql /docker-entrypoint-initdb.d/
+
+# 保留数据挂载点
+VOLUME ["/var/lib/mysql", "/var/log/mysql"]
 
 # 推荐设置时区、字符集等
-ENV TZ=Asia/Shanghai \
-  MYSQL_ROOT_PASSWORD=root \
+ENV MYSQL_ROOT_PASSWORD=root \
   MYSQL_DATABASE=miniblog \
   MYSQL_USER=miniblog \
   MYSQL_PASSWORD=miniblog123

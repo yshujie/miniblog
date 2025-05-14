@@ -9,7 +9,6 @@ services:
     volumes:
       - /data/mysql/data:/var/lib/mysql
       - /data/logs/mysql:/var/log/mysql
-      - ../../../configs/mysql/miniblog.sql:/docker-entrypoint-initdb.d/miniblog.sql:ro
     environment:
       TZ: Asia/Shanghai
     networks:
