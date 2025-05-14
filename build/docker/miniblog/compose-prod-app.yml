@@ -33,9 +33,14 @@ services:
     networks:
       - miniblog-network
     restart: always
+    dns:
+      - 8.8.8.8
+      - 114.114.114.114
     depends_on:
       - backend
       - frontend
+    extra_hosts:
+      - "api.blog.yangshujie.com:127.0.0.1"
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
