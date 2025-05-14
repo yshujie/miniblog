@@ -36,22 +36,27 @@ pipeline {
     // 设置 SSL 证书，由 Jenkins 管理，写到 configs/nginx/ssl 目录下
     stage('Setup SSL') {
       steps {
-        dir("${BASE_DIR}") {
+        withCredentials([
+          file(credentialsId: 'ssl-cert', variable: 'CRT'),
+          file(credentialsId: 'ssl-key',  variable: 'KEY')
+        ]) {
           echo '🔧 设置 SSL 证书'
 
           // 创建证书目录
           sh 'mkdir -p configs/nginx/ssl'
-          
+
           // 写入证书文件
-          writeFile file: 'configs/nginx/ssl/yangshujie.com.crt', text: "${SSL_CERT}"
-          writeFile file: 'configs/nginx/ssl/yangshujie.com.key', text: "${SSL_KEY}"
-          
+          sh "cp ${SSL_CERT} configs/nginx/ssl/yangshujie.com.crt"
+          sh "cp ${SSL_KEY} configs/nginx/ssl/yangshujie.com.key"
+
           // 设置正确的权限
           sh '''
-            chmod 600 configs/nginx/ssl/yangshujie.com.key
-            chmod 644 configs/nginx/ssl/yangshujie.com.crt
+            chmod 644 configs/nginx/ssl/*.crt
+            chmod 600 configs/nginx/ssl/*.key
+          '''
 
-            # 验证证书文件
+          // 验证证书文件
+          sh '''
             echo "=== 证书文件权限 ==="
             ls -l configs/nginx/ssl/
             
