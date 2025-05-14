@@ -24,14 +24,14 @@ services:
       - "3000:80"           # 宿主机 3000 -> 容器内 Nginx 的 80
 
   nginx:
-      image: miniblog-nginx:prod
-      ports:
-        - "80:80"
-        - "443:443"
-      volumes:
-        - /data/logs/nginx:/var/log/nginx
-      networks:
-        - miniblog-network
+    image: miniblog-nginx:prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /data/logs/nginx:/var/log/nginx
+    networks:
+      - miniblog-network
     restart: always
     depends_on:
       - backend
@@ -39,8 +39,8 @@ services:
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
-        timeout: 5s
-        retries: 3
+      timeout: 5s
+      retries: 3
 
 # 网络，使用 miniblog-network
 networks:
