@@ -69,7 +69,7 @@ pipeline {
     }
 
     // 拉取基础设施镜像并启动基础设施容器
-    stage('Infra: Pull & Up') {
+    stage('Infra: Up') {
       steps {
         dir("${BASE_DIR}") {
           echo '🔧 拉取基础设施镜像'
@@ -96,12 +96,22 @@ pipeline {
       }
     }
 
-    // 构建 Nginx 生产镜像
-    stage('Build: Nginx') {
+    // 构建前端生产镜像
+    stage('Build: Frontend') {
       steps {
         dir("${BASE_DIR}") {
-          echo '📦 构建 Nginx 生产镜像'
-          sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
+          echo '📦 构建前端生产镜像'
+          sh """
+              docker build \
+                --network host \
+                --add-host host.docker.internal:host-gateway \
+                --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
+                --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
+                -f Dockerfile.prod.frontend \
+                -t ${FRONTEND_IMAGE_TAG} \
+                ../../../web/miniblog-web
+              """
+        }
       }
     }
 
@@ -128,25 +138,15 @@ pipeline {
       }
     }
 
-    // 构建前端生产镜像
-    stage('Build: Frontend') {
+    // 构建 Nginx 镜像
+    stage('Build: Nginx') {
       steps {
         dir("${BASE_DIR}") {
-          echo '📦 构建前端生产镜像'
-          sh """
-              docker build \
-                --network host \
-                --add-host host.docker.internal:host-gateway \
-                --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
-                --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
-                -f Dockerfile.prod.frontend \
-                -t ${FRONTEND_IMAGE_TAG} \
-                ../../../web/miniblog-web
-              """
+          echo '📦 构建 Nginx 生产镜像'
+          sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
         }
       }
     }
-
    
     // 部署应用
     stage('App Deploy') {
