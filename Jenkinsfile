@@ -33,21 +33,11 @@ pipeline {
       }
     }
 
-    // 停止旧容器
-    stage('Stop Old Containers') {
-      steps {
-        dir("${BASE_DIR}") {
-          echo '🔧 停止旧容器'
-          sh 'docker-compose -f compose-prod-infra.yml down'
-          sh 'docker-compose -f compose-prod-app.yml down'
-        }
-      }
-    }
-
     // 设置 SSL 证书，由 Jenkins 管理，写到 configs/nginx/ssl 目录下
     stage('Setup SSL') {
       steps {
-        echo '🔧 设置 SSL 证书'
+        dir("${env.WORKSPACE}") {
+          echo '🔧 设置 SSL 证书'
 
         // 创建证书目录
         sh 'mkdir -p configs/nginx/ssl'
@@ -71,6 +61,7 @@ pipeline {
           head -n 1 configs/nginx/ssl/yangshujie.com.crt
           head -n 1 configs/nginx/ssl/yangshujie.com.key
         '''
+        }
       }
     }
 
@@ -97,7 +88,7 @@ pipeline {
           // 拉取基础设施镜像
           // sh 'docker-compose -f compose-prod-infra.yml pull'
           // 启动基础设施容器
-          sh 'docker-compose -f compose-prod-infra.yml up -d'
+          sh 'docker-compose -f compose-prod-infra.yml up -d --remove-orphans --force-recreate'
 
           // 等待 Nginx 就绪
           sh '''
@@ -183,8 +174,10 @@ pipeline {
     // 清理构建缓存
     stage('Cleanup') {
       steps {
-        echo '🧹 清理构建缓存'
-        sh 'docker system prune -f'
+        dir("${BASE_DIR}") { 
+          echo '🧹 清理构建缓存'
+          sh 'docker system prune -f'
+        }
       }
     }
   }
