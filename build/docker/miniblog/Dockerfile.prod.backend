@@ -50,6 +50,9 @@ COPY --from=builder /app/cmd/miniblog/miniblog /usr/local/bin/miniblog
 # 复制配置文件
 COPY --from=builder /app/configs/miniblog.yaml /etc/miniblog/config.yaml
 
+# 复制 ssl 文件
+COPY --from=builder /app/configs/ssl/ /etc/miniblog/ssl/
+
 # 暴露端口
 EXPOSE 8081
 EXPOSE 8443
