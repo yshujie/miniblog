@@ -1,0 +1,17 @@
+# build/docker/miniblog/Dockerfile.mysql
+FROM mysql:8
+
+# 将初始化脚本打包到镜像里（可选，也可以继续 bind-mount）
+COPY configs/mysql/miniblog.sql /docker-entrypoint-initdb.d/miniblog.sql
+
+# 推荐设置时区、字符集等
+ENV TZ=Asia/Shanghai \
+  MYSQL_ROOT_PASSWORD=root \
+  MYSQL_DATABASE=miniblog \
+  MYSQL_USER=miniblog \
+  MYSQL_PASSWORD=miniblog123
+
+# 可根据需求修改 my.cnf，比如开启慢查询日志
+# COPY configs/mysql/my.cnf /etc/mysql/conf.d/my.cnf
+
+EXPOSE 3306 33060

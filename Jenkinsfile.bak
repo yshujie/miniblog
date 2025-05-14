@@ -4,21 +4,17 @@ pipeline {
   environment {
     // 项目根目录下 build/docker/miniblog
     BASE_DIR      = "build/docker/miniblog"
+    // 脚本目录
+    SCRIPT_DIR    = "scripts"
+
+    // 镜像前缀
+    IMAGE_REGISTRY     = 'yshujie'
+    BACKEND_IMAGE_TAG  = "${IMAGE_REGISTRY}/miniblog:prod"
+    FRONTEND_IMAGE_TAG = "${IMAGE_REGISTRY}/miniblog-frontend:prod"
 
     // 证书文件
     SSL_CERT = credentials('ssl-cert')
     SSL_KEY = credentials('ssl-key')
-
-    // 镜像前缀
-    IMAGE_REGISTRY     = 'yshujie'
-    // 基础设施镜像
-    NGINX_IMAGE  = "${IMAGE_REGISTRY}/miniblog-nginx:prod"
-    MYSQL_IMAGE  = "${IMAGE_REGISTRY}/miniblog-mysql:prod"
-    REDIS_IMAGE  = "${IMAGE_REGISTRY}/miniblog-redis:prod"
-    APP_IMAGE    = "${IMAGE_REGISTRY}/miniblog-app:prod"
-    // 应用镜像
-    BACKEND_IMAGE_TAG  = "${IMAGE_REGISTRY}/miniblog:prod"
-    FRONTEND_IMAGE_TAG = "${IMAGE_REGISTRY}/miniblog-frontend:prod"
   }
 
   // 阶段
@@ -33,7 +29,7 @@ pipeline {
       }
     }
 
-    // 设置 SSL 证书，由 Jenkins 管理，写到 configs/nginx/ssl 目录下
+    // 设置 SSL 证书
     stage('Setup SSL') {
       steps {
         dir("${BASE_DIR}") {
@@ -62,32 +58,24 @@ pipeline {
         }
       }
     }
-
-    // 构建基础设施镜像
-    stage('Infra: build') {
-      steps {
-        dir("${BASE_DIR}") {
-          echo '🔧 构建基础设施镜像'
-          sh "docker build -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ../../../"
-          sh "docker build -f ${BASE_DIR}/Dockerfile.infra.mysql -t ${MYSQL_IMAGE} ../../../"
-          sh "docker build -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ../../../"
-
-          // 查看镜像
-          sh "docker images | grep ${IMAGE_REGISTRY}"
-        }
-      }
-    }
-
-    // 拉取基础设施镜像并启动基础设施容器
+    
+    // 启动基础设施
     stage('Infra: Pull & Up') {
       steps {
         dir("${BASE_DIR}") {
-          echo '🔧 拉取基础设施镜像'
-          // 拉取基础设施镜像
-          sh 'docker-compose -f compose-prod-infra.yml pull'
-          // 启动基础设施容器
-          sh 'docker-compose -f compose-prod-infra.yml up -d'
+          echo '🔧 启动基础设施'
 
+          sh 'ls -l ../../../configs/nginx'
+          sh 'ls -l ../../../configs/nginx/nginx.conf || echo "FILE MISSING"'
+          sh 'ls -l ../../../configs/nginx/conf.d/default.conf || echo "FILE MISSING"'
+          sh 'ls -l ../../../configs/mysql'
+          sh 'ls -l ../../../configs/mysql/miniblog.sql || echo "FILE MISSING"'
+
+          // 拉取基础镜像
+          sh 'docker-compose -f compose-prod-infra.yml pull'
+          // 启动基础设施
+          sh 'docker-compose -f compose-prod-infra.yml up -d'
+          
           // 等待 Nginx 就绪
           sh '''
             until docker exec miniblog-nginx-1 nginx -t; do

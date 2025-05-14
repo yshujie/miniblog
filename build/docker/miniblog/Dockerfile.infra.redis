@@ -1,0 +1,10 @@
+# build/docker/miniblog/Dockerfile.infra.redis
+FROM redis:alpine
+
+# 如果有自定义 redis.conf，可以一起打包
+# COPY configs/redis/redis.conf /usr/local/etc/redis/redis.conf
+
+# 也可以在这里设置默认命令为加载自定义配置：
+# CMD ["redis-server", "/usr/local/etc/redis/redis.conf"]
+
+EXPOSE 6379
