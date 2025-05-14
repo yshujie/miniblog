@@ -28,6 +28,25 @@ pipeline {
         checkout scm
       }
     }
+    
+    // 创建 Docker 网络
+    stage('Prepare Network') {
+      steps {
+        script {
+          echo '🔧 创建 Docker 网络'
+          
+          // 如果网络不存在，就创建它
+          sh '''
+            if ! docker network inspect miniblog-network >/dev/null 2>&1; then
+              echo ">>> Creating Docker network: miniblog-network"
+              docker network create miniblog-network
+            else
+              echo ">>> Docker network miniblog-network already exists"
+            fi
+          '''
+        }
+      }
+    }
 
     // 设置 SSL 证书，由 Jenkins 管理，写到 configs/nginx/ssl 目录下
     stage('Setup SSL') {

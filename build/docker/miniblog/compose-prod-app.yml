@@ -25,5 +25,5 @@ services:
 
 networks:
   miniblog-network:
-    external: true
     name: miniblog-network
+    driver: bridge
