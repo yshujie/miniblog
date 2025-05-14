@@ -59,7 +59,6 @@ pipeline {
         dir("${env.WORKSPACE}") {
           echo '🔧 构建基础设施镜像'
 
-          sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
           sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.mysql -t ${MYSQL_IMAGE} ."
           sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
 
@@ -74,18 +73,9 @@ pipeline {
       steps {
         dir("${BASE_DIR}") {
           echo '🔧 拉取基础设施镜像'
-          // 拉取基础设施镜像
-          // sh 'docker-compose -f compose-prod-infra.yml pull'
+
           // 启动基础设施容器
           sh 'docker-compose -f compose-prod-infra.yml up -d --remove-orphans --force-recreate'
-
-          // 等待 Nginx 就绪
-          sh '''
-            until docker exec miniblog-nginx-1 nginx -t; do
-              echo "Waiting for Nginx..."
-              sleep 2
-            done
-          '''
 
           // 等待 MySQL 就绪
           sh '''
@@ -103,6 +93,15 @@ pipeline {
             done
           '''
         }
+      }
+    }
+
+    // 构建 Nginx 生产镜像
+    stage('Build: Nginx') {
+      steps {
+        dir("${BASE_DIR}") {
+          echo '📦 构建 Nginx 生产镜像'
+          sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
       }
     }
 
@@ -148,6 +147,7 @@ pipeline {
       }
     }
 
+   
     // 部署应用
     stage('App Deploy') {
       steps {
@@ -169,6 +169,14 @@ pipeline {
           sh '''
             until docker exec miniblog-frontend-1 curl -s http://localhost:3000 | grep -q 'ok'; do
               echo "Waiting for frontend..."
+              sleep 2
+            done
+          '''
+
+          // 等待 Nginx 就绪
+          sh '''
+            until docker exec miniblog-nginx-1 nginx -t; do
+              echo "Waiting for Nginx..."
               sleep 2
             done
           '''

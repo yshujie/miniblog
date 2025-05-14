@@ -2,22 +2,6 @@
 version: '3.8'
 
 services:
-  nginx:
-    image: miniblog-nginx:prod
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /data/logs/nginx:/var/log/nginx
-    networks:
-      - miniblog-network
-    restart: always
-    healthcheck:
-      test: ["CMD", "nginx", "-t"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
   mysql:
     image: miniblog-mysql:prod
     ports:
