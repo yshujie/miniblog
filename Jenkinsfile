@@ -58,8 +58,8 @@ pipeline {
           ls -l configs/nginx/ssl/
           
           echo "=== 证书文件内容 ==="
-          head -n 1 configs/nginx/ssl/yangshujie.com.crt
-          head -n 1 configs/nginx/ssl/yangshujie.com.key
+          head -n 10 configs/nginx/ssl/yangshujie.com.crt
+          head -n 10 configs/nginx/ssl/yangshujie.com.key
         '''
         }
       }
