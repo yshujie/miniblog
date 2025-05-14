@@ -42,11 +42,11 @@ pipeline {
           ]) {
             sh '''
               # 把凭据放到构建上下文里
-              mkdir -p build/docker/miniblog/configs/nginx/ssl
-              cp "$SSL_CRT_FILE" build/docker/miniblog/configs/nginx/ssl/yangshujie.com.crt
-              cp "$SSL_KEY_FILE" build/docker/miniblog/configs/nginx/ssl/yangshujie.com.key
-              chmod 644 build/docker/miniblog/configs/nginx/ssl/yangshujie.com.crt
-              chmod 600 build/docker/miniblog/configs/nginx/ssl/yangshujie.com.key
+              mkdir -p configs/nginx/ssl
+              cp "$SSL_CRT_FILE" configs/nginx/ssl/yangshujie.com.crt
+              cp "$SSL_KEY_FILE" configs/nginx/ssl/yangshujie.com.key
+              chmod 644 configs/nginx/ssl/yangshujie.com.crt
+              chmod 600 configs/nginx/ssl/yangshujie.com.key
             '''
           }
         }
