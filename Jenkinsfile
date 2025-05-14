@@ -84,7 +84,7 @@ pipeline {
         dir("${BASE_DIR}") {
           echo '🔧 拉取基础设施镜像'
           // 拉取基础设施镜像
-          sh 'docker-compose -f compose-prod-infra.yml pull'
+          // sh 'docker-compose -f compose-prod-infra.yml pull'
           // 启动基础设施容器
           sh 'docker-compose -f compose-prod-infra.yml up -d'
 
