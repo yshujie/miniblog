@@ -23,7 +23,8 @@ services:
     ports:
       - "3000:80"           # 宿主机 3000 -> 容器内 Nginx 的 80
 
+# 网络，使用 miniblog-network
 networks:
   miniblog-network:
+    external: true
     name: miniblog-network
-    driver: bridge
