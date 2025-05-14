@@ -6,7 +6,4 @@ FROM nginx:alpine
 COPY configs/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY configs/nginx/conf.d /etc/nginx/conf.d
 
-RUN chmod 644 /etc/nginx/ssl/*.crt \
-  && chmod 600 /etc/nginx/ssl/*.key
-
 EXPOSE 80 443
