@@ -10,15 +10,15 @@ pipeline {
     SSL_KEY = credentials('ssl-key')
 
     // 镜像前缀
-    IMAGE_REGISTRY     = 'yshujie'
+    IMAGE_REGISTRY     = 'miniblog'
     // 基础设施镜像
-    NGINX_IMAGE  = "${IMAGE_REGISTRY}/miniblog-nginx:prod"
-    MYSQL_IMAGE  = "${IMAGE_REGISTRY}/miniblog-mysql:prod"
-    REDIS_IMAGE  = "${IMAGE_REGISTRY}/miniblog-redis:prod"
-    APP_IMAGE    = "${IMAGE_REGISTRY}/miniblog-app:prod"
+    NGINX_IMAGE  = "${IMAGE_REGISTRY}-nginx:prod"
+    MYSQL_IMAGE  = "${IMAGE_REGISTRY}-mysql:prod"
+    REDIS_IMAGE  = "${IMAGE_REGISTRY}-redis:prod"
+    APP_IMAGE    = "${IMAGE_REGISTRY}-app:prod"
     // 应用镜像
-    BACKEND_IMAGE_TAG  = "${IMAGE_REGISTRY}/miniblog:prod"
-    FRONTEND_IMAGE_TAG = "${IMAGE_REGISTRY}/miniblog-frontend:prod"
+    BACKEND_IMAGE_TAG  = "${IMAGE_REGISTRY}-backend:prod"
+    FRONTEND_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend:prod"
   }
 
   // 阶段
