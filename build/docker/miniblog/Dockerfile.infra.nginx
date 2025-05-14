@@ -10,7 +10,10 @@ COPY configs/nginx/ssl /etc/nginx/ssl
 RUN chmod 644 /etc/nginx/ssl/*.crt \
   && chmod 600 /etc/nginx/ssl/*.key
 
-# 检查 ssl
+
+# 输出 ssl 文件，检查是否正确
 RUN ls -al /etc/nginx/ssl
+RUN cat /etc/nginx/ssl/yangshujie.com.crt
+RUN cat /etc/nginx/ssl/yangshujie.com.key
 
 EXPOSE 80 443
