@@ -156,6 +156,22 @@ pipeline {
           sh '''
             docker-compose -f compose-prod-app.yml up -d
           '''
+
+          // 等待应用就绪
+          sh '''
+            until docker exec miniblog-backend-1 curl -s http://localhost:8081/healthz | grep -q 'ok'; do
+              echo "Waiting for backend..."
+              sleep 2
+            done
+          '''
+
+          // 等待前端就绪
+          sh '''
+            until docker exec miniblog-frontend-1 curl -s http://localhost:3000 | grep -q 'ok'; do
+              echo "Waiting for frontend..."
+              sleep 2
+            done
+          '''
         }
       }
     }

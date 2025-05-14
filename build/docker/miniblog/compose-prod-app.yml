@@ -4,30 +4,25 @@ services:
     image: miniblog-backend:prod 
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    network_mode: "host"
-    environment:
-      - DB_HOST=127.0.0.1
-      - DB_PORT=3306
-      - DB_USER=miniblog
-      - DB_PASSWORD=miniblog123
-      - DB_NAME=miniblog
-      - REDIS_HOST=127.0.0.1
-      - REDIS_PORT=6379
-      - DB_DSN=miniblog:miniblog123@tcp(127.0.0.1:3306)/miniblog?charset=utf8mb4&parseTime=True&loc=Local
+    networks:
+      - miniblog-network
     restart: always
     ports:
       - "8081:8081"
       - "8443:8443"
     volumes:
       - /data/logs/miniblog:/data/logs/miniblog
-      - /etc/miniblog/:/etc/miniblog/
-      - /root/.config/ssl/:/etc/miniblog/ssl/
 
   frontend:
     image: miniblog-frontend:prod
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    network_mode: "host"
+    networks:
+      - miniblog-network
     restart: always
     ports:
-      - "3000:3000"
+      - "3000:80"           # 宿主机 3000 -> 容器内 Nginx 的 80
+
+networks:
+  miniblog-network:
+    external: true      
