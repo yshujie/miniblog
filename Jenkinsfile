@@ -166,15 +166,6 @@ pipeline {
               sleep 2
             done
           '''
-
-          // 等待前端就绪
-          sh '''
-            until docker exec miniblog-frontend-1 curl -s http://localhost:3000 | grep -q 'ok'; do
-              echo "Waiting for frontend..."
-              sleep 2
-            done
-          '''
-
           // 等待 Nginx 就绪
           sh '''
             until docker exec miniblog-nginx-1 nginx -t; do
