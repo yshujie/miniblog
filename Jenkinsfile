@@ -33,6 +33,15 @@ pipeline {
       }
     }
 
+    // 停止旧容器
+    stage('Stop Old Containers') {
+      steps {
+        echo '🔧 停止旧容器'
+        sh 'docker-compose -f compose-prod-infra.yml down'
+        sh 'docker-compose -f compose-prod-app.yml down'
+      }
+    }
+
     // 设置 SSL 证书，由 Jenkins 管理，写到 configs/nginx/ssl 目录下
     stage('Setup SSL') {
       steps {
