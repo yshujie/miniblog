@@ -10,4 +10,7 @@ COPY configs/nginx/ssl /etc/nginx/ssl
 RUN chmod 644 /etc/nginx/ssl/*.crt \
   && chmod 600 /etc/nginx/ssl/*.key
 
+# 检查 ssl
+RUN ls -al /etc/nginx/ssl
+
 EXPOSE 80 443
