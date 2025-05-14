@@ -48,7 +48,7 @@ pipeline {
         
         // 设置正确的权限
         sh '''
-          chmod 600 configs/nginx/ssl/yangshujie.com.key
+          chmod 644 configs/nginx/ssl/yangshujie.com.key
           chmod 644 configs/nginx/ssl/yangshujie.com.crt
         '''
 
