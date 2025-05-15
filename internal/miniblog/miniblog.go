@@ -58,6 +58,7 @@ func NewMiniBlogCommand() *cobra.Command {
 	// 设置 cobra 的持久化标志：设置 config 文件路径
 	cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "The path to the miniblog configuration file. Empty string for no configuration file.")
 
+	// 返回 cobra.Command 对象
 	return cmd
 }
 
