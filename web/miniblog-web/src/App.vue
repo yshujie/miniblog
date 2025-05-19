@@ -86,7 +86,7 @@ onDeactivated(() => {
 
 <style lang="less" scoped>
 .app-container {
-  min-height: 100vh;
+  height: 100vh;
   background: #fff;
 }
 
@@ -97,8 +97,8 @@ onDeactivated(() => {
 .main-content {
   padding: 0;
   margin-top: 64px;
+  width: 100%;
   height: calc(100vh - 64px);
-  overflow: hidden;
   background: #fff;
 }
 

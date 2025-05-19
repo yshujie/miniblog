@@ -87,25 +87,21 @@ onDeactivated(() => {
   console.log(`Sidebar component is now deactivated.`)
 })
 
-
 </script>
 <style scoped lang="less">
 .sidebar-root {
-  border-right: 1px solid #eaecef;
   width: 100%;
-  padding: 0 32px 32px;
+  height: 100%;
+  overflow-y: scroll;
 
   .section-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
 
     .section-item {
-      padding: 10px;
+      padding: 8px;
       border-radius: 5px;
 
         .section-title {
-          line-height: 20px;
+          line-height: 16px;
           font-size: 14px;
           font-weight: 600;
           color: #213547;
@@ -131,8 +127,8 @@ onDeactivated(() => {
           }
 
           .article-title {
-            line-height: 20px;
-            font-size: 13px;
+            line-height: 16px;
+            font-size: 14px;
             font-weight: 500;
             color: rgba(60, 60, 60, .7);
             transition: color .5s;
@@ -140,7 +136,5 @@ onDeactivated(() => {
         }
     }   
   }
-
-
 }
 </style>

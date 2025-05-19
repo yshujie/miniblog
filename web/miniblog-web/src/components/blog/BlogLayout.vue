@@ -1,19 +1,16 @@
 <template>
 
-  <template class="blog-layout">
-    <el-row>
+    <el-row class="blog-layout">
       <!-- 侧边栏 -->
-      <el-col :span="4">
+      <el-col :span="4" class="sidebar">
         <aside class="sidebar"><slot name="sidebar" /></aside>
       </el-col>
 
       <!-- 主内容 -->
-      <el-col :span="20">
+      <el-col :span="20" class="main">
         <main class="main"><slot name="main" /></main>
       </el-col>
     </el-row>
-
-  </template>
 
 </template>
 <script setup lang="ts">
@@ -22,23 +19,21 @@
 
 .blog-layout {
   width: 100%;
-  height: calc(100vh - 64px - 60px);
+  height: calc(100vh - 64px);
   overflow: hidden;
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  background-color: #fff;
 
   .sidebar {
+    width: 100%;
+    height: calc(100vh - 64px);
     border-right: 1px solid #eaecef;
-    height: calc(100vh - 64px - 60px);
-    overflow: hidden;
-    overflow-y: scroll;
   }
 
-  .sidebar, .main {
-    overflow: hidden;
-    overflow-y: scroll;
+  .main {
+    // height: calc(100vh - 64px);
+    // overflow: hidden;
+    // overflow-y: scroll;
   }
+  
 }
+
 </style>

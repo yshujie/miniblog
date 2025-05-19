@@ -60,17 +60,18 @@ onMounted(() => {
 </script>
 <style scoped lang="less">
 .article-card {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  height: calc(100vh - 120px); // 减去头部和底部的高度
+  padding: 0;
+  margin: 0;
+  height: calc(100vh - 60px); // 减去头部和底部的高度
 
   .article-card-preview {
+    margin: 0;
+    padding: 32px;
+    width: 100%;
+    height: calc(100vh - 60px);
+    overflow-y: scroll;
     border-right: 1px solid #e0e0e0;
-    height: 100%;
-    overflow-y: auto;
-    padding-right: 20px;
-
+    
     &::-webkit-scrollbar {
       width: 6px;
     }
