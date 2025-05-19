@@ -2,6 +2,7 @@ package miniblog
 
 import (
 	"github.com/gin-gonic/gin"
+	articleCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/article"
 	authCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/auth"
 	moduleCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/module"
 	sectionCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/section"
@@ -39,6 +40,7 @@ func installRouters(g *gin.Engine) error {
 	uc := userCtrl.New(store.S, authz)
 	mc := moduleCtrl.New(store.S)
 	sc := sectionCtrl.New(store.S)
+	arCtrl := articleCtrl.New(store.S)
 
 	// auth 路由
 	g.POST("/register", ac.Register)
@@ -69,6 +71,13 @@ func installRouters(g *gin.Engine) error {
 		{
 			sectionsv1.GET(":module_code", sc.GetList)
 			sectionsv1.GET(":module_code/:code", sc.GetOne)
+		}
+
+		// 创建 articles 路由分组
+		articlesv1 := v1.Group("/articles")
+		{
+			articlesv1.GET(":section_code", arCtrl.GetList)
+			articlesv1.GET(":section_code/:id", arCtrl.GetOne)
 		}
 	}
 
