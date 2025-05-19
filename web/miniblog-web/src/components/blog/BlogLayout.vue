@@ -26,14 +26,7 @@
     width: 100%;
     height: calc(100vh - 64px);
     border-right: 1px solid #eaecef;
-  }
-
-  .main {
-    // height: calc(100vh - 64px);
-    // overflow: hidden;
-    // overflow-y: scroll;
-  }
-  
+  }  
 }
 
 </style>
