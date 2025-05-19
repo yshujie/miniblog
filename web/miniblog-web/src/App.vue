@@ -96,20 +96,25 @@ onDeactivated(() => {
 
 .main-content {
   padding: 0;
-  margin: 64px 0 60px 0;
-  min-height: calc(100vh - 64px - 60px);
+  margin-top: 64px;
+  height: calc(100vh - 64px);
+  overflow: hidden;
   background: #fff;
 }
 
 .footer-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  height: 40px;
   color: #888;
   font-size: 15px;
   background: #fff;
   border-top: 1px solid #ececec;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 </style>
