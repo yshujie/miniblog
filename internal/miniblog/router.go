@@ -3,6 +3,7 @@ package miniblog
 import (
 	"github.com/gin-gonic/gin"
 	authCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/auth"
+	moduleCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/module"
 	userCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/user"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/core"
@@ -35,6 +36,7 @@ func installRouters(g *gin.Engine) error {
 	// 创建 controllers
 	ac := authCtrl.New(store.S)
 	uc := userCtrl.New(store.S, authz)
+	mc := moduleCtrl.New(store.S)
 
 	// auth 路由
 	g.POST("/register", ac.Register)
@@ -53,6 +55,12 @@ func installRouters(g *gin.Engine) error {
 			userv1.GET(":name", uc.Get)
 		}
 
+		// 创建 modules 路由分组
+		modulesv1 := v1.Group("/modules")
+		{
+			modulesv1.GET("", mc.GetAll)
+			modulesv1.GET(":code", mc.GetOne)
+		}
 	}
 
 	return nil
