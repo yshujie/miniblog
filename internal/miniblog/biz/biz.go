@@ -3,6 +3,7 @@ package biz
 import (
 	"github.com/yshujie/miniblog/internal/miniblog/biz/auth"
 	"github.com/yshujie/miniblog/internal/miniblog/biz/module"
+	"github.com/yshujie/miniblog/internal/miniblog/biz/section"
 	"github.com/yshujie/miniblog/internal/miniblog/biz/user"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 )
@@ -12,6 +13,7 @@ type IBiz interface {
 	UserBiz() user.IUserBiz
 	AuthBiz() auth.IAuthBiz
 	ModuleBiz() module.IModuleBiz
+	SectionBiz() section.ISectionBiz
 }
 
 // biz 业务实现
@@ -40,4 +42,9 @@ func (b *biz) AuthBiz() auth.IAuthBiz {
 // ModuleBiz 返回模块业务实例
 func (b *biz) ModuleBiz() module.IModuleBiz {
 	return module.New(b.ds)
+}
+
+// SectionBiz 返回章节业务实例
+func (b *biz) SectionBiz() section.ISectionBiz {
+	return section.New(b.ds)
 }
