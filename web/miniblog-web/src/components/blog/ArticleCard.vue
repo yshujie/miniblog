@@ -6,19 +6,17 @@
         {{ tag }}
       </el-tag>
     </div>
-
     <div class="article-content">
-      <vue3-markdown-it :source="article.content" />
+      <Vue3MarkdownIt :source="article.content" />
     </div>
   </div>
 </template>
 <script setup lang="ts">
-import Vue3MarkdownIt from 'vue3-markdown-it'
 import { defineProps } from 'vue'
 import type { Article } from '../../types/article'
+import Vue3MarkdownIt from 'vue3-markdown-it'
 
 defineProps<{ article: Article }>()
-
 </script>
 <style scoped>
 .article-title {
