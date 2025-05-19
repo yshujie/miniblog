@@ -12,11 +12,8 @@
         <el-menu-item v-for="module in modules" :key="module.code" :index="`/blog/${module.code}`">
           {{ module.title }}
         </el-menu-item>
-        <el-menu-item>
-          <a href="https://docs.nestjs.cn/" target="_blank" rel="noopener">Nestjs中文网</a>
-        </el-menu-item>
-        <el-menu-item>
-          <a href="https://github.com/koala-coding/goodBlog" target="_blank" rel="noopener">GitHub</a>
+        <el-menu-item key="github">
+          <a href="https://github.com/yshujie" target="_blank" rel="noopener">GitHub</a>
         </el-menu-item>
       </el-menu>
     </div>
