@@ -33,4 +33,7 @@ var (
 
 	// ErrUnauthorized 未授权
 	ErrUnauthorized = &Errno{HTTP: 401, Code: "ErrUnauthorized", Message: "未授权"}
+
+	// ErrModuleAlreadyExists 模块已存在
+	ErrModuleAlreadyExists = &Errno{HTTP: 400, Code: "ErrModuleAlreadyExists", Message: "模块已存在"}
 )

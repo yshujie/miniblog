@@ -9,10 +9,8 @@ import (
 
 type ModuleStore interface {
 	Create(ctx context.Context, module *model.Module) error
-	Get(ctx context.Context, id int) (*model.Module, error)
-	Update(ctx context.Context, module *model.Module) error
-	Delete(ctx context.Context, id int) error
-	GetList(ctx context.Context, page, pageSize int) ([]*model.Module, error)
+	GetByCode(ctx context.Context, code string) (*model.Module, error)
+	GetAll(ctx context.Context) ([]*model.Module, error)
 }
 
 // ModuleStore 接口的实现
@@ -32,28 +30,21 @@ func (m *modules) Create(ctx context.Context, module *model.Module) error {
 	return m.db.Create(module).Error
 }
 
-// Get 获取模块
-func (m *modules) Get(ctx context.Context, id int) (*model.Module, error) {
+// GetByCode 获取模块
+func (m *modules) GetByCode(ctx context.Context, code string) (*model.Module, error) {
 	var module model.Module
-	if err := m.db.Where("id = ?", id).First(&module).Error; err != nil {
+	if err := m.db.Where("code = ?", code).First(&module).Error; err != nil {
 		return nil, err
 	}
 
 	return &module, nil
 }
 
-// Update 更新模块
-func (m *modules) Update(ctx context.Context, module *model.Module) error {
-	return m.db.Model(&model.Module{}).Where("id = ?", module.ID).Updates(module).Error
-}
-
-// Delete 删除模块
-func (m *modules) Delete(ctx context.Context, id int) error {
-	return m.db.Where("id = ?", id).Delete(&model.Module{}).Error
-}
-
-// GetList 获取模块列表
-func (m *modules) GetList(ctx context.Context, page, pageSize int) ([]*model.Module, error) {
+// GetAll 获取所有模块
+func (m *modules) GetAll(ctx context.Context) ([]*model.Module, error) {
 	var modules []*model.Module
-	return modules, m.db.Offset((page - 1) * pageSize).Limit(pageSize).Find(&modules).Error
+	if err := m.db.Find(&modules).Error; err != nil {
+		return nil, err
+	}
+	return modules, nil
 }

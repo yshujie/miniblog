@@ -16,6 +16,9 @@ var (
 type IStore interface {
 	DB() *gorm.DB
 	Users() UserStore
+	Modules() ModuleStore
+	Sections() SectionStore
+	Articles() ArticleStore
 }
 
 // datastore 数据库操作
@@ -41,4 +44,19 @@ func (s *datastore) DB() *gorm.DB {
 // User 返回一个实现了 UserStore 接口的实例
 func (s *datastore) Users() UserStore {
 	return newUsers(s.db)
+}
+
+// Module 返回一个实现了 ModuleStore 接口的实例
+func (s *datastore) Modules() ModuleStore {
+	return newModules(s.db)
+}
+
+// Section 返回一个实现了 SectionStore 接口的实例
+func (s *datastore) Sections() SectionStore {
+	return newSections(s.db)
+}
+
+// Article 返回一个实现了 ArticleStore 接口的实例
+func (s *datastore) Articles() ArticleStore {
+	return newArticles(s.db)
 }
