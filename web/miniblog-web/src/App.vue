@@ -1,7 +1,7 @@
 <template>
   <el-container direction="vertical" class="app-container">
     <!-- 头部导航栏 -->
-    <Header />
+    <Header class="header-bar" />
 
     <!-- 主体内容 -->
     <el-main class="main-content">
@@ -9,7 +9,7 @@
     </el-main>
 
     <!-- 页脚 -->
-    <Footer />
+    <Footer class="footer-bar" />
   </el-container>
 </template>
 
@@ -83,11 +83,18 @@ onDeactivated(() => {
   min-height: 100vh;
   background: #fff;
 }
-.main-content {
-  min-height: calc(100vh - 64px - 60px);
-  /* 64px header, 60px footer */
-  padding: 0;
+
+.header-bar {
+  height: 64px;
 }
+
+.main-content {
+  padding: 0;
+  margin: 64px 0 60px 0;
+  min-height: calc(100vh - 64px - 60px);
+  background: #fff;
+}
+
 .footer-bar {
   text-align: center;
   color: #888;

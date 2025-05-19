@@ -91,22 +91,14 @@ onDeactivated(() => {
 </script>
 <style scoped lang="less">
 .sidebar-root {
-  z-index: 1;
-  border-right: 1px solid var(--vt-c-divider-light);
-  width: var(--vp-sidebar-width-small);
-  max-width: 100%;
-  opacity: 1;
-  visibility: visible;
-  box-shadow: none;
-  transform: translate(0);
-  transition: border-color .5s, background-color .5s;
-  padding: 0 32px 96px;
+  border-right: 1px solid #eaecef;
+  width: 100%;
+  padding: 0 32px 32px;
 
   .section-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
-
 
     .section-item {
       padding: 10px;

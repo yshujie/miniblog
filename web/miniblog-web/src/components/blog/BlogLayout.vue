@@ -1,49 +1,44 @@
 <template>
-  <div class="blog-layout">
-    <aside class="sidebar">
-      <slot name="sidebar" />
-    </aside>
-    <main class="main">
-      <slot name="main" />
-    </main>
-  </div>
+
+  <template class="blog-layout">
+    <el-row>
+      <!-- 侧边栏 -->
+      <el-col :span="4">
+        <aside class="sidebar"><slot name="sidebar" /></aside>
+      </el-col>
+
+      <!-- 主内容 -->
+      <el-col :span="20">
+        <main class="main"><slot name="main" /></main>
+      </el-col>
+    </el-row>
+
+  </template>
+
 </template>
 <script setup lang="ts">
 </script>
 <style lang="less" scoped >
+
 .blog-layout {
-  position: relative;
-  min-height: calc(100vh - 120px);
+  width: 100%;
+  height: calc(100vh - 64px - 60px);
+  overflow: hidden;
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  justify-content: flex-start;
-  padding-top: 72px;
-  padding-bottom: 48px;
+  background-color: #fff;
 
   .sidebar {
-    position: fixed;
-    top: 64px;
-    bottom: 60px;
-    left: 0;
-    width: 20%;
-    max-width: 300px;
-    height: auto;
-    overflow-y: auto;
-    z-index: 10;
-    font-size: 16px;
-    background-color: #fff;
-    box-sizing: border-box;
     border-right: 1px solid #eaecef;
+    height: calc(100vh - 64px - 60px);
+    overflow: hidden;
+    overflow-y: scroll;
   }
 
-  .main {
-    flex: 1;
-    width: 80%;
-    margin-left: 20%;
-    padding: 20px;
-    box-sizing: border-box;
+  .sidebar, .main {
+    overflow: hidden;
+    overflow-y: scroll;
   }
 }
-
 </style>
