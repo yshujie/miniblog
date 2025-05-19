@@ -1,14 +1,9 @@
-import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 const routes: Array<RouteRecordRaw> = [
-  { path: '/', component: () => import('../pages/Home.vue') },
-  { path: '/article/:id', component: () => import('../pages/ArticleDetail.vue') },
-  { path: '/archive', component: () => import('../pages/Archive.vue') },
-  { path: '/tag/:name', component: () => import('../pages/Tag.vue') },
-  { path: '/friend', component: () => import('../pages/Friend.vue') },
-  { path: '/about', component: () => import('../pages/About.vue') },
-  { path: '/login', component: () => import('../pages/Login.vue') },
-  { path: '/register', component: () => import('../pages/Register.vue') }
+  { path: '/', component: () => import('../pages/Index.vue') },
+  { path: '/blog/:module', component: () => import('../pages/Blog.vue') },
+  { path: '/blog/:module/:article', component: () => import('../pages/Blog.vue') },
 ]
 
 const router = createRouter({
