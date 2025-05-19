@@ -9,14 +9,20 @@
     </el-main>
 
     <!-- 页脚 -->
-    <Footer class="footer-bar" />
+    <Footer class="footer-bar" v-if="needFooter" />
   </el-container>
 </template>
 
 <script setup lang="ts">
 import Header from './components/Header.vue'
 import Footer from './components/Footer.vue'
-import { onActivated, onBeforeMount, onBeforeUpdate, onBeforeUnmount, onDeactivated, onErrorCaptured, onMounted, onRenderTracked, onRenderTriggered, onUnmounted, onUpdated } from 'vue'
+import { onActivated, onBeforeMount, onBeforeUpdate, onBeforeUnmount, onDeactivated, onErrorCaptured, onMounted, onRenderTracked, onRenderTriggered, onUnmounted, onUpdated, computed } from 'vue'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+const needFooter = computed(() => {
+  return !route.path.includes('/blog')
+})
 
 // onBeforeMount 生命周期钩子，在组件挂载前执行
 onBeforeMount(async () => { 
@@ -78,7 +84,7 @@ onDeactivated(() => {
 })
 </script>
 
-<style scoped>
+<style lang="less" scoped>
 .app-container {
   min-height: 100vh;
   background: #fff;
