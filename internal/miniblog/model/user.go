@@ -32,3 +32,9 @@ func (u *UserM) BeforeCreate(tx *gorm.DB) (err error) {
 
 	return
 }
+
+// BeforeUpdate 在更新前设置信息
+func (u *UserM) BeforeUpdate(tx *gorm.DB) (err error) {
+	u.UpdatedAt = time.Now()
+	return
+}
