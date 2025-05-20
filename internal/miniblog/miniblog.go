@@ -81,7 +81,7 @@ func run() error {
 	g := gin.New()
 
 	// 注册中间件
-	mws := []gin.HandlerFunc{gin.Recovery(), mw.NoCache, mw.Cors, mw.Secure, mw.RequestID()}
+	mws := []gin.HandlerFunc{gin.Recovery(), mw.NoCache, mw.Cors, mw.Secure, mw.RequestID(), mw.Logger()}
 	g.Use(mws...)
 
 	// 安装路由
