@@ -11,17 +11,17 @@ import (
 type Response struct {
 	Code    string      `json:"code"`
 	Message string      `json:"msg"`
-	Data    interface{} `json:"data"`
+	Payload interface{} `json:"payload"`
 }
 
 // WriteResponse 写入响应
-func WriteResponse(c *gin.Context, err error, data interface{}) {
+func WriteResponse(c *gin.Context, err error, payload interface{}) {
 	if err != nil {
 		httpStatus, errCode, errMsg := errno.Decode(err)
 		c.JSON(httpStatus, Response{
 			Code:    errCode,
 			Message: errMsg,
-			Data:    data,
+			Payload: payload,
 		})
 		return
 	}
@@ -29,6 +29,6 @@ func WriteResponse(c *gin.Context, err error, data interface{}) {
 	c.JSON(http.StatusOK, Response{
 		Code:    "ok",
 		Message: "",
-		Data:    data,
+		Payload: payload,
 	})
 }
