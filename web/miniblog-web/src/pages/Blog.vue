@@ -1,7 +1,7 @@
 <template>
   <BlogLayout>
     <template #sidebar>
-      <Sidebar :module="theModule" :sections="theModule.sections" />
+      <Sidebar :sections="sections" :moduleCode="moduleCode" />
     </template>
     <template #main>
       <!-- <ArticleCard :article="theArticle" /> -->
@@ -10,7 +10,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch, computed } from 'vue'
+import { onMounted, watch, computed, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useModuleStore } from '@/stores/module'
 
@@ -24,28 +24,46 @@ const route = useRoute()
 // module store
 const moduleStore = useModuleStore()
 
-// 当前 module
-const theModule = computed(() => { 
+// 计算属性 sections
+const sections = computed(() => {
+  return moduleStore.currentModule?.sections || []
+})
+
+// 计算属性 moduleCode
+const moduleCode = computed(() => {
+  return moduleStore.currentModule?.code || ''
+})
+
+// 组件挂载时，设置当前模块
+onMounted(() => {
   const moduleCode = queryModuleCode()
   const module = moduleStore.getModuleByCode(moduleCode)
   if (!module) {
     throw new Error(`Module with code ${moduleCode} not found`)
   }
-  return module
+
+  // 设置当前模块
+  moduleStore.setCurrentModule(module)
 })
 
-// 组件挂载时加载数据
-onMounted(loadModuleData)
+// 组件卸载时，清除当前模块
+onUnmounted(() => {
+  moduleStore.clearCurrentModule()
+})
 
-// 监听路由参数变化
-watch(
-  () => route.params.module,
-  async (newModuleCode) => {
-    if (newModuleCode) {
-      await loadModuleData()
-    }
-  }
-)
+
+
+
+
+// // 当前 article
+// const theArticle = computed(() => {
+//   const articleId = queryArticleId()
+//   if (!articleId) {
+//     return null
+//   }
+//   const article = moduleStore.getArticleById(articleId)
+//   return article
+// })
 
 // 获取 moduleCode
 function queryModuleCode() {
@@ -56,11 +74,15 @@ function queryModuleCode() {
   return moduleCode
 }
 
-// 加载模块数据
-async function loadModuleData() {
-  const moduleCode = queryModuleCode()
-  await moduleStore.loadSections(moduleCode)
-  await moduleStore.loadArticles(moduleCode)
+
+// 获取 articleId
+function queryArticleId(): number | null {
+  const articleId = route.params.article as string
+  if (!articleId) {
+    console.log('articleId is not found')
+    return null
+  }
+  return parseInt(articleId)
 }
 
 </script>

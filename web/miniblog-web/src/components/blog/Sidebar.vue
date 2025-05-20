@@ -12,7 +12,7 @@
         </h3>
         <div class="article-list">
           <div class="article-item" v-for="article in item.articles" :key="article.title">
-            <el-link underline="never" target="_self" :href="`/blog/${props.module.code}/${article.id}`">
+            <el-link underline="never" target="_self" :href="`/blog/${props.moduleCode}/article/${article.id}`">
               <span class="article-title">{{ article.title }}</span>
             </el-link>
           </div>
@@ -24,9 +24,8 @@
 <script setup lang="ts">
 import { defineProps } from 'vue'
 import type { Section } from '@/types/section';
-import type { Module } from '@/types/module';
 
-const props = defineProps<{ module: Module, sections: Section[] }>()
+const props = defineProps<{ sections: Section[], moduleCode: string }>()
 
 </script>
 <style scoped lang="less">

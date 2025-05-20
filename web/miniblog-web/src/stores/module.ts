@@ -1,10 +1,12 @@
 import { defineStore } from 'pinia'
 import type { Module } from '@/types/module'
 import { fetchModules } from '@/api/module'
+import type { Section } from '@/types/section'
 
 // module store
 export const useModuleStore = defineStore('module', {
   state: () => ({
+    currentModule: null as Module | null,
     modules: [] as Module[],
   }),
 
@@ -15,6 +17,17 @@ export const useModuleStore = defineStore('module', {
     // 根据 code 获取模块
     getModuleByCode: (state) => (code: string): Module | undefined => {
       return state.modules.find(module => module.code === code)
+    },
+
+    // 根据 code 获取模块下的所有章节
+    getSectionsByCode: (state) => (code: string): Section[] => {
+      const module = state.modules.find(module => module.code === code)
+      return module?.sections || []
+    },
+
+    // 根据 id 获取文章
+    getArticleById: (state) => (id: number): Article | undefined => {
+      return state.articles.find(article => article.id === id)
     },
   },
 
@@ -59,6 +72,16 @@ export const useModuleStore = defineStore('module', {
         const articles = await section.loadArticles()
         section.articles = articles
       }
+    },
+
+    // 设置当前模块
+    setCurrentModule(module: Module) {
+      this.currentModule = module
+    },
+
+    // 清除当前模块
+    clearCurrentModule() {
+      this.currentModule = null
     },
 
     // 清除模块数据
