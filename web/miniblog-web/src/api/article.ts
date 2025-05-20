@@ -7,8 +7,8 @@ export async function fetchArticlesBySectionCode(sectionCode: string): Promise<A
   return payload.articles.map(articleData => new Article(articleData))
 }
 
-// fetchArticleById 获取文章详情
-export async function fetchArticleById(sectionCode: string, id: number): Promise<Article | undefined> {
-  const { payload } = await http.get<{ article: any }>(`/articles/${sectionCode}/${id}`)
+// fetchArticle 获取文章详情
+export async function fetchArticle(id: number): Promise<Article | undefined> {
+  const { payload } = await http.get<{ article: any }>(`/articles/${id}`)
   return payload.article ? new Article(payload.article) : undefined
 }

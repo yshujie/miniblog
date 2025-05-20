@@ -1,51 +1,80 @@
 <template>
     <div class="article-card">
-      <el-row>
-        <!-- 文章预览 -->
-        <el-col :span="19">
-          <div class="article-card-preview"  ref="previewScrollDom">
-            <!-- 文章头部 -->
-            <div class="article-card-header">
-              <h2 class="article-title">{{ article.title }}</h2>
-              <div class="article-info">
-                <el-tag class="article-tag" v-for="tag in article.tags" :key="tag" type="primary" effect="dark">{{ tag }}</el-tag>
-              </div>
-            </div>
+      <template v-if="! hasArticle">
+      </template>
 
-            <!-- 文章内容 -->
-            <div class="article-card-content">
-              <MdPreview 
-                :editorId="editorId" 
-                :modelValue="article.content" 
+      <template v-else>
+        <el-row>
+          <!-- 文章预览 -->
+          <el-col :span="19">
+            <div class="article-card-preview"  ref="previewScrollDom">
+              <!-- 文章头部 -->
+              <div class="article-card-header">
+                <h2 class="article-title">{{ currentArticle?.title }}</h2>
+                <div class="article-info">
+                  <el-tag class="article-tag" v-for="tag in currentArticle?.tags" :key="tag" type="primary" effect="dark">{{ tag }}</el-tag>
+                </div>
+              </div>
+
+              <!-- 文章内容 -->
+              <div class="article-card-content">
+                <MdPreview 
+                  :editorId="editorId" 
+                  :modelValue="currentArticle?.content" 
+                />
+              </div>
+            </div>          
+          </el-col>
+
+          <!-- 文章目录 -->
+          <el-col :span="5">
+            <div class="article-card-catalog">
+              <MdCatalog
+                :editorId="editorId"
+                :modelValue="currentArticle?.content"
+                :scrollElement="scrollElement"
               />
             </div>
-          </div>          
-        </el-col>
-
-        <!-- 文章目录 -->
-        <el-col :span="5">
-          <div class="article-card-catalog">
-            <MdCatalog
-              :editorId="editorId"
-              :modelValue="article.content"
-              :scrollElement="scrollElement"
-            />
-          </div>
-        </el-col>
-      </el-row>
+          </el-col>
+        </el-row>
+      </template>
     </div>
 </template>
 <script setup lang="ts">
-import { computed, defineProps, ref, onMounted, nextTick } from 'vue'
-import type { Article } from '../../types/article'
-import { MdPreview, MdCatalog } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
+import { MdPreview, MdCatalog } from 'md-editor-v3'
+import { computed, defineProps, ref, onMounted, nextTick } from 'vue'
+import { Article } from '@/types/article'
+import { fetchArticle } from '@/api/article'
 
-const props = defineProps<{ article: Article }>()
+// 组件 props
+const props = defineProps<{ articleId: number|null }>()
+
+// 组件数据
+const editorId = `article-${props.articleId}`
 const scrollElement = ref<HTMLElement>()
-
 const previewScrollDom = ref<HTMLElement | null>(null)
-const editorId = `article-${props.article.id || props.article.title}`
+// 当前文章
+let currentArticle: Article | null = null
+
+// 计算属性：hasArticle
+const hasArticle = computed(() => {
+  return currentArticle !== null
+})
+
+// 组件挂载时，获取文章
+onMounted(async () => {
+  if (!props.articleId) {
+    return
+  }
+
+  const article = await fetchArticle(props.articleId)
+  if (!article) {
+    return
+  }
+
+  currentArticle = article
+})
 
 </script>
 <style scoped lang="less">

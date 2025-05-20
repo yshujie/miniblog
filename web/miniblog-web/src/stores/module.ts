@@ -25,10 +25,6 @@ export const useModuleStore = defineStore('module', {
       return module?.sections || []
     },
 
-    // 根据 id 获取文章
-    getArticleById: (state) => (id: number): Article | undefined => {
-      return state.articles.find(article => article.id === id)
-    },
   },
 
   actions: {

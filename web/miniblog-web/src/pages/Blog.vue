@@ -4,7 +4,7 @@
       <Sidebar :sections="sections" :moduleCode="moduleCode" />
     </template>
     <template #main>
-      <!-- <ArticleCard :article="theArticle" /> -->
+      <ArticleCard :articleId="chosenArticleId" />
     </template>
   </BlogLayout>
 </template>
@@ -34,6 +34,11 @@ const moduleCode = computed(() => {
   return moduleStore.currentModule?.code || ''
 })
 
+// 计算属性 chosenArticleId
+const chosenArticleId = computed(() => {
+  return queryArticleId()
+})
+
 // 组件挂载时，设置当前模块
 onMounted(() => {
   const moduleCode = queryModuleCode()
@@ -50,20 +55,6 @@ onMounted(() => {
 onUnmounted(() => {
   moduleStore.clearCurrentModule()
 })
-
-
-
-
-
-// // 当前 article
-// const theArticle = computed(() => {
-//   const articleId = queryArticleId()
-//   if (!articleId) {
-//     return null
-//   }
-//   const article = moduleStore.getArticleById(articleId)
-//   return article
-// })
 
 // 获取 moduleCode
 function queryModuleCode() {
