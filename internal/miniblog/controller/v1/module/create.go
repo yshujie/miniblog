@@ -15,6 +15,10 @@ import (
 func (c *ModuleController) Create(ctx *gin.Context) {
 	log.C(ctx).Infow("Create module function called")
 
+	// 打印请求头、请求体
+	fmt.Printf("request headers: %+v\n", ctx.Request.Header)
+	fmt.Printf("request body: %+v\n", ctx.Request.Body)
+
 	// 承接请求参数
 	request := &v1.CreateModuleRequest{}
 	if err := ctx.ShouldBindJSON(request); err != nil {
