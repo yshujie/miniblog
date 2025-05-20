@@ -7,24 +7,28 @@ import (
 	"github.com/yshujie/miniblog/internal/pkg/errno"
 )
 
-type ErrResponse struct {
-	// Code 错误码，指定业务错误码
-	Code string `json:"code"`
-
-	// Message 错误信息
-	Message string `json:"message"`
+// Response 响应结构体
+type Response struct {
+	Code    string      `json:"code"`
+	Message string      `json:"msg"`
+	Data    interface{} `json:"data"`
 }
 
 // WriteResponse 写入响应
 func WriteResponse(c *gin.Context, err error, data interface{}) {
 	if err != nil {
 		httpStatus, errCode, errMsg := errno.Decode(err)
-		c.JSON(httpStatus, ErrResponse{
+		c.JSON(httpStatus, Response{
 			Code:    errCode,
 			Message: errMsg,
+			Data:    data,
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, data)
+	c.JSON(http.StatusOK, Response{
+		Code:    "ok",
+		Message: "",
+		Data:    data,
+	})
 }
