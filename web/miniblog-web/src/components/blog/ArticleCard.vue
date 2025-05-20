@@ -1,6 +1,7 @@
 <template>
     <div class="article-card">
       <template v-if="! hasArticle">
+          <el-empty description="文章不存在" />
       </template>
 
       <template v-else>

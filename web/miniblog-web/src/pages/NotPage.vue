@@ -48,7 +48,6 @@
   margin: 0;
   line-height: 1;
   background: linear-gradient(45deg, #2c3e50, #3498db);
-  -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: bounce 2s infinite;
 }

@@ -58,7 +58,7 @@ export const useModuleStore = defineStore('module', {
         throw new Error(`Module with code ${code} not found`)
       }
       if (module.sections.length === 0) {
-        throw new Error(`Module with code ${code} has no sections`)
+        return
       }
       if (module.sections.some(section => section.articles.length > 0)) {
         return // 如果已经加载过，直接返回

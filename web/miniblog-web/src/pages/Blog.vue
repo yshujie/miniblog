@@ -10,7 +10,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch, computed, onUnmounted } from 'vue'
+import { onMounted, watch, computed, onUnmounted, onUpdated } from 'vue'
 import { useRoute } from 'vue-router'
 import { useModuleStore } from '@/stores/module'
 
@@ -41,20 +41,27 @@ const chosenArticleId = computed(() => {
 
 // 组件挂载时，设置当前模块
 onMounted(() => {
-  const moduleCode = queryModuleCode()
-  const module = moduleStore.getModuleByCode(moduleCode)
-  if (!module) {
-    throw new Error(`Module with code ${moduleCode} not found`)
-  }
+  setCurrentModule(queryModuleCode()) 
+})
 
-  // 设置当前模块
-  moduleStore.setCurrentModule(module)
+// 组件更新时，设置当前模块
+onUpdated(() => {
+  setCurrentModule(queryModuleCode())
 })
 
 // 组件卸载时，清除当前模块
 onUnmounted(() => {
   moduleStore.clearCurrentModule()
 })
+
+// 设置当前模块
+function setCurrentModule(moduleCode: string) {
+  const module = moduleStore.getModuleByCode(moduleCode)
+  if (!module) {
+    throw new Error(`Module with code ${moduleCode} not found`)
+  }
+  moduleStore.setCurrentModule(module)
+}
 
 // 获取 moduleCode
 function queryModuleCode() {
@@ -64,7 +71,6 @@ function queryModuleCode() {
   }
   return moduleCode
 }
-
 
 // 获取 articleId
 function queryArticleId(): number | null {
