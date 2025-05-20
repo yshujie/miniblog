@@ -1,10 +1,10 @@
 <template>
   <el-container direction="vertical" class="app-container">
     <!-- 头部导航栏 -->
-    <Header class="header-bar" />
+    <Header class="header-bar" v-if="needHeader" />
 
     <!-- 主体内容 -->
-    <el-main class="main-content">
+    <el-main class="main-content" :class="{ 'full-screen': fullScreen }">
       <router-view />
     </el-main>
 
@@ -20,8 +20,19 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
+
+const needHeader = computed(() => {
+  const paths = ['/404']
+  return !paths.includes(route.path)
+})
+
 const needFooter = computed(() => {
-  return !route.path.includes('/blog')
+  const paths = ['/404', '/blog']
+  return !paths.includes(route.path)
+})
+
+const fullScreen = computed(() => {
+  return !needHeader.value && !needFooter.value
 })
 
 </script>
@@ -42,6 +53,11 @@ const needFooter = computed(() => {
   width: 100%;
   height: calc(100vh - 64px);
   background: #fff;
+
+  &.full-screen {
+    margin-top: 0;
+    height: 100vh;
+  }
 }
 
 .footer-bar {
