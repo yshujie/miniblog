@@ -51,6 +51,13 @@ func (ctrl *UserController) Create(c *gin.Context) {
 		return
 	}
 
+	// 重新加载策略
+	if err := ctrl.a.ReloadPolicy(); err != nil {
+		log.C(c).Errorw("reload policy failed", "error", err)
+		core.WriteResponse(c, err, nil)
+		return
+	}
+
 	log.C(c).Infow("add named policy success", "username", r.Username)
 
 	// 返回成功响应
