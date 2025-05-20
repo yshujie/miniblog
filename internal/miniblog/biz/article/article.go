@@ -33,7 +33,7 @@ func New(ds store.IStore) *articleBiz {
 // Create 创建文章
 func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v1.CreateArticleResponse, error) {
 	// 检查 section_code 是否已存在
-	existingSection, err := b.ds.Sections().GetByCode(ctx, r.SectionCode)
+	existingSection, err := b.ds.Sections().GetByCode(r.SectionCode)
 	if err != nil {
 		return nil, err
 	}
@@ -42,14 +42,14 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 	}
 
 	// 创建文章
-	article, err := b.ds.Articles().Create(ctx, &model.Article{
+	article := &model.Article{
 		Title:       r.Title,
 		Content:     r.Content,
 		SectionCode: r.SectionCode,
 		Author:      r.Author,
 		Tags:        strings.Join(r.Tags, ","),
-	})
-	if err != nil {
+	}
+	if err := b.ds.Articles().Create(article); err != nil {
 		return nil, err
 	}
 
@@ -69,7 +69,7 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 
 // GetList 获取所有文章
 func (b *articleBiz) GetList(ctx context.Context, sectionCode string) (*v1.GetArticleListResponse, error) {
-	articles, err := b.ds.Articles().GetListBySectionCode(ctx, sectionCode)
+	articles, err := b.ds.Articles().GetListBySectionCode(sectionCode)
 	if err != nil {
 		return nil, err
 	}
@@ -79,14 +79,8 @@ func (b *articleBiz) GetList(ctx context.Context, sectionCode string) (*v1.GetAr
 	}
 	for _, article := range articles {
 		response.Articles = append(response.Articles, &v1.ArticleInfo{
-			ID:          article.ID,
-			Title:       article.Title,
-			Content:     article.Content,
-			SectionCode: article.SectionCode,
-			Author:      article.Author,
-			Tags:        strings.Split(article.Tags, ","),
-			CreatedAt:   article.CreatedAt,
-			UpdatedAt:   article.UpdatedAt,
+			ID:    article.ID,
+			Title: article.Title,
 		})
 	}
 
@@ -95,7 +89,7 @@ func (b *articleBiz) GetList(ctx context.Context, sectionCode string) (*v1.GetAr
 
 // GetOne 获取文章详情
 func (b *articleBiz) GetOne(ctx context.Context, id int) (*v1.GetArticleResponse, error) {
-	article, err := b.ds.Articles().Get(ctx, id)
+	article, err := b.ds.Articles().Get(id)
 	if err != nil {
 		return nil, err
 	}

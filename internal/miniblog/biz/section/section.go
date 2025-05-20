@@ -32,7 +32,7 @@ func New(ds store.IStore) *sectionBiz {
 // Create 创建 section 记录
 func (b *sectionBiz) Create(ctx context.Context, r *v1.CreateSectionRequest) (*v1.CreateSectionResponse, error) {
 	// 检查 code 是否已存在
-	existingSection, err := b.ds.Sections().GetByCode(ctx, r.Code)
+	existingSection, err := b.ds.Sections().GetByCode(r.Code)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (b *sectionBiz) Create(ctx context.Context, r *v1.CreateSectionRequest) (*v
 	}
 
 	// 检查 module_code 是否已存在
-	existingModule, err := b.ds.Modules().GetByCode(ctx, r.ModuleCode)
+	existingModule, err := b.ds.Modules().GetByCode(r.ModuleCode)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (b *sectionBiz) Create(ctx context.Context, r *v1.CreateSectionRequest) (*v
 	}
 
 	// 创建 section 记录
-	err = b.ds.Sections().Create(ctx, &model.Section{
+	err = b.ds.Sections().Create(&model.Section{
 		Code:       r.Code,
 		Title:      r.Title,
 		ModuleCode: r.ModuleCode,
@@ -70,7 +70,7 @@ func (b *sectionBiz) Create(ctx context.Context, r *v1.CreateSectionRequest) (*v
 
 // GetList 获取所有模块
 func (b *sectionBiz) GetList(ctx context.Context, moduleCode string) (*v1.GetSectionListResponse, error) {
-	sections, err := b.ds.Sections().GetListByModuleCode(ctx, moduleCode)
+	sections, err := b.ds.Sections().GetListByModuleCode(moduleCode)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (b *sectionBiz) GetList(ctx context.Context, moduleCode string) (*v1.GetSec
 
 // GetOne 获取模块详情
 func (b *sectionBiz) GetOne(ctx context.Context, code string) (*v1.GetSectionResponse, error) {
-	section, err := b.ds.Sections().GetByCode(ctx, code)
+	section, err := b.ds.Sections().GetByCode(code)
 	if err != nil {
 		return nil, err
 	}

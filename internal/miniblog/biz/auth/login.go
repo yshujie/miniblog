@@ -33,7 +33,7 @@ func (b *authBiz) Login(ctx context.Context, r *v1.LoginRequest) (*v1.LoginRespo
 // 检查用户是否存在
 func (b *authBiz) checkUserExist(ctx context.Context, username string) error {
 	// 获取用户信息
-	_, err := b.ds.Users().Get(ctx, username)
+	_, err := b.ds.Users().Get(username)
 	if err != nil {
 		return errno.ErrUserNotFound
 	}
@@ -43,7 +43,7 @@ func (b *authBiz) checkUserExist(ctx context.Context, username string) error {
 
 func (b *authBiz) checkPassword(ctx context.Context, username string, password string) error {
 	// 获取用户信息
-	user, err := b.ds.Users().Get(ctx, username)
+	user, err := b.ds.Users().Get(username)
 	if err != nil {
 		return errno.ErrUserNotFound
 	}

@@ -1,16 +1,15 @@
 package store
 
 import (
-	"context"
-
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"gorm.io/gorm"
 )
 
 type ModuleStore interface {
-	Create(ctx context.Context, module *model.Module) error
-	GetByCode(ctx context.Context, code string) (*model.Module, error)
-	GetAll(ctx context.Context) ([]*model.Module, error)
+	Create(module *model.Module) error
+	GetByCode(code string) (*model.Module, error)
+	GetAll() ([]*model.Module, error)
+	Update(module *model.Module) error
 }
 
 // ModuleStore 接口的实现
@@ -26,12 +25,12 @@ func newModules(db *gorm.DB) *modules {
 }
 
 // Create 创建模块
-func (m *modules) Create(ctx context.Context, module *model.Module) error {
+func (m *modules) Create(module *model.Module) error {
 	return m.db.Create(module).Error
 }
 
 // GetByCode 获取模块
-func (m *modules) GetByCode(ctx context.Context, code string) (*model.Module, error) {
+func (m *modules) GetByCode(code string) (*model.Module, error) {
 	var module model.Module
 	if err := m.db.Where("code = ?", code).First(&module).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -43,10 +42,15 @@ func (m *modules) GetByCode(ctx context.Context, code string) (*model.Module, er
 }
 
 // GetAll 获取所有模块
-func (m *modules) GetAll(ctx context.Context) ([]*model.Module, error) {
+func (m *modules) GetAll() ([]*model.Module, error) {
 	var modules []*model.Module
 	if err := m.db.Find(&modules).Error; err != nil {
 		return nil, err
 	}
 	return modules, nil
+}
+
+// Update 更新模块
+func (m *modules) Update(module *model.Module) error {
+	return m.db.Save(module).Error
 }

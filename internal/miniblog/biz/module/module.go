@@ -32,7 +32,7 @@ func New(ds store.IStore) *moduleBiz {
 // Create 创建模块
 func (b *moduleBiz) Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.CreateModuleResponse, error) {
 	// 检查 code 是否已存在
-	module, err := b.ds.Modules().GetByCode(ctx, r.Code)
+	module, err := b.ds.Modules().GetByCode(r.Code)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (b *moduleBiz) Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.
 	}
 
 	// 创建 module 记录
-	err = b.ds.Modules().Create(ctx, &model.Module{
+	err = b.ds.Modules().Create(&model.Module{
 		Code:  r.Code,
 		Title: r.Title,
 	})
@@ -62,7 +62,7 @@ func (b *moduleBiz) Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.
 
 // GetAll 获取所有模块
 func (b *moduleBiz) GetAll(ctx context.Context) (*v1.GetAllModulesResponse, error) {
-	modules, err := b.ds.Modules().GetAll(ctx)
+	modules, err := b.ds.Modules().GetAll()
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (b *moduleBiz) GetAll(ctx context.Context) (*v1.GetAllModulesResponse, erro
 
 // GetOne 获取模块详情
 func (b *moduleBiz) GetOne(ctx context.Context, code string) (*v1.GetOneModuleResponse, error) {
-	module, err := b.ds.Modules().GetByCode(ctx, code)
+	module, err := b.ds.Modules().GetByCode(code)
 	if err != nil {
 		return nil, err
 	}

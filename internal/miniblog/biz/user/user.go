@@ -40,7 +40,7 @@ func (b *userBiz) Create(ctx context.Context, r *v1.CreateUserRequest) error {
 
 	log.C(ctx).Infow("start to create user in biz layer", "username", r.Username)
 
-	if err := b.ds.Users().Create(ctx, &userM); err != nil {
+	if err := b.ds.Users().Create(&userM); err != nil {
 		if match, _ := regexp.MatchString("Duplicate entry '.*' for key 'username'", err.Error()); match {
 			log.C(ctx).Warnw("user already exists", "username", r.Username, "error", err)
 			return errno.ErrUserAlreadyExists
@@ -58,7 +58,7 @@ func (b *userBiz) Create(ctx context.Context, r *v1.CreateUserRequest) error {
 func (b *userBiz) ChangePassword(ctx context.Context, username string, r *v1.ChangePasswordRequest) error {
 
 	// 获取用户
-	userM, err := b.ds.Users().Get(ctx, username)
+	userM, err := b.ds.Users().Get(username)
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func (b *userBiz) ChangePassword(ctx context.Context, username string, r *v1.Cha
 
 	// 更新密码
 	userM.Password, _ = auth.Encrypt(r.NewPassword)
-	if err := b.ds.Users().Update(ctx, userM); err != nil {
+	if err := b.ds.Users().Update(userM); err != nil {
 		return err
 	}
 
@@ -79,7 +79,7 @@ func (b *userBiz) ChangePassword(ctx context.Context, username string, r *v1.Cha
 
 // Get 获取用户
 func (b *userBiz) Get(ctx context.Context, username string) (*v1.GetUserResponse, error) {
-	user, err := b.ds.Users().Get(ctx, username)
+	user, err := b.ds.Users().Get(username)
 	if err != nil {
 		return nil, err
 	}

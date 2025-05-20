@@ -12,9 +12,16 @@ type Section struct {
 	Code       string    `json:"code"`
 	Title      string    `json:"title"`
 	ModuleCode string    `json:"module_code"`
+	Status     int       `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
+
+// 章节状态
+const (
+	SectionStatusNormal = iota + 1
+	SectionStatusDeleted
+)
 
 // TableName 指定表名
 func (s *Section) TableName() string {
@@ -32,4 +39,19 @@ func (s *Section) BeforeCreate(tx *gorm.DB) (err error) {
 func (s *Section) BeforeUpdate(tx *gorm.DB) (err error) {
 	s.UpdatedAt = time.Now()
 	return
+}
+
+// 发布章节
+func (s *Section) Publish() {
+	s.Status = SectionStatusNormal
+}
+
+// 下架章节
+func (s *Section) Unpublish() {
+	s.Status = SectionStatusDeleted
+}
+
+// 获取章节状态
+func (s *Section) GetStatus() int {
+	return s.Status
 }
