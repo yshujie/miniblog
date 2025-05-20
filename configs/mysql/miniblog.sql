@@ -87,7 +87,7 @@ DROP TABLE IF EXISTS `module`;
 CREATE TABLE `module` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `code` varchar(255) NOT NULL,
-  `name` varchar(255) NOT NULL,
+  `title` varchar(255) NOT NULL,
   `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
   `updatedAt` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
@@ -98,7 +98,7 @@ DROP TABLE IF EXISTS `section`;
 CREATE TABLE `section` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `code` varchar(255) NOT NULL,
-  `name` varchar(255) NOT NULL,
+  `title` varchar(255) NOT NULL,
   `module_code` varchar(255) NOT NULL,
   `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
   `updatedAt` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
