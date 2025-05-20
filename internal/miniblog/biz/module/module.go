@@ -11,7 +11,7 @@ import (
 
 // ModuleBiz 模块业务接口
 type IModuleBiz interface {
-	Create(ctx context.Context, r *v1.CreateModuleRequest) error
+	Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.CreateModuleResponse, error)
 	GetAll(ctx context.Context) ([]*v1.GetAllModulesResponse, error)
 	GetOne(ctx context.Context, code string) (*v1.GetOneModuleResponse, error)
 }
@@ -30,20 +30,34 @@ func New(ds store.IStore) *moduleBiz {
 }
 
 // Create 创建模块
-func (b *moduleBiz) Create(ctx context.Context, r *v1.CreateModuleRequest) error {
+func (b *moduleBiz) Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.CreateModuleResponse, error) {
 	// 检查 code 是否已存在
 	module, err := b.ds.Modules().GetByCode(ctx, r.Code)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if module != nil {
-		return errno.ErrModuleAlreadyExists
+		return nil, errno.ErrModuleAlreadyExists
 	}
 
-	return b.ds.Modules().Create(ctx, &model.Module{
+	// 创建 module 记录
+	err = b.ds.Modules().Create(ctx, &model.Module{
 		Code:  r.Code,
 		Title: r.Title,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	// 返回响应 CreateModuleResponse
+	response := &v1.CreateModuleResponse{
+		Module: &v1.ModuleInfo{
+			Code:  r.Code,
+			Title: r.Title,
+		},
+	}
+
+	return response, nil
 }
 
 // GetAll 获取所有模块
