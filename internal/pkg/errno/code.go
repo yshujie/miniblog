@@ -36,4 +36,13 @@ var (
 
 	// ErrModuleAlreadyExists 模块已存在
 	ErrModuleAlreadyExists = &Errno{HTTP: 400, Code: "ErrModuleAlreadyExists", Message: "模块已存在"}
+
+	// ErrSectionAlreadyExists section 已存在
+	ErrSectionAlreadyExists = &Errno{HTTP: 400, Code: "ErrSectionAlreadyExists", Message: "section 已存在"}
+
+	// ErrSectionNotFound section 不存在
+	ErrSectionNotFound = &Errno{HTTP: 404, Code: "ErrSectionNotFound", Message: "section 不存在"}
+
+	// ErrModuleNotFound module 不存在
+	ErrModuleNotFound = &Errno{HTTP: 404, Code: "ErrModuleNotFound", Message: "module 不存在"}
 )

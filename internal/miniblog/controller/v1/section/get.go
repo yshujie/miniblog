@@ -1,4 +1,4 @@
-package module
+package section
 
 import (
 	"github.com/gin-gonic/gin"
@@ -6,7 +6,7 @@ import (
 	"github.com/yshujie/miniblog/internal/pkg/log"
 )
 
-// GetList 获取所有模块
+// GetList 获取 section 列表
 func (c *SectionController) GetList(ctx *gin.Context) {
 	log.C(ctx).Infow("Get all sections function called")
 
@@ -19,7 +19,7 @@ func (c *SectionController) GetList(ctx *gin.Context) {
 	core.WriteResponse(ctx, nil, sections)
 }
 
-// GetOne 获取模块详情
+// GetOne 获取 section 详情
 func (c *SectionController) GetOne(ctx *gin.Context) {
 	log.C(ctx).Infow("Get one section function called")
 

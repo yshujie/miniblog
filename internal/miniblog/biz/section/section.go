@@ -3,12 +3,15 @@ package section
 import (
 	"context"
 
+	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
+	"github.com/yshujie/miniblog/internal/pkg/errno"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
 )
 
 // ISectionBiz 模块业务接口
 type ISectionBiz interface {
+	Create(ctx context.Context, r *v1.CreateSectionRequest) (*v1.CreateSectionResponse, error)
 	GetList(ctx context.Context, moduleCode string) ([]*v1.GetSectionListResponse, error)
 	GetOne(ctx context.Context, code string) (*v1.GetSectionResponse, error)
 }
@@ -24,6 +27,45 @@ var _ ISectionBiz = (*sectionBiz)(nil)
 // New 简单工程函数，创建 sectionBiz 实例
 func New(ds store.IStore) *sectionBiz {
 	return &sectionBiz{ds}
+}
+
+// Create 创建 section 记录
+func (b *sectionBiz) Create(ctx context.Context, r *v1.CreateSectionRequest) (*v1.CreateSectionResponse, error) {
+	// 检查 code 是否已存在
+	existingSection, err := b.ds.Sections().GetByCode(ctx, r.Code)
+	if err != nil {
+		return nil, err
+	}
+	if existingSection != nil {
+		return nil, errno.ErrSectionAlreadyExists
+	}
+
+	// 检查 module_code 是否已存在
+	existingModule, err := b.ds.Modules().GetByCode(ctx, r.ModuleCode)
+	if err != nil {
+		return nil, err
+	}
+	if existingModule == nil {
+		return nil, errno.ErrModuleNotFound
+	}
+
+	// 创建 section 记录
+	err = b.ds.Sections().Create(ctx, &model.Section{
+		Code:       r.Code,
+		Title:      r.Title,
+		ModuleCode: r.ModuleCode,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &v1.CreateSectionResponse{
+		Section: &v1.SectionInfo{
+			Code:       r.Code,
+			Title:      r.Title,
+			ModuleCode: r.ModuleCode,
+		},
+	}, nil
 }
 
 // GetList 获取所有模块
