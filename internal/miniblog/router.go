@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	articleCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/article"
 	authCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/auth"
+	blogCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/blog"
 	moduleCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/module"
 	sectionCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/section"
 	userCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/user"
@@ -37,6 +38,7 @@ func installRouters(g *gin.Engine) error {
 
 	// 创建 controllers
 	ac := authCtrl.New(store.S)
+	bc := blogCtrl.New(store.S)
 	uc := userCtrl.New(store.S, authz)
 	mc := moduleCtrl.New(store.S)
 	sc := sectionCtrl.New(store.S)
@@ -57,6 +59,12 @@ func installRouters(g *gin.Engine) error {
 			userv1.PUT(":name/change-password", uc.ChangePassword)
 			userv1.Use(mw.Authn(), mw.Authz(authz))
 			userv1.GET(":name", uc.Get)
+		}
+
+		// 创建 blog 路由分组
+		blogv1 := v1.Group("/blog")
+		{
+			blogv1.GET("/moduleDetail", bc.GetModuleDetail)
 		}
 
 		// 创建 modules 路由分组

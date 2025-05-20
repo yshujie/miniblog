@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import type { Module } from '@/types/module'
 import { fetchModules } from '@/api/module'
 import type { Section } from '@/types/section'
+import { fetchModuleDetail } from '@/api/blog'
 
 // module store
 export const useModuleStore = defineStore('module', {
@@ -37,38 +38,53 @@ export const useModuleStore = defineStore('module', {
       this.modules = await fetchModules()
     },
 
-    // 加载模块下的所有章节
-    async loadSections(code: string) {
-      const module = this.getModuleByCode(code)
-      if (!module) {
-        throw new Error(`Module with code ${code} not found`)
-      }
-      if (module.sections.length > 0) {
-        return // 如果已经加载过，直接返回
-      }
+    // 加载模块详情
+    async loadModuleDetail(code: string) {
+      const moduleDetail = await fetchModuleDetail(code)
 
-      const sections = await module.loadSections()
-      module.sections = sections
+      for (const module of this.modules) {
+        if (module.code !== code) {
+          continue
+        }
+
+        // 更新模块信息
+        module.title = moduleDetail.title
+        module.sections = moduleDetail.sections
+      }
     },
 
-    // 加载模块下的所有文章
-    async loadArticles(code: string) {
-      const module = this.getModuleByCode(code)
-      if (!module) {
-        throw new Error(`Module with code ${code} not found`)
-      }
-      if (module.sections.length === 0) {
-        return
-      }
-      if (module.sections.some(section => section.articles.length > 0)) {
-        return // 如果已经加载过，直接返回
-      }
+    // // 加载模块下的所有章节
+    // async loadSections(code: string) {
+    //   const module = this.getModuleByCode(code)
+    //   if (!module) {
+    //     throw new Error(`Module with code ${code} not found`)
+    //   }
+    //   if (module.sections.length > 0) {
+    //     return // 如果已经加载过，直接返回
+    //   }
 
-      for (const section of module.sections) {
-        const articles = await section.loadArticles()
-        section.articles = articles
-      }
-    },
+    //   const sections = await module.loadSections()
+    //   module.sections = sections
+    // },
+
+    // // 加载模块下的所有文章
+    // async loadArticles(code: string) {
+    //   const module = this.getModuleByCode(code)
+    //   if (!module) {
+    //     throw new Error(`Module with code ${code} not found`)
+    //   }
+    //   if (module.sections.length === 0) {
+    //     return
+    //   }
+    //   if (module.sections.some(section => section.articles.length > 0)) {
+    //     return // 如果已经加载过，直接返回
+    //   }
+
+    //   for (const section of module.sections) {
+    //     const articles = await section.loadArticles()
+    //     section.articles = articles
+    //   }
+    // },
 
     // 设置当前模块
     setCurrentModule(module: Module) {

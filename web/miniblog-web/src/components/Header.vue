@@ -48,8 +48,9 @@ async function initBlogData() {
 
   // 遍历所有模块，加载 sections & articles
   for (const module of moduleStore.modules) {
-    await moduleStore.loadSections(module.code)
-    await moduleStore.loadArticles(module.code)
+    // await moduleStore.loadSections(module.code)
+    // await moduleStore.loadArticles(module.code)
+    await moduleStore.loadModuleDetail(module.code)
   }
 }
 </script>
