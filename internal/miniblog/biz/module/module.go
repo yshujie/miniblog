@@ -67,19 +67,18 @@ func (b *moduleBiz) GetAll(ctx context.Context) ([]*v1.GetAllModulesResponse, er
 		return nil, err
 	}
 
-	response := make([]*v1.GetAllModulesResponse, 0)
+	// 将 modules 追加到 GetAllModulesResponse.Modules 中
+	response := &v1.GetAllModulesResponse{
+		Modules: make([]*v1.ModuleInfo, 0),
+	}
 	for _, module := range modules {
-		response = append(response, &v1.GetAllModulesResponse{
-			Modules: []*v1.ModuleInfo{
-				{
-					Code:  module.Code,
-					Title: module.Title,
-				},
-			},
+		response.Modules = append(response.Modules, &v1.ModuleInfo{
+			Code:  module.Code,
+			Title: module.Title,
 		})
 	}
 
-	return response, nil
+	return []*v1.GetAllModulesResponse{response}, nil
 }
 
 // GetOne 获取模块详情
