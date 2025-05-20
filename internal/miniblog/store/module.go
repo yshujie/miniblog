@@ -34,9 +34,11 @@ func (m *modules) Create(ctx context.Context, module *model.Module) error {
 func (m *modules) GetByCode(ctx context.Context, code string) (*model.Module, error) {
 	var module model.Module
 	if err := m.db.Where("code = ?", code).First(&module).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
-
 	return &module, nil
 }
 
