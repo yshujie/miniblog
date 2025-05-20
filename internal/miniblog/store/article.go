@@ -8,7 +8,7 @@ import (
 )
 
 type ArticleStore interface {
-	Create(ctx context.Context, article *model.Article) error
+	Create(ctx context.Context, article *model.Article) (*model.Article, error)
 	Get(ctx context.Context, id int) (*model.Article, error)
 	GetListBySectionCode(ctx context.Context, sectionCode string) ([]*model.Article, error)
 }
@@ -26,8 +26,12 @@ func newArticles(db *gorm.DB) *articles {
 }
 
 // Create 创建文章
-func (a *articles) Create(ctx context.Context, article *model.Article) error {
-	return a.db.Create(article).Error
+func (a *articles) Create(ctx context.Context, article *model.Article) (*model.Article, error) {
+	err := a.db.Create(article).Error
+	if err != nil {
+		return nil, err
+	}
+	return article, nil
 }
 
 // Get 获取文章

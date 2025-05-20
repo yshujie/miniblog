@@ -1,4 +1,4 @@
-package module
+package article
 
 import (
 	"github.com/yshujie/miniblog/internal/miniblog/biz"

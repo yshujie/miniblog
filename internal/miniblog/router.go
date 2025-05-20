@@ -70,6 +70,7 @@ func installRouters(g *gin.Engine) error {
 		// 创建 sections 路由分组
 		sectionsv1 := v1.Group("/sections")
 		{
+			sectionsv1.POST("", sc.Create)
 			sectionsv1.GET(":module_code", sc.GetList)
 			sectionsv1.GET(":module_code/:code", sc.GetOne)
 		}
@@ -77,6 +78,7 @@ func installRouters(g *gin.Engine) error {
 		// 创建 articles 路由分组
 		articlesv1 := v1.Group("/articles")
 		{
+			articlesv1.POST("", arCtrl.Create)
 			articlesv1.GET(":section_code", arCtrl.GetList)
 			articlesv1.GET(":section_code/:id", arCtrl.GetOne)
 		}
