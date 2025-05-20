@@ -2,6 +2,7 @@ package log
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -68,17 +69,46 @@ func NewLogger(opts *Options) *zapLogger {
 
 	// 自定义时间序列化函数
 	encoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-		enc.AppendString(t.Format("2006-01-02 15:04:05.000"))
+		enc.AppendString(t.Format("15:04:05.000"))
 	}
 
-	// 自定义 time.Duration 序列化函数，将时间序列化为经过的毫秒数（浮点数）
+	// 自定义 time.Duration 序列化函数
 	encoderConfig.EncodeDuration = func(d time.Duration, enc zapcore.PrimitiveArrayEncoder) {
-		enc.AppendFloat64(float64(d) / float64(time.Millisecond))
+		enc.AppendString(fmt.Sprintf("%.3f ms", float64(d.Microseconds())/1000))
 	}
 
 	// 自定义日志级别序列化函数
 	encoderConfig.EncodeLevel = func(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
-		enc.AppendString(l.String())
+		var levelStr string
+		switch l {
+		case zapcore.DebugLevel:
+			levelStr = "DBG"
+		case zapcore.InfoLevel:
+			levelStr = "NTC"
+		case zapcore.WarnLevel:
+			levelStr = "WRN"
+		case zapcore.ErrorLevel:
+			levelStr = "ERR"
+		case zapcore.DPanicLevel:
+			levelStr = "DPN"
+		case zapcore.PanicLevel:
+			levelStr = "PNC"
+		case zapcore.FatalLevel:
+			levelStr = "FTL"
+		default:
+			levelStr = l.String()
+		}
+		enc.AppendString(fmt.Sprintf("[%s]", levelStr))
+	}
+
+	// 自定义调用者序列化函数
+	encoderConfig.EncodeCaller = func(caller zapcore.EntryCaller, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString(fmt.Sprintf("[%s]", caller.TrimmedPath()))
+	}
+
+	// 自定义消息序列化函数
+	encoderConfig.EncodeName = func(s string, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString(fmt.Sprintf("[%s]", s))
 	}
 
 	// 构建 zap.Logger 需要的配置

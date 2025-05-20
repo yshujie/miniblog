@@ -1,6 +1,9 @@
 package middleware
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -23,9 +26,6 @@ func Logger() gin.HandlerFunc {
 		// 执行时间
 		latencyTime := endTime.Sub(startTime)
 
-		// 请求方式
-		reqMethod := c.Request.Method
-
 		// 请求路由
 		reqUri := c.Request.RequestURI
 
@@ -35,21 +35,46 @@ func Logger() gin.HandlerFunc {
 		// 请求IP
 		clientIP := c.ClientIP()
 
+		// 服务器IP
+		serverIP := c.Request.Host
+
 		// 请求ID
 		requestID := c.GetString(known.XRequestIDKey)
 
-		// 用户名
-		username := c.GetString(known.XUsernameKey)
+		// 获取 Referer
+		referer := c.Request.Referer()
 
-		// 日志格式
-		log.C(c).Infow("HTTP Request",
-			"request_id", requestID,
-			"status", statusCode,
-			"latency", latencyTime,
-			"client_ip", clientIP,
-			"method", reqMethod,
-			"uri", reqUri,
-			"username", username,
+		// 获取 User-Agent
+		userAgent := c.Request.UserAgent()
+
+		// 获取 POST 数据
+		var postData string
+		if c.Request.Method == "POST" {
+			body, err := io.ReadAll(c.Request.Body)
+			if err == nil {
+				postData = string(body)
+			}
+		}
+
+		// 获取 Cookies
+		cookies, _ := json.Marshal(c.Request.Cookies())
+
+		// 构建日志消息
+		msg := fmt.Sprintf("%s [%s][%d] [%.3f ms] [NTC] [-- [server_ip = %s] [client_ip = %s] [theUrl = %s] [referer = %s] [_USER_AGENT = %s] [posts = %s] [cookies = %s] --]",
+			startTime.Format("15:04:05.000"),
+			requestID,
+			statusCode,
+			float64(latencyTime.Microseconds())/1000,
+			serverIP,
+			clientIP,
+			reqUri,
+			referer,
+			userAgent,
+			postData,
+			string(cookies),
 		)
+
+		// 输出日志
+		log.C(c).Infow(msg)
 	}
 }
