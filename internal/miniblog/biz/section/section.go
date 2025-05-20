@@ -12,7 +12,7 @@ import (
 // ISectionBiz 模块业务接口
 type ISectionBiz interface {
 	Create(ctx context.Context, r *v1.CreateSectionRequest) (*v1.CreateSectionResponse, error)
-	GetList(ctx context.Context, moduleCode string) ([]*v1.GetSectionListResponse, error)
+	GetList(ctx context.Context, moduleCode string) (*v1.GetSectionListResponse, error)
 	GetOne(ctx context.Context, code string) (*v1.GetSectionResponse, error)
 }
 
@@ -69,22 +69,20 @@ func (b *sectionBiz) Create(ctx context.Context, r *v1.CreateSectionRequest) (*v
 }
 
 // GetList 获取所有模块
-func (b *sectionBiz) GetList(ctx context.Context, moduleCode string) ([]*v1.GetSectionListResponse, error) {
+func (b *sectionBiz) GetList(ctx context.Context, moduleCode string) (*v1.GetSectionListResponse, error) {
 	sections, err := b.ds.Sections().GetListByModuleCode(ctx, moduleCode)
 	if err != nil {
 		return nil, err
 	}
 
-	response := make([]*v1.GetSectionListResponse, 0)
+	response := &v1.GetSectionListResponse{
+		Sections: make([]*v1.SectionInfo, 0),
+	}
 	for _, section := range sections {
-		response = append(response, &v1.GetSectionListResponse{
-			Sections: []*v1.SectionInfo{
-				{
-					Code:       section.Code,
-					Title:      section.Title,
-					ModuleCode: section.ModuleCode,
-				},
-			},
+		response.Sections = append(response.Sections, &v1.SectionInfo{
+			Code:       section.Code,
+			Title:      section.Title,
+			ModuleCode: section.ModuleCode,
 		})
 	}
 

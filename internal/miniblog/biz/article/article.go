@@ -13,7 +13,7 @@ import (
 // ArticleBiz 文章业务接口
 type IArticleBiz interface {
 	Create(ctx context.Context, r *v1.CreateArticleRequest) (*v1.CreateArticleResponse, error)
-	GetList(ctx context.Context, sectionCode string) ([]*v1.GetArticleListResponse, error)
+	GetList(ctx context.Context, sectionCode string) (*v1.GetArticleListResponse, error)
 	GetOne(ctx context.Context, id int) (*v1.GetArticleResponse, error)
 }
 
@@ -68,27 +68,25 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 }
 
 // GetList 获取所有文章
-func (b *articleBiz) GetList(ctx context.Context, sectionCode string) ([]*v1.GetArticleListResponse, error) {
+func (b *articleBiz) GetList(ctx context.Context, sectionCode string) (*v1.GetArticleListResponse, error) {
 	articles, err := b.ds.Articles().GetListBySectionCode(ctx, sectionCode)
 	if err != nil {
 		return nil, err
 	}
 
-	response := make([]*v1.GetArticleListResponse, 0)
+	response := &v1.GetArticleListResponse{
+		Articles: make([]*v1.ArticleInfo, 0),
+	}
 	for _, article := range articles {
-		response = append(response, &v1.GetArticleListResponse{
-			Articles: []*v1.ArticleInfo{
-				{
-					ID:          article.ID,
-					Title:       article.Title,
-					Content:     article.Content,
-					SectionCode: article.SectionCode,
-					Author:      article.Author,
-					Tags:        strings.Split(article.Tags, ","),
-					CreatedAt:   article.CreatedAt,
-					UpdatedAt:   article.UpdatedAt,
-				},
-			},
+		response.Articles = append(response.Articles, &v1.ArticleInfo{
+			ID:          article.ID,
+			Title:       article.Title,
+			Content:     article.Content,
+			SectionCode: article.SectionCode,
+			Author:      article.Author,
+			Tags:        strings.Split(article.Tags, ","),
+			CreatedAt:   article.CreatedAt,
+			UpdatedAt:   article.UpdatedAt,
 		})
 	}
 
