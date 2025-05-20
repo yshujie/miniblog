@@ -23,17 +23,35 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount } from 'vue'
+import { onMounted } from 'vue'
 import { useModuleStore } from '@/stores/module'
 
 // module store
 const moduleStore = useModuleStore()
 
-// onBeforeMount 生命周期钩子，在组件挂载前执行
-onBeforeMount(async () => { 
+// 组件挂载时加载数据
+onMounted(async () => { 
+  // 加载模块数据
   await moduleStore.loadModules()
+
+  // 预热 blog 数据
+  await initBlogData()
+
+  console.log(`moduleStore.modules is ${moduleStore.modules}.`)
 })
 
+// 预热 blog 数据
+async function initBlogData() {
+  if (moduleStore.modules.length === 0) {
+    return
+  }
+
+  // 遍历所有模块，加载 sections & articles
+  for (const module of moduleStore.modules) {
+    await moduleStore.loadSections(module.code)
+    await moduleStore.loadArticles(module.code)
+  }
+}
 </script>
 
 <style lang="less" scoped>
