@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { ApiResponse } from '../types/response'
 
 // 创建 axios 实例
 const http = axios.create({
@@ -37,6 +38,7 @@ http.interceptors.request.use(
 // 响应拦截器
 http.interceptors.response.use(
   response => {
+    // 直接返回响应数据，因为后端已经包装了 code、msg 和 payload
     return response.data
   },
   error => {
@@ -62,5 +64,16 @@ http.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+// 扩展 axios 实例的类型
+declare module 'axios' {
+  interface AxiosInstance {
+    get<T = any>(url: string, config?: any): Promise<ApiResponse<T>>
+    post<T = any>(url: string, data?: any, config?: any): Promise<ApiResponse<T>>
+    put<T = any>(url: string, data?: any, config?: any): Promise<ApiResponse<T>>
+    delete<T = any>(url: string, config?: any): Promise<ApiResponse<T>>
+    patch<T = any>(url: string, data?: any, config?: any): Promise<ApiResponse<T>>
+  }
+}
 
 export default http 

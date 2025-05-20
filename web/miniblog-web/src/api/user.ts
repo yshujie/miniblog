@@ -9,13 +9,13 @@ export interface LoginResponse {
 }
 
 export async function login(username: string, password: string): Promise<LoginResponse> {
-  const { data } = await http.post<LoginResponse>('/api/v1/login', {
+  const { payload } = await http.post<LoginResponse>('/api/v1/login', {
     username,
     password
   })
   // 保存 token 到 localStorage
-  localStorage.setItem('token', data.token)
-  return data
+  localStorage.setItem('token', payload.token)
+  return payload
 }
 
 export interface RegisterResponse {
@@ -24,11 +24,11 @@ export interface RegisterResponse {
 }
 
 export async function register(username: string, password: string): Promise<RegisterResponse> {
-  const { data } = await http.post<RegisterResponse>('/api/v1/register', {
+  const { payload } = await http.post<RegisterResponse>('/api/v1/register', {
     username,
     password
   })
-  return data
+  return payload
 }
 
 export async function logout(): Promise<void> {
