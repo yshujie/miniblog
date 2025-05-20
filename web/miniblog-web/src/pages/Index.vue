@@ -6,10 +6,11 @@
       <el-avatar class="avatar" :src="logo" size="large">
         <img :src="logo" alt="logo" />
       </el-avatar>
-      <h1>Node.js全栈技术博客</h1>
+      <h1>clack 的技术博客</h1>
       <p class="desc">
-        专注于前端、Node.js、数据库及面试题解析的高质量技术博客，<br />
-        帮助开发者快速成长的学习平台
+        《费曼物理讲义》中讲：What I cannot create, I do not understand.
+        <br />
+        这里便是我创造的：对 AI 的探索、对技术的思考、对生活的记录。
       </p>
       <el-button type="success" size="large" class="read-btn">开始阅读</el-button>
     </div>
@@ -21,18 +22,21 @@
     <div class="columns">
       <div class="column">
         <div class="col-title">功不唐捐</div>
-        <div class="col-desc">记录每一天的进步，一分耕耘，一分收获。</div>
-      </div>
-      <div class="column">
-        <div class="col-title">程序员成长指北</div>
         <div class="col-desc">
-          专注 Node.js 技术栈分享，从前端到 Node.js 再到后端数据库，祝您成为优秀的高效 Node.js 全栈工程师
+          功不唐捐，玉汝于成
         </div>
       </div>
       <div class="column">
-        <div class="col-title">koala</div>
+        <div class="col-title">面向未来的开发者</div>
         <div class="col-desc">
-          一个有趣的且乐于分享的人。座右铭：今天未完成的，明天更不会完成。
+          需求分析、领域建模、架构设计、编码实现，开发者不可止于码农。
+          AI 是时代的加速器，强者必定愈强
+        </div>
+      </div>
+      <div class="column">
+        <div class="col-title">终身学习</div>
+        <div class="col-desc">
+          今天未完成的，明天更不会完成
         </div>
       </div>
     </div>
@@ -40,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-const logo = new URL('@/assets/logo.png', import.meta.url).href
+import logo from '@/assets/logo.jpeg'
 </script>
 
 <style lang="less" scoped>
@@ -68,6 +72,7 @@ const logo = new URL('@/assets/logo.png', import.meta.url).href
     color: #888;
     font-size: 18px;
     margin-bottom: 22px;
+    line-height: 1.8;
   }
   .read-btn {
     padding: 10px 32px;

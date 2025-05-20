@@ -1,7 +1,7 @@
 <template>
   <el-header class="header-bar">
     <div class="left">
-      <span class="logo">Node.js全栈技术博客</span>
+      <span class="logo">clack 的技术博客</span>
     </div>
 
     <div class="right">
