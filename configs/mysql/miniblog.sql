@@ -1,63 +1,18 @@
--- Copyright 2022 Innkeeper Belm(孔令飞) <nosbelm@qq.com>. All rights reserved.
--- Use of this source code is governed by a MIT style
--- license that can be found in the LICENSE file. The original repo for
--- this file is https://github.com/marmotedu/miniblog.
-
--- MariaDB dump 10.19  Distrib 10.5.17-MariaDB, for Linux (x86_64)
---
--- Host: 127.0.0.1    Database: miniblog
--- ------------------------------------------------------
--- Server version	10.5.17-MariaDB
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-
 --
 -- Current Database: `miniblog`
 --
 
-/*!40000 DROP DATABASE IF EXISTS `miniblog`*/;
+DROP DATABASE IF EXISTS `miniblog`;
 
-CREATE DATABASE /*!32312 IF NOT EXISTS*/ `miniblog` /*!40100 DEFAULT CHARACTER SET latin1 */;
+CREATE DATABASE IF NOT EXISTS `miniblog` DEFAULT CHARACTER SET utf8;
 
 USE `miniblog`;
-
---
--- Table structure for table `post`
---
-
-DROP TABLE IF EXISTS `post`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `post` (
-  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `username` varchar(255) NOT NULL,
-  `postID` varchar(256) NOT NULL,
-  `title` varchar(256) NOT NULL,
-  `content` longtext NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `postID` (`postID`),
-  KEY `idx_username` (`username`)
-) ENGINE=InnoDB AUTO_INCREMENT=141 DEFAULT CHARSET=utf8;
-/*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `user`
 --
 
 DROP TABLE IF EXISTS `user`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `user` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `username` varchar(255) NOT NULL,
@@ -65,47 +20,47 @@ CREATE TABLE `user` (
   `nickname` varchar(30) NOT NULL,
   `email` varchar(256) NOT NULL,
   `phone` varchar(16) NOT NULL,
+  `status` tinyint(4) NOT NULL DEFAULT '1' COMMENT '1: 正常, 2: 禁用',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)
-) ENGINE=MyISAM AUTO_INCREMENT=27 DEFAULT CHARSET=utf8;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2022-12-02  0:12:03
-
+--
+-- Table structure for table `module`
+--
 DROP TABLE IF EXISTS `module`;
 CREATE TABLE `module` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `code` varchar(255) NOT NULL,
   `title` varchar(255) NOT NULL,
+  `status` tinyint(4) NOT NULL DEFAULT '1' COMMENT '1: 上架, 2: 下架',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `code` (`code`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
+--
+-- Table structure for table `section`
+--
 DROP TABLE IF EXISTS `section`;
 CREATE TABLE `section` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `code` varchar(255) NOT NULL,
   `title` varchar(255) NOT NULL,
   `module_code` varchar(255) NOT NULL,
+  `status` tinyint(4) NOT NULL DEFAULT '1' COMMENT '1: 上架, 2: 下架',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `module_code_code` (`module_code`, `code`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
+--
+-- Table structure for table `article`
+--
 DROP TABLE IF EXISTS `article`;
 CREATE TABLE `article` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -114,8 +69,49 @@ CREATE TABLE `article` (
   `section_code` varchar(255) NOT NULL,
   `author` varchar(255) NOT NULL,
   `tags` varchar(255) NOT NULL,
+  `status` tinyint(4) NOT NULL DEFAULT '1' COMMENT '1: 正常, 2: 禁用',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `section_code_id` (`section_code`, `id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+--
+-- Insert data into table `user`
+--
+INSERT INTO `user` (`username`, `password`, `nickname`, `email`, `phone`, `status`) VALUES ('yangshujie', '1q2w3e4r', '杨舒杰', 'yshujie@163.com', '15711236163', 1);
+
+
+--
+-- Insert data into table `module`
+--
+INSERT INTO `module` (`code`, `title`, `status`) VALUES ('ai', 'AI', 1);
+INSERT INTO `module` (`code`, `title`, `status`) VALUES ('go', 'Golang', 1);
+INSERT INTO `module` (`code`, `title`, `status`) VALUES ('ddd', '领域驱动设计', 1);
+INSERT INTO `module` (`code`, `title`, `status`) VALUES ('architecture', '软件架构设计', 1);
+INSERT INTO `module` (`code`, `title`, `status`) VALUES ('refactor', '重构', 0);
+
+--
+-- Insert data into table `section`
+--
+# AI
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('ai_history', '人工智能发展史', 'ai', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('ai_prompt', 'Prompt 工程', 'ai', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('ai_llm', 'LLM 模型', 'ai', 1);
+
+# Golang
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('go_base', 'Golang 基础', 'go', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('go_oop', 'Golang 与 面向对象', 'go', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('go_design_pattern', 'Golang 中的设计模式', 'go', 1);
+
+# 领域驱动设计
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('ddd_analysis', '需求分析', 'ddd', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('ddd_modeling', '领域建模', 'ddd', 1);
+
+# 软件架构设计
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('refactor_thinking', '思想&原则', 'refactor', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('refactor_pattern', '设计模式', 'refactor', 1);
+
+# 重构
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('refactor_smell', '坏味道', 'refactor', 0);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('refactor_technique', '重构技巧', 'refactor', 0);
