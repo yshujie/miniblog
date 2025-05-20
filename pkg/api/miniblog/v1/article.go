@@ -8,7 +8,7 @@ type CreateArticleRequest struct {
 	Content     string   `json:"content" valid:"required,stringlength(1|100000)"`
 	SectionCode string   `json:"section_code" valid:"required,stringlength(1|255)"`
 	Author      string   `json:"author" valid:"required,stringlength(1|255)"`
-	Tags        []string `json:"tags" valid:"required,dive,stringlength(1|255)"`
+	Tags        []string `json:"tags" valid:"required"`
 }
 
 // CreateArticleResponse 创建文章响应
