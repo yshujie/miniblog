@@ -9,7 +9,7 @@
     <div class="nav">
       <el-menu mode="horizontal" :default-active="'/'" router>
         <el-menu-item index="/">首页</el-menu-item>
-        <el-menu-item v-for="module in modules" :key="module.code" :index="`/blog/${module.code}`">
+        <el-menu-item v-for="module in moduleStore.modules" :key="module.code" :index="`/blog/${module.code}`">
           {{ module.title }}
         </el-menu-item>
         <el-menu-item key="github">
@@ -23,19 +23,15 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount, ref } from 'vue'
-import { fetchModules } from '../api/module'
-import type { Module } from '@/types/module'
+import { onBeforeMount } from 'vue'
+import { useModuleStore } from '@/stores/module'
 
-const modules = ref<Module[]>([])
+// module store
+const moduleStore = useModuleStore()
 
 // onBeforeMount 生命周期钩子，在组件挂载前执行
 onBeforeMount(async () => { 
-  console.log(`Header component is now before mounted.`)
-
-  // 获取模块列表
-  modules.value = await fetchModules()
-  console.log("modules", modules.value)
+  await moduleStore.loadModules()
 })
 
 </script>
