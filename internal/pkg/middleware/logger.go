@@ -41,67 +41,81 @@ func Logger() gin.HandlerFunc {
 		blw := &bodyLogWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
 		c.Writer = blw
 
+		// 记录请求日志
+		logRequest(c, startTime, requestBody)
+
 		// 处理请求
 		c.Next()
 
-		// 结束时间
-		endTime := time.Now()
-
-		// 执行时间
-		latencyTime := endTime.Sub(startTime)
-
-		// 请求路由
-		reqUri := c.Request.RequestURI
-
-		// 状态码
-		statusCode := c.Writer.Status()
-
-		// 请求IP
-		clientIP := c.ClientIP()
-
-		// 服务器IP
-		serverIP := c.Request.Host
-
-		// 请求ID
-		requestID := c.GetString(known.XRequestIDKey)
-
-		// 获取 Referer
-		referer := c.Request.Referer()
-
-		// 获取 User-Agent
-		userAgent := c.Request.UserAgent()
-
-		// 获取 Cookies
-		cookies, _ := json.Marshal(c.Request.Cookies())
-
-		// 构建请求日志消息
-		requestMsg := fmt.Sprintf("%s [%s][%d] [%.3f ms] [NTC] [-- [server_ip = %s] [client_ip = %s] [theUrl = %s] [referer = %s] [_USER_AGENT = %s] [request_body = %s] [cookies = %s] --]",
-			startTime.Format("15:04:05.000"),
-			requestID,
-			statusCode,
-			float64(latencyTime.Microseconds())/1000,
-			serverIP,
-			clientIP,
-			reqUri,
-			referer,
-			userAgent,
-			string(requestBody),
-			string(cookies),
-		)
-
-		// 构建响应日志消息
-		responseMsg := fmt.Sprintf("%s [%s][%d] [%.3f ms] [NTC] [-- [response_body = %s] --]",
-			endTime.Format("15:04:05.000"),
-			requestID,
-			statusCode,
-			float64(latencyTime.Microseconds())/1000,
-			blw.body.String(),
-		)
-
-		// 输出请求日志
-		log.C(c).Infow("HTTP Request", "request", requestMsg)
-
-		// 输出响应日志
-		log.C(c).Infow("HTTP Response", "response", responseMsg)
+		// 记录响应日志
+		logResponse(c, startTime, blw.body.String())
 	}
+}
+
+// logRequest 记录请求日志
+func logRequest(c *gin.Context, startTime time.Time, requestBody []byte) {
+	// 请求路由
+	reqUri := c.Request.RequestURI
+
+	// 请求IP
+	clientIP := c.ClientIP()
+
+	// 服务器IP
+	serverIP := c.Request.Host
+
+	// 请求ID
+	requestID := c.GetString(known.XRequestIDKey)
+
+	// 获取 Referer
+	referer := c.Request.Referer()
+
+	// 获取 User-Agent
+	userAgent := c.Request.UserAgent()
+
+	// 获取 Cookies
+	cookies, _ := json.Marshal(c.Request.Cookies())
+
+	// 构建请求日志消息
+	requestMsg := fmt.Sprintf("%s [%s][%d] [0.000 ms] [NTC] [-- [server_ip = %s] [client_ip = %s] [theUrl = %s] [referer = %s] [_USER_AGENT = %s] [request_body = %s] [cookies = %s] --]",
+		startTime.Format("15:04:05.000"),
+		requestID,
+		c.Writer.Status(),
+		serverIP,
+		clientIP,
+		reqUri,
+		referer,
+		userAgent,
+		string(requestBody),
+		string(cookies),
+	)
+
+	// 输出请求日志
+	log.C(c).Infow("HTTP Request", "request", requestMsg)
+}
+
+// logResponse 记录响应日志
+func logResponse(c *gin.Context, startTime time.Time, responseBody string) {
+	// 结束时间
+	endTime := time.Now()
+
+	// 执行时间
+	latencyTime := endTime.Sub(startTime)
+
+	// 状态码
+	statusCode := c.Writer.Status()
+
+	// 请求ID
+	requestID := c.GetString(known.XRequestIDKey)
+
+	// 构建响应日志消息
+	responseMsg := fmt.Sprintf("%s [%s][%d] [%.3f ms] [NTC] [-- [response_body = %s] --]",
+		endTime.Format("15:04:05.000"),
+		requestID,
+		statusCode,
+		float64(latencyTime.Microseconds())/1000,
+		responseBody,
+	)
+
+	// 输出响应日志
+	log.C(c).Infow("HTTP Response", "response", responseMsg)
 }
