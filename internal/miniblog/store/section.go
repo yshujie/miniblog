@@ -34,6 +34,9 @@ func (s *sections) Create(ctx context.Context, section *model.Section) error {
 func (s *sections) GetByCode(ctx context.Context, code string) (*model.Section, error) {
 	var section model.Section
 	if err := s.db.Where("code = ?", code).First(&section).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
 
