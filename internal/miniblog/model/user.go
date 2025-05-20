@@ -14,8 +14,8 @@ type UserM struct {
 	Nickname  string    `gorm:"column:nickname"`
 	Email     string    `gorm:"column:email"`
 	Phone     string    `gorm:"column:phone"`
-	CreatedAt time.Time `gorm:"column:createdAt"`
-	UpdatedAt time.Time `gorm:"column:updatedAt"`
+	CreatedAt time.Time `gorm:"column:created_at"`
+	UpdatedAt time.Time `gorm:"column:updated_at"`
 }
 
 // TableName 指定表名

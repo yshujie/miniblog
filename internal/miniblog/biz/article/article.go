@@ -61,8 +61,8 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 			SectionCode: article.SectionCode,
 			Author:      article.Author,
 			Tags:        strings.Split(article.Tags, ","),
-			CreateTime:  article.CreateTime,
-			UpdateTime:  article.UpdateTime,
+			CreatedAt:   article.CreatedAt,
+			UpdatedAt:   article.UpdatedAt,
 		},
 	}, nil
 }
@@ -85,8 +85,8 @@ func (b *articleBiz) GetList(ctx context.Context, sectionCode string) ([]*v1.Get
 					SectionCode: article.SectionCode,
 					Author:      article.Author,
 					Tags:        strings.Split(article.Tags, ","),
-					CreateTime:  article.CreateTime,
-					UpdateTime:  article.UpdateTime,
+					CreatedAt:   article.CreatedAt,
+					UpdatedAt:   article.UpdatedAt,
 				},
 			},
 		})
@@ -110,8 +110,8 @@ func (b *articleBiz) GetOne(ctx context.Context, id int) (*v1.GetArticleResponse
 			SectionCode: article.SectionCode,
 			Author:      article.Author,
 			Tags:        strings.Split(article.Tags, ","),
-			CreateTime:  article.CreateTime,
-			UpdateTime:  article.UpdateTime,
+			CreatedAt:   article.CreatedAt,
+			UpdatedAt:   article.UpdatedAt,
 		},
 	}, nil
 }

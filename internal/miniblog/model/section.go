@@ -12,8 +12,8 @@ type Section struct {
 	Code       string    `json:"code"`
 	Title      string    `json:"title"`
 	ModuleCode string    `json:"module_code"`
-	CreateTime time.Time `json:"create_time"`
-	UpdateTime time.Time `json:"update_time"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // TableName 指定表名
@@ -23,13 +23,13 @@ func (s *Section) TableName() string {
 
 // BeforeCreate 在创建前设置信息
 func (s *Section) BeforeCreate(tx *gorm.DB) (err error) {
-	s.CreateTime = time.Now()
-	s.UpdateTime = time.Now()
+	s.CreatedAt = time.Now()
+	s.UpdatedAt = time.Now()
 	return
 }
 
 // BeforeUpdate 在更新前设置信息
 func (s *Section) BeforeUpdate(tx *gorm.DB) (err error) {
-	s.UpdateTime = time.Now()
+	s.UpdatedAt = time.Now()
 	return
 }

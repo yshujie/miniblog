@@ -14,8 +14,8 @@ type Article struct {
 	SectionCode string    `json:"section_code"`
 	Author      string    `json:"author"`
 	Tags        string    `json:"tags"`
-	CreateTime  time.Time `json:"create_time"`
-	UpdateTime  time.Time `json:"update_time"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // TableName 指定表名
@@ -25,13 +25,13 @@ func (a *Article) TableName() string {
 
 // BeforeCreate 在创建前设置信息
 func (a *Article) BeforeCreate(tx *gorm.DB) (err error) {
-	a.CreateTime = time.Now()
-	a.UpdateTime = time.Now()
+	a.CreatedAt = time.Now()
+	a.UpdatedAt = time.Now()
 	return
 }
 
 // BeforeUpdate 在更新前设置信息
 func (a *Article) BeforeUpdate(tx *gorm.DB) (err error) {
-	a.UpdateTime = time.Now()
+	a.UpdatedAt = time.Now()
 	return
 }

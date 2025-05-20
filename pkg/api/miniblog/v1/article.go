@@ -34,6 +34,6 @@ type ArticleInfo struct {
 	SectionCode string    `json:"section_code"`
 	Author      string    `json:"author"`
 	Tags        []string  `json:"tags"`
-	CreateTime  time.Time `json:"create_time"`
-	UpdateTime  time.Time `json:"update_time"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
