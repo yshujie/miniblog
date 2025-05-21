@@ -40,7 +40,9 @@ export const useModuleStore = defineStore('module', {
 
     // 加载模块详情
     async loadAllModuleDetail() {
+      console.log('in loadAllModuleDetail')
       for (const module of this.modules) {
+        console.log('module: ', module)
         const moduleDetail = await fetchModuleDetail(module.code)
         module.title = moduleDetail.title
         module.sections = moduleDetail.sections.map(section => new Section(section))
