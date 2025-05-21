@@ -1,14 +1,14 @@
 <template>
-    <div class="article-card">
-      <template v-if="! hasArticle">
+    <div class="article-container">
+      <div v-show="!hasArticle" class="no-article-card">
           <el-empty description="文章不存在" />
-      </template>
+      </div>
 
-      <template v-else>
+      <div v-show="hasArticle" class="article-card">
         <el-row>
           <!-- 文章预览 -->
           <el-col :span="19">
-            <div class="article-card-preview"  ref="previewScrollDom">
+            <div class="article-card-preview" ref="previewScrollDom">
               <!-- 文章头部 -->
               <div class="article-card-header">
                 <h2 class="article-title">{{ currentArticle?.title }}</h2>
@@ -38,13 +38,13 @@
             </div>
           </el-col>
         </el-row>
-      </template>
+      </div>
     </div>
 </template>
 <script setup lang="ts">
 import 'md-editor-v3/lib/style.css'
 import { MdPreview, MdCatalog } from 'md-editor-v3'
-import { computed, defineProps, ref, onMounted, nextTick } from 'vue'
+import { computed, defineProps, ref, onMounted, nextTick, onUpdated } from 'vue'
 import { Article } from '@/types/article'
 import { fetchArticleDetail } from '@/api/blog'
 
@@ -56,29 +56,54 @@ const editorId = `article-${props.articleId}`
 const scrollElement = ref<HTMLElement>()
 const previewScrollDom = ref<HTMLElement | null>(null)
 // 当前文章
-let currentArticle: Article | null = null
+const currentArticle = ref<Article | null>(null)
 
 // 计算属性：hasArticle
 const hasArticle = computed(() => {
-  return currentArticle !== null
+  return currentArticle.value !== null && currentArticle.value instanceof Article
 })
 
 // 组件挂载时，获取文章
 onMounted(async () => {
-  if (!props.articleId) {
-    return
+  console.log('onMounted')
+  console.log("props.articleId", props.articleId)
+  await fetchCurrentArticle(props.articleId)
+})
+
+onUpdated(async () => {
+  console.log('onUpdated')
+  console.log("props.articleId", props.articleId)
+  await fetchCurrentArticle(props.articleId)
+})
+
+// 获取文章详情
+async function fetchCurrentArticle(articleId: number | null) {
+  if (!articleId) {
+    return null
   }
 
-  const article = await fetchArticleDetail(props.articleId)
+  const article = await fetchArticleDetail(articleId)
+  console.log('article detail:', article)
   if (!article) {
     return
   }
 
-  currentArticle = article
-})
+  currentArticle.value = article
+}
 
 </script>
 <style scoped lang="less">
+.article-container {
+  height: 100%;
+}
+
+.no-article-card {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
 .article-card {
   padding: 0;
   margin: 0;

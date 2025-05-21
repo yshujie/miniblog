@@ -12,7 +12,7 @@
         </h3>
         <div class="article-list">
           <div class="article-item" v-for="article in item.articles" :key="article.title">
-            <el-link underline="never" target="_self" :href="`/blog/${props.moduleCode}/article/${article.id}`">
+            <el-link underline="never" target="_self" @click="handleArticleClick(article.id)">
               <span class="article-title">{{ article.title }}</span>
             </el-link>
           </div>
@@ -23,10 +23,16 @@
 </template>
 <script setup lang="ts">
 import { defineProps } from 'vue'
+import { useRouter } from 'vue-router'
 import type { Section } from '@/types/section';
 
 const props = defineProps<{ sections: Section[], moduleCode: string }>()
 
+const router = useRouter()
+
+const handleArticleClick = (articleId: number) => {
+  router.push(`/blog/${props.moduleCode}/article/${articleId}`)
+}
 </script>
 <style scoped lang="less">
 .sidebar-root {
