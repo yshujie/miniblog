@@ -34,25 +34,12 @@ onMounted(async () => {
   // 加载模块数据
   await moduleStore.loadModules()
 
-  // 预热 blog 数据
-  await initBlogData()
+  // 预热所有模块数据
+  await moduleStore.loadAllModuleDetail()
 
   console.log(`moduleStore.modules is ${moduleStore.modules}.`)
 })
 
-// 预热 blog 数据
-async function initBlogData() {
-  if (moduleStore.modules.length === 0) {
-    return
-  }
-
-  // 遍历所有模块，加载 sections & articles
-  for (const module of moduleStore.modules) {
-    // await moduleStore.loadSections(module.code)
-    // await moduleStore.loadArticles(module.code)
-    await moduleStore.loadModuleDetail(module.code)
-  }
-}
 </script>
 
 <style lang="less" scoped>
