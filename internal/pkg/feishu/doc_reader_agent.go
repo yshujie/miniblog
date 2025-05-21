@@ -24,8 +24,23 @@ type docReaderAgent struct {
 
 // NewDocReaderAgent 创建文档阅读器 Agent
 func NewDocReaderAgent(appID, appSecret string) (*docReaderAgent, error) {
+	log.Infow("start to create doc reader agent", "app_id", appID)
+
+	// 创建飞书客户端
 	client := lark.NewClient(appID, appSecret)
+	if client == nil {
+		log.Errorw("failed to create lark client")
+		return nil, fmt.Errorf("failed to create lark client")
+	}
+
+	// 创建 token loader
 	tokenLoader := NewTokenLoader(appID, appSecret)
+	if tokenLoader == nil {
+		log.Errorw("failed to create token loader")
+		return nil, fmt.Errorf("failed to create token loader")
+	}
+
+	log.Infow("successfully created doc reader agent")
 	return &docReaderAgent{
 		client:      client,
 		tokenLoader: tokenLoader,
@@ -64,10 +79,11 @@ func (d *docReaderAgent) ReadContent(docToken string, docType string, resultType
 
 	// 获取 tenantAccessToken
 	tenantAccessToken, err := d.tokenLoader.LoadToken(context.Background())
-	log.Infow("tenantAccessToken", "tenantAccessToken", tenantAccessToken)
 	if err != nil {
-		return "", fmt.Errorf("failed to load tenantAccessToken: %s", err)
+		log.Errorw("failed to load tenant access token", "error", err)
+		return "", fmt.Errorf("failed to load tenant access token: %v", err)
 	}
+	log.Infow("successfully loaded tenant access token", "token", tenantAccessToken)
 
 	// 发起请求
 	resp, err := d.client.Docs.V1.Content.Get(
@@ -76,14 +92,18 @@ func (d *docReaderAgent) ReadContent(docToken string, docType string, resultType
 		larkcore.WithTenantAccessToken(tenantAccessToken),
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to read doc: %s", err)
+		log.Errorw("failed to read doc", "error", err)
+		return "", fmt.Errorf("failed to read doc: %v", err)
 	}
 
 	// 服务端错误处理
 	if !resp.Success() {
+		log.Errorw("failed to read doc", "error", larkcore.Prettify(resp.CodeError))
 		return "", fmt.Errorf("failed to read doc: %s", larkcore.Prettify(resp.CodeError))
 	}
 
 	// 返回内容
-	return larkcore.Prettify(resp.Data.Content), nil
+	content := larkcore.Prettify(resp.Data.Content)
+	log.Infow("successfully read doc content", "content_length", len(content))
+	return content, nil
 }
