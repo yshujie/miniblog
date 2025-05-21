@@ -8,6 +8,7 @@ import (
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/errno"
+	"github.com/yshujie/miniblog/internal/pkg/log"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
 	"github.com/yshujie/miniblog/pkg/feishu"
 )
@@ -82,18 +83,23 @@ func loadArticleContent(externalLink string) (string, error) {
 		viper.GetString("feishu.doc_reader.app_secret"),
 	)
 	if err != nil {
+		log.Warnw("failed to create doc reader agent", "error", err)
 		return "", errno.ErrReadDocFailed
 	}
 	// 解析 docToken
 	docToken, err := docReaderAgent.ParseDocToken(externalLink)
 	if err != nil {
+		log.Warnw("failed to parse doc token", "error", err)
 		return "", errno.ErrReadDocFailed
 	}
 	// 读取文档内容
 	content, err := docReaderAgent.ReadContent(docToken, "docx", "markdown")
 	if err != nil {
+		log.Warnw("failed to read doc content", "error", err)
 		return "", errno.ErrReadDocFailed
 	}
+
+	log.Infow("read doc content", "content", content)
 	return content, nil
 }
 
