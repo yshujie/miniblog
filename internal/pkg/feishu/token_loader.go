@@ -14,19 +14,25 @@ type TokenLoader interface {
 }
 
 type tokenLoader struct {
-	client *lark.Client
+	client    *lark.Client
+	appID     string
+	appSecret string
 }
 
-func NewTokenLoader(client *lark.Client) TokenLoader {
-	return &tokenLoader{client: client}
+func NewTokenLoader(appID, appSecret string) TokenLoader {
+	return &tokenLoader{
+		client:    lark.NewClient(appID, appSecret),
+		appID:     appID,
+		appSecret: appSecret,
+	}
 }
 
 func (t *tokenLoader) LoadToken(ctx context.Context) (string, error) {
 	// 创建请求对象
 	req := larkauth.NewInternalTenantAccessTokenReqBuilder().
 		Body(larkauth.NewInternalTenantAccessTokenReqBodyBuilder().
-			AppId(`cli_slkdjalasdkjasd`).
-			AppSecret(`dskLLdkasdjlasdKK`).
+			AppId(t.appID).
+			AppSecret(t.appSecret).
 			Build()).
 		Build()
 
@@ -43,6 +49,14 @@ func (t *tokenLoader) LoadToken(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("logId: %s, error response: \n%s", resp.RequestId(), larkcore.Prettify(resp.CodeError))
 	}
 
-	return larkcore.Prettify(resp), nil
-	// return resp.Data.TenantAccessToken, nil
+	// 解析响应
+	var data struct {
+		TenantAccessToken string `json:"tenant_access_token"`
+		Expire            int    `json:"expire"`
+	}
+	if err := resp.JSONUnmarshalBody(&data, nil); err != nil {
+		return "", fmt.Errorf("failed to parse tenant access token response: %v", err)
+	}
+
+	return data.TenantAccessToken, nil
 }

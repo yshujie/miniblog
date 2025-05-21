@@ -25,7 +25,11 @@ type docReaderAgent struct {
 // NewDocReaderAgent 创建文档阅读器 Agent
 func NewDocReaderAgent(appID, appSecret string) (*docReaderAgent, error) {
 	client := lark.NewClient(appID, appSecret)
-	return &docReaderAgent{client: client}, nil
+	tokenLoader := NewTokenLoader(appID, appSecret)
+	return &docReaderAgent{
+		client:      client,
+		tokenLoader: tokenLoader,
+	}, nil
 }
 
 // 解析 DocToken
