@@ -3,6 +3,7 @@ package feishu
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	lark "github.com/larksuite/oapi-sdk-go/v3"
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
@@ -11,7 +12,7 @@ import (
 
 // Agent 飞书 Agent
 type DocReaderAgent interface {
-	Read(docToken string, docType string, resultType string) (string, error)
+	ReadContent(docToken string, docType string, resultType string) (string, error)
 }
 
 // docReaderAgent 文档阅读器 Agent
@@ -25,7 +26,28 @@ func NewDocReaderAgent(appID, appSecret string) (*docReaderAgent, error) {
 	return &docReaderAgent{client: client}, nil
 }
 
-func (d *docReaderAgent) Read(docToken string, docType string, resultType string) (string, error) {
+// 解析 DocToken
+func (d *docReaderAgent) ParseDocToken(docUrl string) (string, error) {
+	// 判断 docUrl 是否为空
+	if docUrl == "" {
+		return "", fmt.Errorf("docUrl is empty")
+	}
+	// 判断 docUrl 是否为空
+	if !strings.HasPrefix(docUrl, "https://") {
+		return "", fmt.Errorf("docUrl is not a valid url")
+	}
+	// 拆解 url 获取 docToken
+	docToken := strings.Split(docUrl, "/")
+	if len(docToken) < 2 {
+		return "", fmt.Errorf("docUrl is not a valid url")
+	}
+
+	// 最后一位是 docToken
+	return docToken[len(docToken)-1], nil
+}
+
+// ReadContent 读取文档内容
+func (d *docReaderAgent) ReadContent(docToken string, docType string, resultType string) (string, error) {
 	// 创建请求对象
 	req := larkdocs.NewGetContentReqBuilder().
 		DocToken(docToken).
@@ -49,5 +71,6 @@ func (d *docReaderAgent) Read(docToken string, docType string, resultType string
 		return "", fmt.Errorf("failed to read doc: %s", larkcore.Prettify(resp.CodeError))
 	}
 
-	return larkcore.Prettify(resp), nil
+	// 返回内容
+	return larkcore.Prettify(resp.Data.Content), nil
 }

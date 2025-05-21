@@ -84,7 +84,13 @@ func loadArticleContent(externalLink string) (string, error) {
 	if err != nil {
 		return "", errno.ErrReadDocFailed
 	}
-	content, err := docReaderAgent.Read(externalLink, "docx", "markdown")
+	// 解析 docToken
+	docToken, err := docReaderAgent.ParseDocToken(externalLink)
+	if err != nil {
+		return "", errno.ErrReadDocFailed
+	}
+	// 读取文档内容
+	content, err := docReaderAgent.ReadContent(docToken, "docx", "markdown")
 	if err != nil {
 		return "", errno.ErrReadDocFailed
 	}
