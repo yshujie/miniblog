@@ -65,6 +65,7 @@ func installRouters(g *gin.Engine) error {
 		blogv1 := v1.Group("/blog")
 		{
 			blogv1.GET("/moduleDetail", bc.GetModuleDetail)
+			blogv1.GET("/articleDetail", bc.GetArticleDetail)
 		}
 
 		// 创建 modules 路由分组

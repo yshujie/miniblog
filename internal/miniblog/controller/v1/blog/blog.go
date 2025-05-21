@@ -41,12 +41,41 @@ func (c *BlogController) GetModuleDetail(ctx *gin.Context) {
 		return
 	}
 
+	log.C(ctx).Infow("Get module detail function called", "req", req)
+
 	// 调用 Biz 层处理业务
-	moduleDetailResp, err := c.biz.BlogBiz().GetModuleDetail(ctx, &req)
+	moduleDetailResp, err := c.biz.BlogBiz().GetModuleDetail(&req)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
 	}
 
 	core.WriteResponse(ctx, nil, moduleDetailResp)
+}
+
+// GetArticleDetail 获取文章详情
+func (c *BlogController) GetArticleDetail(ctx *gin.Context) {
+	log.C(ctx).Infow("Get article detail function called")
+
+	// 获取请求数据
+	var req v1.GetArticleDetailRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		core.WriteResponse(ctx, errno.ErrBind, nil)
+		return
+	}
+
+	// 验证请求数据
+	if err := validator.New().Struct(req); err != nil {
+		core.WriteResponse(ctx, errno.ErrInvalidParameter, nil)
+		return
+	}
+
+	// 调用 Biz 层处理业务
+	articleDetailResp, err := c.biz.BlogBiz().GetArticleDetail(&req)
+	if err != nil {
+		core.WriteResponse(ctx, err, nil)
+		return
+	}
+
+	core.WriteResponse(ctx, nil, articleDetailResp)
 }

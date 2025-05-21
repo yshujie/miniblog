@@ -89,7 +89,7 @@ func (b *articleBiz) GetList(ctx context.Context, sectionCode string) (*v1.GetAr
 
 // GetOne 获取文章详情
 func (b *articleBiz) GetOne(ctx context.Context, id int) (*v1.GetArticleResponse, error) {
-	article, err := b.ds.Articles().Get(id)
+	article, err := b.ds.Articles().GetOne(id)
 	if err != nil {
 		return nil, err
 	}

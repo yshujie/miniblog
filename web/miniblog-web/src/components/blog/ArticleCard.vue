@@ -46,7 +46,7 @@ import 'md-editor-v3/lib/style.css'
 import { MdPreview, MdCatalog } from 'md-editor-v3'
 import { computed, defineProps, ref, onMounted, nextTick } from 'vue'
 import { Article } from '@/types/article'
-import { fetchArticle } from '@/api/article'
+import { fetchArticleDetail } from '@/api/blog'
 
 // 组件 props
 const props = defineProps<{ articleId: number|null }>()
@@ -69,7 +69,7 @@ onMounted(async () => {
     return
   }
 
-  const article = await fetchArticle(props.articleId)
+  const article = await fetchArticleDetail(props.articleId)
   if (!article) {
     return
   }

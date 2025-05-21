@@ -1,7 +1,7 @@
 package blog
 
 import (
-	"context"
+	"strings"
 
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/log"
@@ -10,7 +10,8 @@ import (
 
 // BlogBiz 博客业务接口
 type IBlogBiz interface {
-	GetModuleDetail(ctx context.Context, req *v1.GetModuleDetailRequest) (*v1.GetModuleDetailResponse, error)
+	GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModuleDetailResponse, error)
+	GetArticleDetail(req *v1.GetArticleDetailRequest) (*v1.GetArticleDetailResponse, error)
 }
 
 // blogBiz 博客业务实现
@@ -27,8 +28,8 @@ func New(ds store.IStore) *blogBiz {
 }
 
 // Create 创建用户
-func (b *blogBiz) GetModuleDetail(ctx context.Context, req *v1.GetModuleDetailRequest) (*v1.GetModuleDetailResponse, error) {
-	log.C(ctx).Infow("start to get module detail in biz layer", "moduleCode", req.ModuleCode)
+func (b *blogBiz) GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModuleDetailResponse, error) {
+	log.Infow("start to get module detail in biz layer", "moduleCode", req.ModuleCode)
 
 	// 获取模块
 	module, _ := b.ds.Modules().GetByCode(req.ModuleCode)
@@ -61,5 +62,26 @@ func (b *blogBiz) GetModuleDetail(ctx context.Context, req *v1.GetModuleDetailRe
 	// 返回模块详情
 	return &v1.GetModuleDetailResponse{
 		ModuleDetail: moduleDetail,
+	}, nil
+}
+
+func (b *blogBiz) GetArticleDetail(req *v1.GetArticleDetailRequest) (*v1.GetArticleDetailResponse, error) {
+	log.Infow("start to get article detail in biz layer", "articleID", req.ArticleID)
+
+	// 获取文章
+	article, _ := b.ds.Articles().GetOne(req.ArticleID)
+	articleDetail := &v1.ArticleDetail{
+		ID:          article.ID,
+		Title:       article.Title,
+		Content:     article.Content,
+		SectionCode: article.SectionCode,
+		Author:      article.Author,
+		Tags:        strings.Split(article.Tags, ","),
+		CreatedAt:   article.CreatedAt,
+		UpdatedAt:   article.UpdatedAt,
+	}
+
+	return &v1.GetArticleDetailResponse{
+		ArticleDetail: articleDetail,
 	}, nil
 }

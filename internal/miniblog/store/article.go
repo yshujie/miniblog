@@ -7,7 +7,7 @@ import (
 
 type ArticleStore interface {
 	Create(article *model.Article) error
-	Get(id int) (*model.Article, error)
+	GetOne(id int) (*model.Article, error)
 	GetListBySectionCode(sectionCode string) ([]*model.Article, error)
 	Update(article *model.Article) error
 }
@@ -34,7 +34,7 @@ func (a *articles) Create(article *model.Article) error {
 }
 
 // Get 获取文章
-func (a *articles) Get(id int) (*model.Article, error) {
+func (a *articles) GetOne(id int) (*model.Article, error) {
 	var article model.Article
 	if err := a.db.Where("id = ?", id).First(&article).Error; err != nil {
 		return nil, err
