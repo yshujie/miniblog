@@ -109,8 +109,8 @@ INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('ddd_an
 INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('ddd_modeling', '领域建模', 'ddd', 1);
 
 # 软件架构设计
-INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('refactor_thinking', '思想&原则', 'refactor', 1);
-INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('refactor_pattern', '设计模式', 'refactor', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('design_thinking', '设计原则&思想', 'architecture', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('design_pattern', '设计模式', 'architecture', 1);
 
 # 重构
 INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('refactor_smell', '坏味道', 'refactor', 0);
