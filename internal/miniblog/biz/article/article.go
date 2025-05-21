@@ -4,10 +4,12 @@ import (
 	"context"
 	"strings"
 
+	"github.com/spf13/viper"
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/errno"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
+	"github.com/yshujie/miniblog/pkg/feishu"
 )
 
 // ArticleBiz 文章业务接口
@@ -41,10 +43,16 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 		return nil, errno.ErrSectionNotFound
 	}
 
+	// 读取 article 内容
+	content, err := loadArticleContent(r.ExternalLink)
+	if err != nil {
+		return nil, err
+	}
+
 	// 创建文章
 	article := &model.Article{
 		Title:       r.Title,
-		Content:     r.Content,
+		Content:     content,
 		SectionCode: r.SectionCode,
 		Author:      r.Author,
 		Tags:        strings.Join(r.Tags, ","),
@@ -65,6 +73,22 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 			UpdatedAt:   article.UpdatedAt,
 		},
 	}, nil
+}
+
+// loadArticleContent 加载文章内容
+func loadArticleContent(externalLink string) (string, error) {
+	docReaderAgent, err := feishu.NewDocReaderAgent(
+		viper.GetString("feishu.doc_reader.app_id"),
+		viper.GetString("feishu.doc_reader.app_secret"),
+	)
+	if err != nil {
+		return "", errno.ErrReadDocFailed
+	}
+	content, err := docReaderAgent.Read(externalLink, "docx", "markdown")
+	if err != nil {
+		return "", errno.ErrReadDocFailed
+	}
+	return content, nil
 }
 
 // GetList 获取所有文章

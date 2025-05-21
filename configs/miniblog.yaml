@@ -66,3 +66,9 @@ cors:
 tls:
   cert: /etc/miniblog/ssl/yangshujie.com.crt # 服务端证书文件
   key: /etc/miniblog/ssl/yangshujie.com.key # 服务端私钥文件
+
+# feishu 配置
+feishu:
+  doc_reader:
+    app_id: "cli_a8a6833e6859501c"
+    app_secret: "A87ckTk0iNJRSta5zD1XNgqdnbpSoKNv"

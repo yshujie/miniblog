@@ -45,4 +45,7 @@ var (
 
 	// ErrModuleNotFound module 不存在
 	ErrModuleNotFound = &Errno{HTTP: 404, Code: "ErrModuleNotFound", Message: "module 不存在"}
+
+	// ErrReadDocFailed 读取文档失败
+	ErrReadDocFailed = &Errno{HTTP: 500, Code: "ErrReadDocFailed", Message: "读取文档失败"}
 )

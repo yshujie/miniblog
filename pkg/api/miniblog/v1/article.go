@@ -4,11 +4,11 @@ import "time"
 
 // CreateArticleRequest 创建文章请求
 type CreateArticleRequest struct {
-	Title       string   `json:"title" valid:"required,stringlength(1|255)"`
-	Content     string   `json:"content" valid:"required,stringlength(1|100000)"`
-	SectionCode string   `json:"section_code" valid:"required,stringlength(1|255)"`
-	Author      string   `json:"author" valid:"required,stringlength(1|255)"`
-	Tags        []string `json:"tags" valid:"required"`
+	Title        string   `json:"title" valid:"required,stringlength(1|255)"`
+	SectionCode  string   `json:"section_code" valid:"required,stringlength(1|255)"`
+	Author       string   `json:"author" valid:"required,stringlength(1|255)"`
+	Tags         []string `json:"tags" valid:"required"`
+	ExternalLink string   `json:"external_link" valid:"required"`
 }
 
 // CreateArticleResponse 创建文章响应
