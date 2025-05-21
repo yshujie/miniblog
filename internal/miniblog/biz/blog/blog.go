@@ -34,6 +34,7 @@ func (b *blogBiz) GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModule
 	// 获取模块
 	module, _ := b.ds.Modules().GetByCode(req.ModuleCode)
 	moduleDetail := &v1.ModuleDetail{
+		ID:    module.ID,
 		Code:  module.Code,
 		Title: module.Title,
 	}
@@ -42,16 +43,20 @@ func (b *blogBiz) GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModule
 	sections, _ := b.ds.Sections().GetListByModuleCode(req.ModuleCode)
 	for _, section := range sections {
 		sectionDetail := &v1.SectionDetail{
-			Code:  section.Code,
-			Title: section.Title,
+			ID:         section.ID,
+			Code:       section.Code,
+			ModuleCode: section.ModuleCode,
+			Title:      section.Title,
 		}
 
 		// 获取文章列表
 		articles, _ := b.ds.Articles().GetListBySectionCode(section.Code)
 		for _, article := range articles {
 			articleDetail := &v1.ArticleDetail{
-				ID:    article.ID,
-				Title: article.Title,
+				ID:          article.ID,
+				Title:       article.Title,
+				SectionCode: article.SectionCode,
+				Author:      article.Author,
 			}
 			sectionDetail.Articles = append(sectionDetail.Articles, articleDetail)
 		}

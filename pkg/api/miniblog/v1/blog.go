@@ -24,6 +24,7 @@ type GetArticleDetailResponse struct {
 
 // ModuleDetail 模块详情
 type ModuleDetail struct {
+	ID       int              `json:"id"`
 	Code     string           `json:"code"`
 	Title    string           `json:"title"`
 	Sections []*SectionDetail `json:"sections"`
@@ -31,9 +32,11 @@ type ModuleDetail struct {
 
 // SectionDetail 章节详情
 type SectionDetail struct {
-	Code     string           `json:"code"`
-	Title    string           `json:"title"`
-	Articles []*ArticleDetail `json:"articles"`
+	ID         int              `json:"id"`
+	Code       string           `json:"code"`
+	Title      string           `json:"title"`
+	ModuleCode string           `json:"module_code"`
+	Articles   []*ArticleDetail `json:"articles"`
 }
 
 // ArticleDetail 文章详情

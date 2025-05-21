@@ -3,7 +3,6 @@ export class Article {
   id: number
   sectionCode: string
   title: string
-  summary: string
   content: string
   author: string
   tags: string[]
@@ -14,22 +13,20 @@ export class Article {
     id: number
     sectionCode: string
     title: string
-    summary: string
-    content: string
     author: string
-    tags: string[]
-    createdAt: string
-    updatedAt: string
+    content: string | undefined
+    tags: string[] | undefined
+    createdAt: string | undefined
+    updatedAt: string | undefined
   }) {
     this.id = data.id
     this.sectionCode = data.sectionCode
     this.title = data.title
-    this.summary = data.summary
-    this.content = data.content
     this.author = data.author
-    this.tags = data.tags
-    this.createdAt = data.createdAt
-    this.updatedAt = data.updatedAt
+    this.content = data.content || ''
+    this.tags = data.tags || []
+    this.createdAt = data.createdAt || ''
+    this.updatedAt = data.updatedAt || ''
   }
 
   // 获取文章的 markdown 内容
