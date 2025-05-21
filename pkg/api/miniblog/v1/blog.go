@@ -4,7 +4,7 @@ import "time"
 
 // GetModuleDetailRequest 获取模块详情请求
 type GetModuleDetailRequest struct {
-	ModuleCode string `json:"module_code" valid:"required"`
+	ModuleCode string `form:"module_code" valid:"required"`
 }
 
 // GetModuleDetailResponse 获取模块详情响应
@@ -14,7 +14,7 @@ type GetModuleDetailResponse struct {
 
 // GetArticleDetailRequest 获取文章详情请求
 type GetArticleDetailRequest struct {
-	ArticleID int `json:"article_id" valid:"required"`
+	ArticleID int `form:"article_id" valid:"required"`
 }
 
 // GetArticleDetailResponse 获取文章详情响应

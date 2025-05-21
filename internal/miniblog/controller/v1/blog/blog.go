@@ -29,8 +29,8 @@ func (c *BlogController) GetModuleDetail(ctx *gin.Context) {
 	log.C(ctx).Infow("Get module detail function called")
 
 	// 获取请求数据
-	var req v1.GetModuleDetailRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	req := &v1.GetModuleDetailRequest{}
+	if err := ctx.ShouldBindQuery(req); err != nil {
 		core.WriteResponse(ctx, errno.ErrBind, nil)
 		return
 	}
@@ -44,7 +44,7 @@ func (c *BlogController) GetModuleDetail(ctx *gin.Context) {
 	log.C(ctx).Infow("Get module detail function called", "req", req)
 
 	// 调用 Biz 层处理业务
-	moduleDetailResp, err := c.biz.BlogBiz().GetModuleDetail(&req)
+	moduleDetailResp, err := c.biz.BlogBiz().GetModuleDetail(req)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
@@ -58,8 +58,8 @@ func (c *BlogController) GetArticleDetail(ctx *gin.Context) {
 	log.C(ctx).Infow("Get article detail function called")
 
 	// 获取请求数据
-	var req v1.GetArticleDetailRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+	req := &v1.GetArticleDetailRequest{}
+	if err := ctx.ShouldBindQuery(req); err != nil {
 		core.WriteResponse(ctx, errno.ErrBind, nil)
 		return
 	}
@@ -71,7 +71,7 @@ func (c *BlogController) GetArticleDetail(ctx *gin.Context) {
 	}
 
 	// 调用 Biz 层处理业务
-	articleDetailResp, err := c.biz.BlogBiz().GetArticleDetail(&req)
+	articleDetailResp, err := c.biz.BlogBiz().GetArticleDetail(req)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
