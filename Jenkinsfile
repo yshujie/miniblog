@@ -35,18 +35,28 @@ pipeline {
         dir("${env.WORKSPACE}") {
           echo '🔧 设置 SSL 证书'
 
-          // 从全局凭据中拉出两个 Secret File
+          // 从全局凭据中拉出 Secret File
           withCredentials([
-            file(credentialsId: 'ssl-crt',  variable: 'SSL_CRT_FILE'),
-            file(credentialsId: 'ssl-key',  variable: 'SSL_KEY_FILE'),
+            file(credentialsId: 'www.yangshujie.com.cert.key',  variable: 'WWW_SSL_KEY_FILE'),
+            file(credentialsId: 'www.yangshujie.com.cert.pem',  variable: 'WWW_SSL_CRT_FILE'),
+            file(credentialsId: 'api.yangshujie.com.cert.key',  variable: 'API_SSL_KEY_FILE'),
+            file(credentialsId: 'api.yangshujie.com.cert.pem',  variable: 'API_SSL_CRT_FILE'),
           ]) {
             sh '''
-              # 把凭据放到构建上下文里
+              # 创建 SSL 目录
               mkdir -p configs/nginx/ssl
-              cp "$SSL_CRT_FILE" configs/nginx/ssl/yangshujie.com.crt
-              cp "$SSL_KEY_FILE" configs/nginx/ssl/yangshujie.com.key
-              chmod 644 configs/nginx/ssl/yangshujie.com.crt
-              chmod 600 configs/nginx/ssl/yangshujie.com.key
+              
+              # 复制 www.yangshujie.com 证书
+              cp "$WWW_SSL_CRT_FILE" configs/nginx/ssl/www.yangshujie.com.crt
+              cp "$WWW_SSL_KEY_FILE" configs/nginx/ssl/www.yangshujie.com.key
+              
+              # 复制 api.yangshujie.com 证书
+              cp "$API_SSL_CRT_FILE" configs/nginx/ssl/api.yangshujie.com.crt
+              cp "$API_SSL_KEY_FILE" configs/nginx/ssl/api.yangshujie.com.key
+              
+              # 设置权限
+              chmod 644 configs/nginx/ssl/*.crt
+              chmod 600 configs/nginx/ssl/*.key
             '''
           }
         }
