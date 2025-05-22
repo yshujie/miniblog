@@ -21,8 +21,10 @@ type Article struct {
 
 // 文章状态
 const (
-	ArticleStatusNormal  = iota + 1
-	ArticleStatusDeleted = 2
+	ArticleStatusDraft       = 1 // 草稿
+	ArticleStatusPublished   = 2 // 已发布
+	ArticleStatusUnpublished = 3 // 已下架
+	ArticleStatusDeleted     = 4 // 已删除
 )
 
 // TableName 指定表名
@@ -45,11 +47,16 @@ func (a *Article) BeforeUpdate(tx *gorm.DB) (err error) {
 
 // 发布文章
 func (a *Article) Publish() {
-	a.Status = ArticleStatusNormal
+	a.Status = ArticleStatusPublished
 }
 
 // 下架文章
 func (a *Article) Unpublish() {
+	a.Status = ArticleStatusUnpublished
+}
+
+// 删除文章
+func (a *Article) Delete() {
 	a.Status = ArticleStatusDeleted
 }
 

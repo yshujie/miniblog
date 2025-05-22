@@ -17,3 +17,15 @@ func (ctrl *UserController) Get(c *gin.Context) {
 
 	core.WriteResponse(c, nil, user)
 }
+
+func (ctrl *UserController) GetMyInfo(c *gin.Context) {
+	log.C(c).Infow("GetMyInfo function called")
+
+	user, err := ctrl.b.UserBiz().GetMyInfo(c)
+	if err != nil {
+		core.WriteResponse(c, err, nil)
+		return
+	}
+
+	core.WriteResponse(c, nil, user)
+}

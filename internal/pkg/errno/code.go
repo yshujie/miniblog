@@ -51,4 +51,10 @@ var (
 
 	// ErrFeishu 飞书错误
 	ErrFeishuTokenRefreshFailed = &Errno{HTTP: 500, Code: "ErrFeishuTokenRefreshFailed", Message: "飞书 token 刷新失败"}
+
+	// ErrArticleNotFound 文章不存在
+	ErrArticleNotFound = &Errno{HTTP: 404, Code: "ErrArticleNotFound", Message: "文章不存在"}
+
+	// ErrUpdateArticleFailed 更新文章失败
+	ErrUpdateArticleFailed = &Errno{HTTP: 500, Code: "ErrUpdateArticleFailed", Message: "更新文章失败"}
 )

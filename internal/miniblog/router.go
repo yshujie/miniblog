@@ -44,11 +44,6 @@ func installRouters(g *gin.Engine) error {
 	sc := sectionCtrl.New(store.S)
 	arCtrl := articleCtrl.New(store.S)
 
-	// // auth 路由
-	// g.POST("/register", ac.Register)
-	// g.POST("/login", ac.Login)
-	// g.POST("/logout", ac.Logout)
-
 	// 创建 v1 路由组
 	v1 := g.Group("/v1")
 	{
@@ -59,44 +54,55 @@ func installRouters(g *gin.Engine) error {
 			authv1.POST("/logout", ac.Logout)
 			authv1.POST("/register", ac.Register)
 		}
-		// 创建 users 路由分组
-		userv1 := v1.Group("/users")
-		{
-			userv1.POST("", uc.Create)
-			userv1.PUT(":name/change-password", uc.ChangePassword)
-			userv1.Use(mw.Authn(), mw.Authz(authz))
-			userv1.GET(":name", uc.Get)
-		}
 
 		// 创建 blog 路由分组
 		blogv1 := v1.Group("/blog")
 		{
+			blogv1.GET("/modules", mc.GetAll)
 			blogv1.GET("/moduleDetail", bc.GetModuleDetail)
 			blogv1.GET("/articleDetail", bc.GetArticleDetail)
+
 		}
 
-		// 创建 modules 路由分组
-		modulesv1 := v1.Group("/modules")
+		adminv1 := v1.Group("/admin")
 		{
-			modulesv1.POST("", mc.Create)
-			modulesv1.GET("", mc.GetAll)
-			modulesv1.GET(":code", mc.GetOne)
-		}
+			adminv1.Use(mw.Authn(), mw.Authz(authz))
 
-		// 创建 sections 路由分组
-		sectionsv1 := v1.Group("/sections")
-		{
-			sectionsv1.POST("", sc.Create)
-			sectionsv1.GET(":module_code", sc.GetList)
-			sectionsv1.GET(":module_code/:code", sc.GetOne)
-		}
+			// users 路由分组
+			userv1 := adminv1.Group("/users")
+			{
+				userv1.POST("", uc.Create)                             // 创建用户
+				userv1.PUT(":name/change-password", uc.ChangePassword) // 修改密码
+				userv1.GET(":name", uc.Get)                            // 获取用户信息
+				userv1.GET("/myinfo", uc.GetMyInfo)                    // 获取当前用户信息
+			}
 
-		// 创建 articles 路由分组
-		articlesv1 := v1.Group("/articles")
-		{
-			articlesv1.POST("", arCtrl.Create)
-			articlesv1.GET(":section_code", arCtrl.GetList)
-			articlesv1.GET(":section_code/:id", arCtrl.GetOne)
+			// modules 路由分组
+			modulesv1 := adminv1.Group("/modules")
+			{
+				modulesv1.GET("", mc.GetAll)      // 获取所有模块
+				modulesv1.POST("", mc.Create)     // 创建模块
+				modulesv1.GET(":code", mc.GetOne) // 获取模块信息
+			}
+
+			// sections 路由分组
+			sectionsv1 := adminv1.Group("/sections")
+			{
+				sectionsv1.POST("", sc.Create)                  // 创建章节
+				sectionsv1.GET(":module_code", sc.GetList)      // 获取章节列表
+				sectionsv1.GET(":module_code/:code", sc.GetOne) // 获取章节信息
+			}
+
+			// articles 路由分组
+			articlesv1 := adminv1.Group("/articles")
+			{
+				articlesv1.POST("", arCtrl.Create)                 // 创建文章
+				articlesv1.GET("", arCtrl.GetList)                 // 获取文章列表
+				articlesv1.GET("/:id", arCtrl.GetOne)              // 获取文章信息
+				articlesv1.PUT("/:id", arCtrl.Update)              // 更新文章
+				articlesv1.PUT("/:id/publish", arCtrl.Publish)     // 发布文章
+				articlesv1.PUT("/:id/unpublish", arCtrl.Unpublish) // 下架文章
+			}
 		}
 	}
 

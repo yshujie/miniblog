@@ -18,6 +18,7 @@ type IUserBiz interface {
 	Create(ctx context.Context, r *v1.CreateUserRequest) error
 	ChangePassword(ctx context.Context, username string, r *v1.ChangePasswordRequest) error
 	Get(ctx context.Context, username string) (*v1.GetUserResponse, error)
+	GetMyInfo(ctx context.Context) (*v1.GetUserResponse, error)
 }
 
 // userBiz 用户业务实现
@@ -40,6 +41,10 @@ func (b *userBiz) Create(ctx context.Context, r *v1.CreateUserRequest) error {
 
 	log.C(ctx).Infow("start to create user in biz layer", "username", r.Username)
 
+	// 加密密码
+	userM.Password, _ = auth.Encrypt(r.Password)
+
+	// 创建用户
 	if err := b.ds.Users().Create(&userM); err != nil {
 		if match, _ := regexp.MatchString("Duplicate entry '.*' for key 'username'", err.Error()); match {
 			log.C(ctx).Warnw("user already exists", "username", r.Username, "error", err)
@@ -79,6 +84,24 @@ func (b *userBiz) ChangePassword(ctx context.Context, username string, r *v1.Cha
 
 // Get 获取用户
 func (b *userBiz) Get(ctx context.Context, username string) (*v1.GetUserResponse, error) {
+	user, err := b.ds.Users().Get(username)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp v1.GetUserResponse
+	_ = copier.Copy(&resp, user)
+
+	resp.CreatedAt = user.CreatedAt.Format("2006-01-02 15:04:05")
+	resp.UpdatedAt = user.UpdatedAt.Format("2006-01-02 15:04:05")
+
+	return &resp, nil
+}
+
+// GetMyInfo 获取当前用户信息
+func (b *userBiz) GetMyInfo(ctx context.Context) (*v1.GetUserResponse, error) {
+	username := ctx.Value("username").(string)
+
 	user, err := b.ds.Users().Get(username)
 	if err != nil {
 		return nil, err

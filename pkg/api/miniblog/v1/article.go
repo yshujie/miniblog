@@ -2,10 +2,25 @@ package v1
 
 import "time"
 
+// ArticleIdRequest 文章ID请求
+type ArticleIdRequest struct {
+	ID int `json:"id" valid:"required,numeric"`
+}
+
 // CreateArticleRequest 创建文章请求
 type CreateArticleRequest struct {
 	Title        string   `json:"title" valid:"required,stringlength(1|255)"`
 	SectionCode  string   `json:"section_code" valid:"required,stringlength(1|255)"`
+	Author       string   `json:"author" valid:"required,stringlength(1|255)"`
+	Tags         []string `json:"tags" valid:"required"`
+	ExternalLink string   `json:"external_link" valid:"required"`
+}
+
+// UpdateArticleRequest 更新文章请求
+type UpdateArticleRequest struct {
+	ID           int      `json:"id" valid:"required,numeric"`
+	Title        string   `json:"title" valid:"required,stringlength(1|255)"`
+	Content      string   `json:"content" valid:"required,stringlength(1|255)"`
 	Author       string   `json:"author" valid:"required,stringlength(1|255)"`
 	Tags         []string `json:"tags" valid:"required"`
 	ExternalLink string   `json:"external_link" valid:"required"`

@@ -16,6 +16,9 @@ import (
 // ArticleBiz 文章业务接口
 type IArticleBiz interface {
 	Create(ctx context.Context, r *v1.CreateArticleRequest) (*v1.CreateArticleResponse, error)
+	Update(ctx context.Context, r *v1.UpdateArticleRequest) error
+	Publish(ctx context.Context, r *v1.ArticleIdRequest) error
+	Unpublish(ctx context.Context, r *v1.ArticleIdRequest) error
 	GetList(ctx context.Context, sectionCode string) (*v1.GetArticleListResponse, error)
 	GetOne(ctx context.Context, id int) (*v1.GetArticleResponse, error)
 }
@@ -74,6 +77,60 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 			UpdatedAt:   article.UpdatedAt,
 		},
 	}, nil
+}
+
+// Update 更新文章
+func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) error {
+	article, err := b.ds.Articles().GetOne(r.ID)
+	if err != nil {
+		return err
+	}
+
+	// 更新文章
+	article.Title = r.Title
+	article.Author = r.Author
+	article.Tags = strings.Join(r.Tags, ",")
+	article.Content = r.Content
+
+	if err := b.ds.Articles().Update(article); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Publish 发布文章
+func (b *articleBiz) Publish(ctx context.Context, r *v1.ArticleIdRequest) error {
+	article, err := b.ds.Articles().GetOne(r.ID)
+	if err != nil {
+		return errno.ErrArticleNotFound
+	}
+
+	// 发布文章
+	article.Publish()
+
+	if err := b.ds.Articles().Update(article); err != nil {
+		return errno.ErrUpdateArticleFailed
+	}
+
+	return nil
+}
+
+// Unpublish 下架文章
+func (b *articleBiz) Unpublish(ctx context.Context, r *v1.ArticleIdRequest) error {
+	article, err := b.ds.Articles().GetOne(r.ID)
+	if err != nil {
+		return errno.ErrArticleNotFound
+	}
+
+	// 下架文章
+	article.Unpublish()
+
+	if err := b.ds.Articles().Update(article); err != nil {
+		return errno.ErrUpdateArticleFailed
+	}
+
+	return nil
 }
 
 // loadArticleContent 加载文章内容
