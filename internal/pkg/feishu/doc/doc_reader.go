@@ -58,9 +58,9 @@ func (d *DocReader) ReadContent(docUrl string, docType string, resultType string
 	log.Infow("ReadContent resp", "resp", resp)
 
 	// 返回内容
-	content := larkcore.Prettify(resp.Data.Content)
-	log.Infow("successfully read doc content", "content_length", len(content))
+	content := *resp.Data.Content
 	log.Infow("content", "content", content)
+
 	return content, nil
 }
 
