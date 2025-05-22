@@ -48,4 +48,7 @@ var (
 
 	// ErrReadDocFailed 读取文档失败
 	ErrReadDocFailed = &Errno{HTTP: 500, Code: "ErrReadDocFailed", Message: "读取文档失败"}
+
+	// ErrFeishu 飞书错误
+	ErrFeishuTokenRefreshFailed = &Errno{HTTP: 500, Code: "ErrFeishuTokenRefreshFailed", Message: "飞书 token 刷新失败"}
 )

@@ -45,7 +45,7 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 	}
 
 	// 读取 article 内容
-	content, err := loadArticleContent(r.ExternalLink)
+	content, err := loadArticleContent(r.ExternalLink, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -77,23 +77,14 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 }
 
 // loadArticleContent 加载文章内容
-func loadArticleContent(externalLink string) (string, error) {
-	docReaderAgent, err := feishu.NewDocReaderAgent(
+func loadArticleContent(externalLink string, ctx context.Context) (string, error) {
+	// 读取文档内容
+	content, err := feishu.GetClient(
 		viper.GetString("feishu.doc_reader.app_id"),
 		viper.GetString("feishu.doc_reader.app_secret"),
-	)
-	if err != nil {
-		log.Warnw("failed to create doc reader agent", "error", err)
-		return "", errno.ErrReadDocFailed
-	}
-	// 解析 docToken
-	docToken, err := docReaderAgent.ParseDocToken(externalLink)
-	if err != nil {
-		log.Warnw("failed to parse doc token", "error", err)
-		return "", errno.ErrReadDocFailed
-	}
-	// 读取文档内容
-	content, err := docReaderAgent.ReadContent(docToken, "docx", "markdown")
+		ctx,
+	).
+		DocReader.ReadContent(externalLink, "docx", "markdown")
 	if err != nil {
 		log.Warnw("failed to read doc content", "error", err)
 		return "", errno.ErrReadDocFailed
