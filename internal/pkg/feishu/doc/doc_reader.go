@@ -3,6 +3,7 @@ package doc
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	lark "github.com/larksuite/oapi-sdk-go/v3"
@@ -45,23 +46,24 @@ func (d *DocReader) ReadContent(docUrl string, docType string, resultType string
 		req,
 	)
 	if err != nil {
-		log.Errorw("failed to read doc", "error", err)
 		return "", fmt.Errorf("failed to read doc: %v", err)
 	}
 
 	// 服务端错误处理
 	if !resp.Success() {
-		log.Errorw("failed to read doc", "error", larkcore.Prettify(resp.CodeError))
 		return "", fmt.Errorf("failed to read doc: %s", larkcore.Prettify(resp.CodeError))
 	}
 
-	log.Infow("ReadContent resp", "resp", resp)
-
 	// 返回内容
 	content := *resp.Data.Content
-	log.Infow("content", "content", content)
 
-	return content, nil
+	// 解析 content 中的 ASCII 码
+	parsedContent, err := d.parseContent(content)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse content: %v", err)
+	}
+
+	return parsedContent, nil
 }
 
 // 解析 DocToken
@@ -82,4 +84,19 @@ func (d *DocReader) parseDocToken(docUrl string) (string, error) {
 
 	// 最后一位是 docToken
 	return docToken[len(docToken)-1], nil
+}
+
+// 解析 content 中的 ASCII 码
+func (d *DocReader) parseContent(content string) (string, error) {
+	// 转义符处理，将 \\ 转换为 \
+	content = strings.ReplaceAll(content, "\\", "\\")
+
+	// 使用 strconv.Unquote 处理 ASCII 码
+	unquoted, err := strconv.Unquote(`"` + content + `"`)
+	if err != nil {
+		log.Errorw("failed to unquote content", "error", err)
+		return "", err
+	}
+
+	return unquoted, nil
 }
