@@ -2,23 +2,23 @@ import request from '@/utils/request'
 
 export function login(data) {
   return request({
-    url: '/login',
+    url: '/auth/login',
     method: 'post',
     data
   })
 }
 
-export function getInfo(token) {
+export function logout() {
   return request({
-    url: '/users',
-    method: 'get',
-    params: { token }
+    url: '/auth/logout',
+    method: 'post'
   })
 }
 
-export function logout() {
+export function getInfo(token) {
+  console.log('in getInfo', token)
   return request({
-    url: '/logout',
-    method: 'post'
+    url: '/users/myinfo',
+    method: 'get'
   })
 }
