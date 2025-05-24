@@ -18,7 +18,9 @@ type ChangePasswordRequest struct {
 }
 
 // GetUserResponse 指定了 `GET /v1/users/{name}` 接口的返回参数.
-type GetUserResponse UserInfo
+type GetUserResponse struct {
+	User UserInfo `json:"user"`
+}
 
 // UserInfo 指定了用户的详细信息.
 type UserInfo struct {
