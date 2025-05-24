@@ -3,11 +3,11 @@
     <el-form ref="postForm" :model="postForm" :rules="rules" class="form-container">
 
       <sticky :z-index="10" :class-name="'sub-navbar '+postForm.status">
-        <el-button v-loading="loading" style="margin-left: 10px;" type="success" @click="submitForm">
-          发布
+        <el-button v-loading="loading" style="margin-left: 10px;" type="success" @click="save">
+          保存
         </el-button>
-        <el-button v-loading="loading" type="warning" @click="draftForm">
-          保草稿
+        <el-button v-loading="loading" type="warning" @click="publish">
+          发布
         </el-button>
       </sticky>
 
@@ -24,15 +24,48 @@
               <el-row>
                 <el-col :span="8">
                   <el-form-item label-width="60px" label="Author:" class="postInfo-container-item">
-                    <el-select v-model="postForm.author" :remote-method="getRemoteUserList" filterable default-first-option remote placeholder="Search user">
-                      <el-option v-for="(item,index) in userListOptions" :key="item+index" :label="item" :value="item" />
-                    </el-select>
+                    <el-input v-model="postForm.author" placeholder="Please enter the author" />
                   </el-form-item>
                 </el-col>
 
                 <el-col :span="10">
                   <el-form-item label-width="120px" label="Tags:" class="postInfo-container-item">
-                    <el-input v-model="postForm.tags" placeholder="Please enter the tags" />
+                    <el-select
+                      v-model="postForm.tags"
+                      multiple
+                      filterable
+                      allow-create
+                      default-first-option
+                      placeholder="文章标签"
+                    >
+                      <el-option
+                        v-for="tag in postForm.tags"
+                        :key="tag"
+                        :label="tag"
+                        :value="tag"
+                      />
+                    </el-select>
+
+                  </el-form-item>
+                </el-col>
+              </el-row>
+            </div>
+
+            <div class="postInfo-container">
+              <el-row>
+                <el-col :span="8">
+                  <el-form-item label-width="60px" label="Module" class="postInfo-container-item">
+                    <el-select v-model="postForm.module_code" placeholder="Module Code" class="module-select" @change="initSections">
+                      <el-option v-for="module in modules" :key="module.code" :label="module.title" :value="module.code" />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="10">
+                  <el-form-item label-width="120px" label="Section" class="postInfo-container-item">
+                    <el-select v-model="postForm.section_code" placeholder="Section Code" class="section-select">
+                      <el-option v-for="section in sections" :key="section.code" :label="section.title" :value="section.code" />
+                    </el-select>
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -40,15 +73,9 @@
           </el-col>
         </el-row>
 
-        <el-form-item style="margin-bottom: 40px;" label-width="70px" label="Summary:">
-          <el-input v-model="postForm.content_short" :rows="1" type="textarea" class="article-textarea" autosize placeholder="Please enter the content" />
-          <span v-show="contentShortLength" class="word-counter">{{ contentShortLength }}words</span>
+        <el-form-item style="margin-bottom: 40px;" label="ExternalLink:">
+          <el-input v-model="postForm.external_link" :rows="1" type="textarea" class="article-textarea" autosize placeholder="Please enter the ExternalLink URL" />
         </el-form-item>
-
-        <el-form-item prop="content" style="margin-bottom: 30px;">
-          <markdown-editor ref="editor" v-model="postForm.content" height="800px" :options="{hideModeSwitch:true,previewStyle:'tab'}" />
-        </el-form-item>
-
       </div>
     </el-form>
   </div>
@@ -57,21 +84,23 @@
 <script>
 import MDinput from '@/components/MDinput'
 import Sticky from '@/components/Sticky' // 粘性header组件
-import { fetchArticle } from '@/api/article'
-import MarkdownEditor from '@/components/MarkdownEditor'
+import { fetchArticle, createArticle, publishArticle, updateArticle } from '@/api/article'
+import { fetchModules } from '@/api/module'
+import { fetchSections } from '@/api/section'
 
 const defaultForm = {
   status: 'draft',
   title: '', // 文章题目
-  content: '', // 文章内容
-  content_short: '', // 文章摘要
+  module_code: '', // 模块代码
+  section_code: '', // 章节代码
+  external_link: '', // 外部链接
   tags: '', // 文章标签
   id: ''
 }
 
 export default {
   name: 'ArticleDetail',
-  components: { MDinput, Sticky, MarkdownEditor },
+  components: { MDinput, Sticky },
   props: {
     isEdit: {
       type: Boolean,
@@ -101,6 +130,8 @@ export default {
       callback()
     }
     return {
+      modules: [],
+      sections: [],
       postForm: Object.assign({}, defaultForm),
       loading: false,
       userListOptions: [],
@@ -130,6 +161,10 @@ export default {
     }
   },
   created() {
+    console.log('ArticleDetail created')
+    // 初始化 modules
+    this.initModules()
+
     if (this.isEdit) {
       const id = this.$route.params && this.$route.params.id
       this.fetchData(id)
@@ -158,6 +193,29 @@ export default {
         console.log(err)
       })
     },
+
+    async initModules() {
+      // 清空模块选择
+      this.postForm.module_code = ''
+      this.modules = []
+
+      // 获取模块
+      const modulesResp = await fetchModules()
+      this.modules = modulesResp.modules
+
+      console.log('modules', this.modules)
+    },
+
+    async initSections() {
+      // 清空章节选择
+      this.postForm.section_code = ''
+      this.sections = []
+
+      // 获取章节
+      const sectionsResp = await fetchSections(this.postForm.module_code)
+      this.sections = sectionsResp.sections
+    },
+
     setTagsViewTitle() {
       const title = 'Edit Article'
       const route = Object.assign({}, this.tempRoute, { title: `${title}-${this.postForm.id}` })
@@ -167,7 +225,8 @@ export default {
       const title = 'Edit Article'
       document.title = `${title} - ${this.postForm.id}`
     },
-    submitForm() {
+
+    save() {
       console.log(this.postForm)
       this.$refs.postForm.validate(valid => {
         if (valid) {
@@ -184,23 +243,49 @@ export default {
           console.log('error submit!!')
           return false
         }
+      }).then(async() => {
+        if (this.isEdit) {
+          updateArticle(this.postForm)
+
+          this.$message({
+            message: '保存成功，文章已更新',
+            type: 'success',
+            showClose: true,
+            duration: 1000
+          })
+        } else {
+          const resp = await createArticle(this.postForm)
+          this.postForm.id = resp.article.id
+
+          this.$message({
+            message: '保存成功，文章已创建',
+            type: 'success',
+            showClose: true,
+            duration: 1000
+          })
+        }
       })
     },
-    draftForm() {
-      if (this.postForm.content.length === 0 || this.postForm.title.length === 0) {
+
+    publish() {
+      if (this.postForm.title.length === 0) {
         this.$message({
           message: '请填写必要的标题和内容',
           type: 'warning'
         })
         return
       }
-      this.$message({
-        message: '保存成功',
-        type: 'success',
-        showClose: true,
-        duration: 1000
+
+      publishArticle(this.postForm).then(response => {
+        this.$message({
+          message: '发布成功',
+          type: 'success',
+          showClose: true,
+          duration: 1000
+        })
+
+        this.postForm.status = 'published'
       })
-      this.postForm.status = 'draft'
     }
   }
 }
@@ -232,6 +317,14 @@ export default {
     right: 10px;
     top: 0px;
   }
+}
+
+.module-select {
+  width: 200px;
+  margin-right: 10px;
+}
+.section-select {
+  width: 200px;
 }
 
 .article-textarea ::v-deep {

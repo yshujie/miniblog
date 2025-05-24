@@ -33,7 +33,7 @@ export function fetchArticle(id) {
  */
 export function createArticle(data) {
   return request({
-    url: '/article/create',
+    url: '/articles',
     method: 'post',
     data
   })
@@ -47,6 +47,19 @@ export function createArticle(data) {
 export function updateArticle(data) {
   return request({
     url: '/article/update',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 发布文章
+ * @param {Object} data 文章数据
+ * @returns {Promise} 发布结果
+ */
+export function publishArticle(data) {
+  return request({
+    url: '/article/publish',
     method: 'post',
     data
   })
