@@ -28,13 +28,13 @@ func (c *ArticleController) GetList(ctx *gin.Context) {
 	}
 
 	// 获取文章列表
-	articles, err := c.biz.ArticleBiz().GetList(ctx, &req)
+	articlesResp, err := c.biz.ArticleBiz().GetList(ctx, &req)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
 	}
 
-	core.WriteResponse(ctx, nil, articles)
+	core.WriteResponse(ctx, nil, articlesResp)
 }
 
 // GetOneByCode 获取文章详情

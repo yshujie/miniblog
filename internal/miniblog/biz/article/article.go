@@ -175,6 +175,8 @@ func (b *articleBiz) GetList(ctx context.Context, r *v1.ArticleListRequest) (*v1
 		}
 	}
 
+	response.Total = len(articles)
+
 	return response, nil
 }
 

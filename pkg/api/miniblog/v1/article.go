@@ -42,6 +42,7 @@ type CreateArticleResponse struct {
 // GetArticleListResponse 获取文章列表响应
 type GetArticleListResponse struct {
 	Articles []*ArticleInfo `json:"articles"`
+	Total    int            `json:"total"`
 }
 
 // GetArticleResponse 获取文章响应
