@@ -24,9 +24,11 @@ func Authz(a Auther) gin.HandlerFunc {
 		if allowed, _ := a.Authorize(sub, obj, act); !allowed {
 			// 权限不足，暂不做处理
 			// core.WriteResponse(c, errno.ErrUnauthorized, nil)
-			log.Debugw("Build authorize context", "sub", sub, "obj", obj, "act", act)
-			c.Abort()
+			log.Debugw("Authorize failed", "sub:", sub, "obj:", obj, "act:", act)
+			// c.Abort()
 			return
 		}
+
+		c.Next()
 	}
 }
