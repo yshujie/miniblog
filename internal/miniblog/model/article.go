@@ -64,3 +64,18 @@ func (a *Article) Delete() {
 func (a *Article) GetStatus() int {
 	return a.Status
 }
+
+func (a *Article) GetStatusString() string {
+	switch a.Status {
+	case ArticleStatusDraft:
+		return "Draft"
+	case ArticleStatusPublished:
+		return "Published"
+	case ArticleStatusUnpublished:
+		return "Unpublished"
+	case ArticleStatusDeleted:
+		return "Deleted"
+	default:
+		return "Unknown"
+	}
+}

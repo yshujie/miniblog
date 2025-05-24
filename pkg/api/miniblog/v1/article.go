@@ -1,7 +1,5 @@
 package v1
 
-import "time"
-
 // ArticleIdRequest 文章ID请求
 type ArticleIdRequest struct {
 	ID int `json:"id" valid:"required,numeric"`
@@ -52,12 +50,13 @@ type GetArticleResponse struct {
 
 // ArticleInfo 文章信息
 type ArticleInfo struct {
-	ID          int       `json:"id"`
-	Title       string    `json:"title"`
-	Content     string    `json:"content"`
-	SectionCode string    `json:"section_code"`
-	Author      string    `json:"author"`
-	Tags        []string  `json:"tags"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          int      `json:"id"`
+	Title       string   `json:"title"`
+	Content     string   `json:"content"`
+	SectionCode string   `json:"section_code"`
+	Author      string   `json:"author"`
+	Tags        []string `json:"tags"`
+	Status      string   `json:"status"`
+	CreatedAt   string   `json:"created_at"`
+	UpdatedAt   string   `json:"updated_at"`
 }
