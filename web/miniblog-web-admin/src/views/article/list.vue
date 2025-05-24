@@ -1,5 +1,23 @@
 <template>
   <div class="app-container">
+
+    <el-form :model="filters" label-width="120px">
+      <el-form-item label="Module Code">
+        <el-select v-model="filters.module_code" placeholder="Module Code" @change="initSections">
+          <el-option v-for="module in modules" :key="module.code" :label="module.name" :value="module.code" />
+        </el-select>
+
+        <el-select v-model="filters.section_code" placeholder="Section Code" @change="section">
+          <el-option v-for="section in sections" :key="section.code" :label="section.name" :value="section.code" />
+        </el-select>
+      </el-form-item>
+
+      <el-form-item>
+        <el-button type="primary" @click="search">Search</el-button>
+        <el-button @click="resetSearch">Reset</el-button>
+      </el-form-item>
+    </el-form>
+
     <el-table v-loading="listLoading" :data="list" border fit highlight-current-row style="width: 100%">
       <el-table-column align="center" label="ID" width="80">
         <template slot-scope="scope">
@@ -52,12 +70,14 @@
       </el-table-column>
     </el-table>
 
-    <pagination v-show="total>0" :total="total" :page.sync="listQuery.page" :limit.sync="listQuery.limit" @pagination="getList" />
+    <pagination v-show="total>0" :total="total" :page.sync="filters.page" :limit.sync="filters.limit" @pagination="getList" />
   </div>
 </template>
 
 <script>
 import { fetchList } from '@/api/article'
+import { fetchModules } from '@/api/module'
+import { fetchSections } from '@/api/section'
 import Pagination from '@/components/Pagination' // Secondary package based on el-pagination
 
 export default {
@@ -78,23 +98,61 @@ export default {
       list: null,
       total: 0,
       listLoading: true,
-      listQuery: {
+      modules: [],
+      sections: [],
+      filters: {
+        module_code: '',
+        section_code: '',
         page: 1,
         limit: 20
       }
     }
   },
   created() {
-    this.getList()
+    this.init()
   },
   methods: {
-    getList() {
+    init() {
+      this.initModules()
+    },
+
+    async initModules() {
+      // 清空模块选择
+      this.filters.module_code = ''
+      this.modules = []
+
+      // 获取模块
+      const modulesResp = await fetchModules()
+      this.modules = modulesResp.modules
+
+      console.log('modules', this.modules)
+    },
+
+    async initSections() {
+      // 清空章节选择
+      this.filters.section_code = ''
+      this.sections = []
+
+      // 获取章节
+      const sectionsResp = await fetchSections(this.filters.module_code)
+      this.sections = sectionsResp.sections
+    },
+
+    async search() {
       this.listLoading = true
-      fetchList(this.listQuery).then(response => {
-        this.list = response.data.items
-        this.total = response.data.total
-        this.listLoading = false
-      })
+      const listResp = await fetchList(this.filters)
+      this.list = listResp.items
+      this.total = listResp.total
+      this.listLoading = false
+    },
+
+    resetSearch() {
+      this.filters = {
+        module_code: '',
+        section_code: '',
+        page: 1,
+        limit: 20
+      }
     }
   }
 }

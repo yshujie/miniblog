@@ -82,7 +82,7 @@ service.interceptors.response.use(
       // 返回错误信息
       return Promise.reject(new Error(res.message || 'Error'))
     } else {
-      return res
+      return res.payload
     }
   },
   error => {
