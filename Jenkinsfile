@@ -130,8 +130,8 @@ pipeline {
       steps {
         dir("${BASE_DIR}") {
           echo '📦 构建后端生产镜像'
-          // 关闭 BuildKit，构建后端服务
-          withEnv(["DOCKER_BUILDKIT=0"]) {
+          // 启用 BuildKit 并使用缓存
+          withEnv(["DOCKER_BUILDKIT=1"]) {
             sh '''
               docker build \
                 --network host \
@@ -139,6 +139,8 @@ pipeline {
                 --build-arg GOPROXY=https://goproxy.cn,direct \
                 --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
                 --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
+                --build-arg GO111MODULE=on \
+                --cache-from ${BACKEND_IMAGE_TAG} \
                 -f Dockerfile.prod.backend \
                 -t ${BACKEND_IMAGE_TAG} \
                 ../../../
