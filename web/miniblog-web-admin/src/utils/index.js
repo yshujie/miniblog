@@ -3,10 +3,10 @@
  */
 
 /**
- * Parse the time to string
- * @param {(Object|string|number)} time
- * @param {string} cFormat
- * @returns {string | null}
+ * 解析时间
+ * @param {Object|string|number} time 时间
+ * @param {String} cFormat 时间格式
+ * @returns {String} 时间字符串
  */
 export function parseTime(time, cFormat) {
   if (arguments.length === 0 || !time) {
@@ -45,16 +45,17 @@ export function parseTime(time, cFormat) {
   const time_str = format.replace(/{([ymdhisa])+}/g, (result, key) => {
     const value = formatObj[key]
     // Note: getDay() returns 0 on Sunday
-    if (key === 'a') { return ['日', '一', '二', '三', '四', '五', '六'][value ] }
+    if (key === 'a') { return ['日', '一', '二', '三', '四', '五', '六'][value] }
     return value.toString().padStart(2, '0')
   })
   return time_str
 }
 
 /**
- * @param {number} time
- * @param {string} option
- * @returns {string}
+ * 格式化时间
+ * @param {Number} time 时间
+ * @param {String} option 时间格式
+ * @returns {String} 时间字符串
  */
 export function formatTime(time, option) {
   if (('' + time).length === 10) {
@@ -95,8 +96,9 @@ export function formatTime(time, option) {
 }
 
 /**
- * @param {string} url
- * @returns {Object}
+ * 获取查询对象
+ * @param {String} url 查询 URL
+ * @returns {Object} 查询对象
  */
 export function getQueryObject(url) {
   url = url == null ? window.location.href : url
@@ -114,11 +116,12 @@ export function getQueryObject(url) {
 }
 
 /**
- * @param {string} input value
- * @returns {number} output value
+ * 获取字节长度
+ * @param {String} str 字符串
+ * @returns {Number} 字节长度
  */
 export function byteLength(str) {
-  // returns the byte length of an utf8 string
+  // 返回 UTF-8 字符串的字节长度
   let s = str.length
   for (var i = str.length - 1; i >= 0; i--) {
     const code = str.charCodeAt(i)
@@ -130,8 +133,9 @@ export function byteLength(str) {
 }
 
 /**
- * @param {Array} actual
- * @returns {Array}
+ * 清理数组
+ * @param {Array} actual 数组
+ * @returns {Array} 清理后的数组
  */
 export function cleanArray(actual) {
   const newArray = []
@@ -144,8 +148,9 @@ export function cleanArray(actual) {
 }
 
 /**
- * @param {Object} json
- * @returns {Array}
+ * 获取查询参数
+ * @param {Object} json 查询参数
+ * @returns {Array} 查询参数
  */
 export function param(json) {
   if (!json) return ''
@@ -158,8 +163,9 @@ export function param(json) {
 }
 
 /**
- * @param {string} url
- * @returns {Object}
+ * 获取查询参数对象
+ * @param {String} url 查询 URL
+ * @returns {Object} 查询参数对象
  */
 export function param2Obj(url) {
   const search = decodeURIComponent(url.split('?')[1]).replace(/\+/g, ' ')
@@ -180,8 +186,9 @@ export function param2Obj(url) {
 }
 
 /**
- * @param {string} val
- * @returns {string}
+ * 将 HTML 转换为文本
+ * @param {String} val HTML 字符串
+ * @returns {String} 文本字符串
  */
 export function html2Text(val) {
   const div = document.createElement('div')
@@ -190,10 +197,10 @@ export function html2Text(val) {
 }
 
 /**
- * Merges two objects, giving the last one precedence
- * @param {Object} target
- * @param {(Object|Array)} source
- * @returns {Object}
+ * 合并两个对象，给最后一个对象赋予优先权
+ * @param {Object} target 目标对象
+ * @param {(Object|Array)} source 源对象
+ * @returns {Object} 合并后的对象
  */
 export function objectMerge(target, source) {
   if (typeof target !== 'object') {
@@ -214,8 +221,9 @@ export function objectMerge(target, source) {
 }
 
 /**
- * @param {HTMLElement} element
- * @param {string} className
+ * 切换类名
+ * @param {HTMLElement} element 元素
+ * @param {String} className 类名
  */
 export function toggleClass(element, className) {
   if (!element || !className) {
@@ -234,8 +242,9 @@ export function toggleClass(element, className) {
 }
 
 /**
- * @param {string} type
- * @returns {Date}
+  * 获取时间
+ * @param {String} type 类型
+ * @returns {Date} 时间
  */
 export function getTime(type) {
   if (type === 'start') {
@@ -246,10 +255,11 @@ export function getTime(type) {
 }
 
 /**
- * @param {Function} func
- * @param {number} wait
- * @param {boolean} immediate
- * @return {*}
+ * 防抖
+ * @param {Function} func 函数
+ * @param {Number} wait 等待时间
+ * @param {Boolean} immediate 是否立即执行
+ * @returns {Function} 防抖后的函数
  */
 export function debounce(func, wait, immediate) {
   let timeout, args, context, timestamp, result
@@ -287,11 +297,9 @@ export function debounce(func, wait, immediate) {
 }
 
 /**
- * This is just a simple version of deep copy
- * Has a lot of edge cases bug
- * If you want to use a perfect deep copy, use lodash's _.cloneDeep
- * @param {Object} source
- * @returns {Object}
+ * 深拷贝
+ * @param {Object} source 源对象
+ * @returns {Object} 深拷贝后的对象
  */
 export function deepClone(source) {
   if (!source && typeof source !== 'object') {
@@ -309,15 +317,17 @@ export function deepClone(source) {
 }
 
 /**
- * @param {Array} arr
- * @returns {Array}
+* 去重
+ * @param {Array} arr 数组
+ * @returns {Array} 去重后的数组
  */
 export function uniqueArr(arr) {
   return Array.from(new Set(arr))
 }
 
 /**
- * @returns {string}
+ * 创建唯一字符串
+ * @returns {String} 唯一字符串
  */
 export function createUniqueString() {
   const timestamp = +new Date() + ''
@@ -326,28 +336,28 @@ export function createUniqueString() {
 }
 
 /**
- * Check if an element has a class
- * @param {HTMLElement} elm
- * @param {string} cls
- * @returns {boolean}
+ * 检查元素是否具有类名
+ * @param {HTMLElement} elm 元素
+ * @param {String} cls 类名
+ * @returns {Boolean} 是否具有类名
  */
 export function hasClass(ele, cls) {
   return !!ele.className.match(new RegExp('(\\s|^)' + cls + '(\\s|$)'))
 }
 
 /**
- * Add class to element
- * @param {HTMLElement} elm
- * @param {string} cls
+ * 添加类名
+ * @param {HTMLElement} elm 元素
+ * @param {String} cls 类名
  */
 export function addClass(ele, cls) {
   if (!hasClass(ele, cls)) ele.className += ' ' + cls
 }
 
 /**
- * Remove class from element
- * @param {HTMLElement} elm
- * @param {string} cls
+ * 移除类名
+ * @param {HTMLElement} elm 元素
+ * @param {String} cls 类名
  */
 export function removeClass(ele, cls) {
   if (hasClass(ele, cls)) {

@@ -1,9 +1,9 @@
 import store from '@/store'
 
 /**
- * @param {Array} value
- * @returns {Boolean}
- * @example see @/views/permission/directive.vue
+ * 检查权限
+ * @param {Array} value 权限数组
+ * @returns {Boolean} 是否具有权限
  */
 export default function checkPermission(value) {
   if (value && value instanceof Array && value.length > 0) {

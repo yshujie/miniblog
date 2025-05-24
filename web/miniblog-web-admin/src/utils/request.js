@@ -3,40 +3,42 @@ import { MessageBox, Message } from 'element-ui'
 import store from '@/store'
 import { getToken } from '@/utils/auth'
 
-// create an axios instance
+/**
+ * 创建 axios 实例
+ * @returns {Object} axios 实例
+ */
 const service = axios.create({
-  baseURL: process.env.VUE_APP_BASE_API, // url = base url + request url
-  // withCredentials: true, // send cookies when cross-domain requests
-  timeout: 5000 // request timeout
+  baseURL: process.env.VUE_APP_BASE_API, // 基础 URL
+  timeout: 5000 // 请求超时时间
 })
 
-// request interceptor
+/**
+ * 请求拦截器
+ * @param {Object} config 请求配置
+ * @returns {Promise} 请求配置
+ */
 service.interceptors.request.use(
   config => {
-    // do something before request is sent
-
+    // 如果存在 token，则添加到请求头
     if (getToken()) {
-      // let each request carry token
-      // ['X-Token'] is a custom headers key
-      // please modify it according to the actual situation
+      // 添加 token 到请求头
       config.headers['Authorization'] = `Bearer ${getToken()}`
     }
     return config
   },
   error => {
-    // do something with request error
-    console.log(error) // for debug
+    // 处理请求错误
+    console.log(error) // 调试
     return Promise.reject(error)
   }
 )
 
-// response interceptor
+/**
+ * 响应拦截器
+ * @param {Object} response 响应数据
+ * @returns {Promise} 响应数据
+ */
 service.interceptors.response.use(
-  /**
-   * If you want to get http information such as headers or status
-   * Please return  response => response
-  */
-
   /**
    * Determine the request status by custom code
    * Here is just an example
@@ -45,7 +47,7 @@ service.interceptors.response.use(
   response => {
     const res = response.data
 
-    // if the custom code is not 20000, it is judged as an error.
+    // 如果响应码不是 ok，则提示错误
     if (res.code !== 'ok') {
       Message({
         message: res.message || 'Error',
@@ -53,7 +55,7 @@ service.interceptors.response.use(
         duration: 5 * 1000
       })
 
-      // 50008: Illegal token; 50012: Other clients logged in; 50014: Token expired;
+      // 如果响应码是 unauthorized，则提示重新登录
       if (res.code === 'unauthorized') {
         // to re-login
         MessageBox.confirm('You have been logged out, you can cancel to stay on this page, or log in again', 'Confirm logout', {
@@ -66,6 +68,8 @@ service.interceptors.response.use(
           })
         })
       }
+
+      // 返回错误信息
       return Promise.reject(new Error(res.message || 'Error'))
     } else {
       return res

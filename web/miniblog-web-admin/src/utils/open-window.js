@@ -1,9 +1,9 @@
 /**
- *Created by PanJiaChen on 16/11/29.
- * @param {Sting} url
- * @param {Sting} title
- * @param {Number} w
- * @param {Number} h
+ * 打开新窗口
+ * @param {String} url 新窗口的 URL
+ * @param {String} title 新窗口的标题
+ * @param {Number} w 新窗口的宽度
+ * @param {Number} h 新窗口的高度
  */
 export default function openWindow(url, title, w, h) {
   // Fixes dual-screen position                            Most browsers       Firefox

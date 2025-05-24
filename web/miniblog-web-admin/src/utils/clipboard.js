@@ -1,6 +1,10 @@
 import Vue from 'vue'
 import Clipboard from 'clipboard'
 
+/**
+ * 复制成功
+ * @returns {Void}
+ */
 function clipboardSuccess() {
   Vue.prototype.$message({
     message: 'Copy successfully',
@@ -9,6 +13,10 @@ function clipboardSuccess() {
   })
 }
 
+/**
+ * 复制失败
+ * @returns {Void}
+ */
 function clipboardError() {
   Vue.prototype.$message({
     message: 'Copy failed',
@@ -16,6 +24,12 @@ function clipboardError() {
   })
 }
 
+/**
+ * 复制
+ * @param {String} text 文本
+ * @param {Object} event 事件
+ * @returns {Void}
+ */
 export default function handleClipboard(text, event) {
   const clipboard = new Clipboard(event.target, {
     text: () => text

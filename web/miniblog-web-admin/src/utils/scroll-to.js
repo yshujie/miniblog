@@ -7,14 +7,17 @@ Math.easeInOutQuad = function(t, b, c, d) {
   return -c / 2 * (t * (t - 2) - 1) + b
 }
 
-// requestAnimationFrame for Smart Animating http://goo.gl/sx5sts
+/**
+ * requestAnimationFrame for Smart Animating http://goo.gl/sx5sts
+ * @returns {Function} requestAnimationFrame
+ */
 var requestAnimFrame = (function() {
   return window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || function(callback) { window.setTimeout(callback, 1000 / 60) }
 })()
 
 /**
- * Because it's so fucking difficult to detect the scrolling element, just move them all
- * @param {number} amount
+ * 移动元素
+ * @param {Number} amount 移动距离
  */
 function move(amount) {
   document.documentElement.scrollTop = amount
@@ -22,14 +25,19 @@ function move(amount) {
   document.body.scrollTop = amount
 }
 
+/**
+ * 获取元素位置
+ * @returns {Number} 元素位置
+ */
 function position() {
   return document.documentElement.scrollTop || document.body.parentNode.scrollTop || document.body.scrollTop
 }
 
 /**
- * @param {number} to
- * @param {number} duration
- * @param {Function} callback
+ * 滚动到指定位置
+ * @param {Number} to 目标位置
+ * @param {Number} duration 滚动时间
+ * @param {Function} callback 回调函数
  */
 export function scrollTo(to, duration, callback) {
   const start = position()
