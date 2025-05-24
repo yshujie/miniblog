@@ -20,6 +20,7 @@ func (c *ArticleController) GetList(ctx *gin.Context) {
 		core.WriteResponse(ctx, err, nil)
 		return
 	}
+	log.Infow("GetList", "req", req)
 
 	// 验证请求参数
 	if err := validator.New().Struct(req); err != nil {

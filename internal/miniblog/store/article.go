@@ -2,6 +2,7 @@ package store
 
 import (
 	"github.com/yshujie/miniblog/internal/miniblog/model"
+	"github.com/yshujie/miniblog/internal/pkg/log"
 	"gorm.io/gorm"
 )
 
@@ -44,6 +45,7 @@ func (a *articles) GetOne(id int) (*model.Article, error) {
 
 // GetListBySectionCode 获取文章列表
 func (a *articles) GetListBySectionCode(sectionCode string, page int, limit int) ([]*model.Article, error) {
+	log.Infow("GetListBySectionCode", "sectionCode", sectionCode, "page", page, "limit", limit)
 	var articles []*model.Article
 	return articles, a.db.Where("section_code = ?", sectionCode).Offset((page - 1) * limit).Limit(limit).Find(&articles).Error
 }
