@@ -1,20 +1,10 @@
 import request from '@/utils/request'
 
-export function login(data) {
-  return request({
-    url: '/auth/login',
-    method: 'post',
-    data
-  })
-}
-
-export function logout() {
-  return request({
-    url: '/auth/logout',
-    method: 'post'
-  })
-}
-
+/**
+ * 获取用户信息
+ * @param {String} token 令牌
+ * @returns {Promise} 用户信息
+ */
 export function getInfo(token) {
   console.log('in getInfo', token)
   return request({
