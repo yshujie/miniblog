@@ -3,12 +3,15 @@ import { MessageBox, Message } from 'element-ui'
 import store from '@/store'
 import { getToken } from '@/utils/auth'
 
+// 定义基础 URL
+const AUTH_BASE_URL = 'https://api.yangshujie.com/api/auth'
+const ADMIN_BASE_URL = 'https://api.yangshujie.com/api/admin'
+
 /**
  * 创建 axios 实例
  * @returns {Object} axios 实例
  */
 const service = axios.create({
-  baseURL: process.env.VUE_APP_BASE_API, // 基础 URL
   timeout: 5000 // 请求超时时间
 })
 
@@ -19,6 +22,13 @@ const service = axios.create({
  */
 service.interceptors.request.use(
   config => {
+    // 根据请求路径设置不同的 baseURL
+    if (config.url.startsWith('/auth/')) {
+      config.baseURL = AUTH_BASE_URL
+    } else {
+      config.baseURL = ADMIN_BASE_URL
+    }
+
     // 如果存在 token，则添加到请求头
     if (getToken()) {
       // 添加 token 到请求头
