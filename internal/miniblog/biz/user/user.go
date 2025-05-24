@@ -116,8 +116,16 @@ func (b *userBiz) GetMyInfo(ctx context.Context) (*v1.GetUserResponse, error) {
 	// 将用户信息转换为响应对象
 	var resp v1.GetUserResponse
 	_ = copier.Copy(&resp, user)
+
+	// 设置管理员角色
+	resp.Roles = getAdminRoles()
 	resp.CreatedAt = user.CreatedAt.Format("2006-01-02 15:04:05")
 	resp.UpdatedAt = user.UpdatedAt.Format("2006-01-02 15:04:05")
 
 	return &resp, nil
+}
+
+// getAdminRoles 获取管理员角色
+func getAdminRoles() []string {
+	return []string{"admin"}
 }

@@ -55,7 +55,7 @@ const actions = {
           reject('Verification failed, please Login again.')
         }
 
-        const { roles, name, avatar, introduction } = payload
+        const { roles, nickname, avatar, introduction } = payload
 
         // roles must be a non-empty array
         if (!roles || roles.length <= 0) {
@@ -63,7 +63,7 @@ const actions = {
         }
 
         commit('SET_ROLES', roles)
-        commit('SET_NAME', name)
+        commit('SET_NAME', nickname)
         commit('SET_AVATAR', avatar)
         commit('SET_INTRODUCTION', introduction)
         resolve(payload)
