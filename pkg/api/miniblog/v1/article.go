@@ -28,10 +28,10 @@ type UpdateArticleRequest struct {
 
 // ArticleListRequest 文章列表请求
 type ArticleListRequest struct {
-	ModuleCode  string `json:"module_code" valid:"required,stringlength(1|255)"`
-	SectionCode string `json:"section_code" valid:"required,stringlength(1|255)"`
-	Page        int    `json:"page" valid:"required,numeric"`
-	Limit       int    `json:"limit" valid:"required,numeric"`
+	ModuleCode  string `form:"module_code" valid:"required,stringlength(1|255)"`
+	SectionCode string `form:"section_code" valid:"required,stringlength(1|255)"`
+	Page        int    `form:"page" valid:"required,numeric"`
+	Limit       int    `form:"limit" valid:"required,numeric"`
 }
 
 // CreateArticleResponse 创建文章响应
