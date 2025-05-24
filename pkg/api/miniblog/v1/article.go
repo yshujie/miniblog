@@ -8,6 +8,7 @@ type ArticleIdRequest struct {
 // CreateArticleRequest 创建文章请求
 type CreateArticleRequest struct {
 	Title        string   `json:"title" valid:"required,stringlength(1|255)"`
+	ModuleCode   string   `json:"module_code" valid:"required,stringlength(1|255)"`
 	SectionCode  string   `json:"section_code" valid:"required,stringlength(1|255)"`
 	Author       string   `json:"author" valid:"required,stringlength(1|255)"`
 	Tags         []string `json:"tags" valid:"required"`

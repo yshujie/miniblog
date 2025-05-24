@@ -41,10 +41,12 @@ func (d *DocReader) ReadContent(docUrl string, docType string, resultType string
 		Build()
 
 	// 发起请求
+	log.Infow("read doc", "docUrl", docUrl, "docType", docType, "resultType", resultType)
 	resp, err := d.larkClient.Docs.V1.Content.Get(
 		context.Background(),
 		req,
 	)
+	log.Infow("read doc", "resp", resp)
 	if err != nil {
 		return "", fmt.Errorf("failed to read doc: %v", err)
 	}
@@ -56,6 +58,7 @@ func (d *DocReader) ReadContent(docUrl string, docType string, resultType string
 
 	// 返回内容
 	content := *resp.Data.Content
+	log.Infow("read doc", "content", content)
 
 	// 解析 content 中的 ASCII 码
 	parsedContent, err := d.parseContent(content)
