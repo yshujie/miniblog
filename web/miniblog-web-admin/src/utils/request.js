@@ -4,8 +4,8 @@ import store from '@/store'
 import { getToken } from '@/utils/auth'
 
 // 定义基础 URL
-const AUTH_BASE_URL = 'https://api.yangshujie.com/api/auth'
-const ADMIN_BASE_URL = 'https://api.yangshujie.com/api/admin'
+const AUTH_BASE_URL = 'https://api.yangshujie.com/v1'
+const ADMIN_BASE_URL = 'https://api.yangshujie.com/v1/admin'
 
 /**
  * 创建 axios 实例

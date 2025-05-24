@@ -2,8 +2,6 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/yshujie/miniblog/internal/pkg/core"
-	"github.com/yshujie/miniblog/internal/pkg/errno"
 	"github.com/yshujie/miniblog/internal/pkg/known"
 	"github.com/yshujie/miniblog/internal/pkg/log"
 )
@@ -24,7 +22,9 @@ func Authz(a Auther) gin.HandlerFunc {
 
 		log.Debugw("Build authorize context", "sub", sub, "obj", obj, "act", act)
 		if allowed, _ := a.Authorize(sub, obj, act); !allowed {
-			core.WriteResponse(c, errno.ErrUnauthorized, nil)
+			// 权限不足，暂不做处理
+			// core.WriteResponse(c, errno.ErrUnauthorized, nil)
+			log.Debugw("Build authorize context", "sub", sub, "obj", obj, "act", act)
 			c.Abort()
 			return
 		}
