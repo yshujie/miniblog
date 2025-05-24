@@ -3,12 +3,12 @@
 
     <el-form :model="filters" label-width="120px">
       <el-form-item label="Module Code">
-        <el-select v-model="filters.module_code" placeholder="Module Code" @change="initSections">
-          <el-option v-for="module in modules" :key="module.code" :label="module.name" :value="module.code" />
+        <el-select v-model="filters.module_code" placeholder="Module Code" class="module-select" @change="initSections">
+          <el-option v-for="module in modules" :key="module.code" :label="module.title" :value="module.code" />
         </el-select>
 
-        <el-select v-model="filters.section_code" placeholder="Section Code" @change="section">
-          <el-option v-for="section in sections" :key="section.code" :label="section.name" :value="section.code" />
+        <el-select v-model="filters.section_code" placeholder="Section Code" class="section-select" @change="search">
+          <el-option v-for="section in sections" :key="section.code" :label="section.title" :value="section.code" />
         </el-select>
       </el-form-item>
 
@@ -25,9 +25,9 @@
         </template>
       </el-table-column>
 
-      <el-table-column width="180px" align="center" label="Date">
+      <el-table-column width="180px" align="center" label="Created At">
         <template slot-scope="scope">
-          <span>{{ scope.row.timestamp | parseTime('{y}-{m}-{d} {h}:{i}') }}</span>
+          <span>{{ scope.row.created_at }}</span>
         </template>
       </el-table-column>
 
@@ -37,25 +37,26 @@
         </template>
       </el-table-column>
 
-      <el-table-column width="100px" label="Importance">
-        <template slot-scope="scope">
-          <svg-icon v-for="n in +scope.row.importance" :key="n" icon-class="star" class="meta-item__icon" />
-        </template>
-      </el-table-column>
-
-      <el-table-column class-name="status-col" label="Status" width="110">
-        <template slot-scope="{row}">
-          <el-tag :type="row.status | statusFilter">
-            {{ row.status }}
-          </el-tag>
-        </template>
-      </el-table-column>
-
       <el-table-column min-width="300px" label="Title">
         <template slot-scope="{row}">
           <router-link :to="'/article/edit/'+row.id" class="link-type">
             <span>{{ row.title }}</span>
           </router-link>
+        </template>
+      </el-table-column>
+
+      <el-table-column min-width="300px" label="Tags">
+        <template slot-scope="{row}">
+          <el-tag v-for="tag in row.tags" :key="tag" type="primary" class="tag-item">{{ tag }}</el-tag>
+        </template>
+      </el-table-column>
+
+      <el-table-column min-width="300px" label="Status">
+        <template slot-scope="{row}">
+          <el-tag v-if="row.status === 'published'" type="success" class="tag-item">Published</el-tag>
+          <el-tag v-else-if="row.status === 'draft'" type="info" class="tag-item">Draft</el-tag>
+          <el-tag v-else-if="row.status === 'deleted'" type="danger" class="tag-item">Deleted</el-tag>
+          <el-tag v-else type="warning" class="tag-item">Unknown</el-tag>
         </template>
       </el-table-column>
 
@@ -70,7 +71,7 @@
       </el-table-column>
     </el-table>
 
-    <pagination v-show="total>0" :total="total" :page.sync="filters.page" :limit.sync="filters.limit" @pagination="getList" />
+    <pagination v-show="total>0" :total="total" :page.sync="filters.page" :limit.sync="filters.limit" @pagination="search" />
   </div>
 </template>
 
@@ -141,7 +142,9 @@ export default {
     async search() {
       this.listLoading = true
       const listResp = await fetchList(this.filters)
-      this.list = listResp.items
+
+      console.log('listResp', listResp)
+      this.list = listResp.articles
       this.total = listResp.total
       this.listLoading = false
     },
@@ -166,5 +169,15 @@ export default {
   position: absolute;
   right: 15px;
   top: 10px;
+}
+.module-select {
+  width: 200px;
+  margin-right: 10px;
+}
+.section-select {
+  width: 200px;
+}
+.tag-item {
+  margin-right: 5px;
 }
 </style>
