@@ -8,6 +8,7 @@ import (
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/errno"
+	"github.com/yshujie/miniblog/internal/pkg/known"
 	"github.com/yshujie/miniblog/internal/pkg/log"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
 	"github.com/yshujie/miniblog/pkg/auth"
@@ -100,16 +101,21 @@ func (b *userBiz) Get(ctx context.Context, username string) (*v1.GetUserResponse
 
 // GetMyInfo 获取当前用户信息
 func (b *userBiz) GetMyInfo(ctx context.Context) (*v1.GetUserResponse, error) {
-	username := ctx.Value("username").(string)
+	// 从上下文中获取当前用户的用户名
+	username := ctx.Value(known.XUsernameKey)
+	if username == nil {
+		return nil, errno.ErrUserNotFound
+	}
 
-	user, err := b.ds.Users().Get(username)
+	// 根据用户名获取用户信息
+	user, err := b.ds.Users().Get(username.(string))
 	if err != nil {
 		return nil, err
 	}
 
+	// 将用户信息转换为响应对象
 	var resp v1.GetUserResponse
 	_ = copier.Copy(&resp, user)
-
 	resp.CreatedAt = user.CreatedAt.Format("2006-01-02 15:04:05")
 	resp.UpdatedAt = user.UpdatedAt.Format("2006-01-02 15:04:05")
 
