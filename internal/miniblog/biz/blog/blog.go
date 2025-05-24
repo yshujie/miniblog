@@ -50,7 +50,7 @@ func (b *blogBiz) GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModule
 		}
 
 		// 获取文章列表
-		articles, _ := b.ds.Articles().GetListBySectionCode(section.Code)
+		articles, _ := b.ds.Articles().GetListBySectionCode(section.Code, 1, 100)
 		for _, article := range articles {
 			articleDetail := &v1.ArticleDetail{
 				ID:          article.ID,

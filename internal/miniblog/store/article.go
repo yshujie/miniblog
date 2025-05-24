@@ -8,7 +8,7 @@ import (
 type ArticleStore interface {
 	Create(article *model.Article) error
 	GetOne(id int) (*model.Article, error)
-	GetListBySectionCode(sectionCode string) ([]*model.Article, error)
+	GetListBySectionCode(sectionCode string, page int, limit int) ([]*model.Article, error)
 	Update(article *model.Article) error
 }
 
@@ -43,9 +43,9 @@ func (a *articles) GetOne(id int) (*model.Article, error) {
 }
 
 // GetListBySectionCode 获取文章列表
-func (a *articles) GetListBySectionCode(sectionCode string) ([]*model.Article, error) {
+func (a *articles) GetListBySectionCode(sectionCode string, page int, limit int) ([]*model.Article, error) {
 	var articles []*model.Article
-	return articles, a.db.Where("section_code = ?", sectionCode).Find(&articles).Error
+	return articles, a.db.Where("section_code = ?", sectionCode).Offset((page - 1) * limit).Limit(limit).Find(&articles).Error
 }
 
 // Update 更新文章

@@ -26,6 +26,14 @@ type UpdateArticleRequest struct {
 	ExternalLink string   `json:"external_link" valid:"required"`
 }
 
+// ArticleListRequest 文章列表请求
+type ArticleListRequest struct {
+	ModuleCode  string `json:"module_code" valid:"required,stringlength(1|255)"`
+	SectionCode string `json:"section_code" valid:"required,stringlength(1|255)"`
+	Page        int    `json:"page" valid:"required,numeric"`
+	Limit       int    `json:"limit" valid:"required,numeric"`
+}
+
 // CreateArticleResponse 创建文章响应
 type CreateArticleResponse struct {
 	Article *ArticleInfo `json:"article"`

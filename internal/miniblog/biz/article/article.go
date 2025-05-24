@@ -19,7 +19,7 @@ type IArticleBiz interface {
 	Update(ctx context.Context, r *v1.UpdateArticleRequest) error
 	Publish(ctx context.Context, r *v1.ArticleIdRequest) error
 	Unpublish(ctx context.Context, r *v1.ArticleIdRequest) error
-	GetList(ctx context.Context, sectionCode string) (*v1.GetArticleListResponse, error)
+	GetList(ctx context.Context, r *v1.ArticleListRequest) (*v1.GetArticleListResponse, error)
 	GetOne(ctx context.Context, id int) (*v1.GetArticleResponse, error)
 }
 
@@ -152,20 +152,26 @@ func loadArticleContent(externalLink string, ctx context.Context) (string, error
 }
 
 // GetList 获取所有文章
-func (b *articleBiz) GetList(ctx context.Context, sectionCode string) (*v1.GetArticleListResponse, error) {
-	articles, err := b.ds.Articles().GetListBySectionCode(sectionCode)
+func (b *articleBiz) GetList(ctx context.Context, r *v1.ArticleListRequest) (*v1.GetArticleListResponse, error) {
+	articles, err := b.ds.Articles().GetListBySectionCode(r.SectionCode, r.Page, r.Limit)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &v1.GetArticleListResponse{
-		Articles: make([]*v1.ArticleInfo, 0),
+		Articles: make([]*v1.ArticleInfo, len(articles)),
 	}
-	for _, article := range articles {
-		response.Articles = append(response.Articles, &v1.ArticleInfo{
-			ID:    article.ID,
-			Title: article.Title,
-		})
+	for i, article := range articles {
+		response.Articles[i] = &v1.ArticleInfo{
+			ID:          article.ID,
+			Title:       article.Title,
+			Content:     article.Content,
+			SectionCode: article.SectionCode,
+			Author:      article.Author,
+			Tags:        strings.Split(article.Tags, ","),
+			CreatedAt:   article.CreatedAt,
+			UpdatedAt:   article.UpdatedAt,
+		}
 	}
 
 	return response, nil
