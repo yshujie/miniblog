@@ -3,11 +3,14 @@
     <el-form ref="postForm" :model="postForm" :rules="rules" class="form-container">
 
       <sticky :z-index="10" :class-name="'sub-navbar '+postForm.status">
-        <el-button v-loading="loading" style="margin-left: 10px;" type="success" @click="save">
+        <el-button v-loading="loading" type="default" @click="save">
           保存
         </el-button>
-        <el-button v-loading="loading" type="warning" @click="publish">
+        <el-button v-loading="loading" type="success" @click="publish">
           发布
+        </el-button>
+        <el-button v-loading="loading" type="warning" @click="unpublish">
+          下架
         </el-button>
       </sticky>
 
@@ -73,6 +76,16 @@
           </el-col>
         </el-row>
 
+        <el-form-item v-show="isEdit" label="Status:" prop="status" style="margin-bottom: 40px;">
+          <el-tag
+            :key="postForm.status"
+            :type="tagType"
+            effect="dark"
+          >
+            {{ postForm.status }}
+          </el-tag>
+        </el-form-item>
+
         <el-form-item v-show="! isEdit" label="ExternalLink:" prop="external_link" style="margin-bottom: 40px;">
           <el-input v-model="postForm.external_link" :rows="1" type="textarea" class="article-textarea" autosize placeholder="Please enter the ExternalLink URL" />
         </el-form-item>
@@ -94,7 +107,7 @@
 import MDinput from '@/components/MDinput'
 import Sticky from '@/components/Sticky' // 粘性header组件
 import MarkdownEditor from '@/components/MarkdownEditor'
-import { fetchArticle, createArticle, publishArticle, updateArticle } from '@/api/article'
+import { fetchArticle, createArticle, publishArticle, updateArticle, unpublishArticle } from '@/api/article'
 import { fetchModules } from '@/api/module'
 import { fetchSections } from '@/api/section'
 
@@ -177,21 +190,19 @@ export default {
     }
   },
   computed: {
-    contentShortLength() {
-      return this.postForm.content_short.length
-    },
-    displayTime: {
-      // set and get is useful when the data
-      // returned by the back end api is different from the front end
-      // back end return => "2013-06-25 06:59:25"
-      // front end need timestamp => 1372114765000
-      get() {
-        return (+new Date(this.postForm.display_time))
-      },
-      set(val) {
-        this.postForm.display_time = new Date(val)
+    tagType() {
+      const statusMap = {
+        Draft: 'info',
+        Published: 'success',
+        Unpublished: 'danger'
       }
+
+      console.log('status', this.postForm.status)
+      console.log('tagType', statusMap[this.postForm.status])
+
+      return statusMap[this.postForm.status] || 'info'
     }
+
   },
   async created() {
     console.log('ArticleDetail created')
@@ -325,23 +336,56 @@ export default {
     },
 
     publish() {
-      if (this.postForm.title.length === 0) {
-        this.$message({
-          message: '请填写必要的标题和内容',
-          type: 'warning'
-        })
-        return
-      }
+      this.$refs.postForm.validate(valid => {
+        if (valid) {
+          publishArticle(this.postForm).then(response => {
+            this.$message({
+              message: '发布成功',
+              type: 'success',
+              showClose: true,
+              duration: 1000
+            })
 
-      publishArticle(this.postForm).then(response => {
-        this.$message({
-          message: '发布成功',
-          type: 'success',
-          showClose: true,
-          duration: 1000
-        })
+            this.fetchData()
+          }).catch(error => {
+            console.log('error', error)
+            this.$message({
+              message: '发布失败，错误信息：' + error.message,
+              type: 'error',
+              showClose: true,
+              duration: 3000
+            })
+          })
+        } else {
+          return false
+        }
+      })
+    },
 
-        this.postForm.status = 'published'
+    unpublish() {
+      this.$refs.postForm.validate(valid => {
+        if (valid) {
+          unpublishArticle(this.postForm).then(response => {
+            this.$message({
+              message: '下架成功',
+              type: 'success',
+              showClose: true,
+              duration: 1000
+            })
+
+            this.fetchData()
+          }).catch(error => {
+            console.log('error', error)
+            this.$message({
+              message: '下架失败，错误信息：' + error.message,
+              type: 'error',
+              showClose: true,
+              duration: 3000
+            })
+          })
+        } else {
+          return false
+        }
       })
     }
   }

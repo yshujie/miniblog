@@ -152,12 +152,19 @@ aside {
     color: #fff;
   }
 
+  // 草稿
   &.draft {
-    background: #d0d0d0;
+    background: #707070;
   }
 
-  &.deleted {
-    background: #d0d0d0;
+  // 已发布
+  &.published {
+    background: #007bff;
+  }
+
+  // 已下架
+  &.unpublished {
+    background: #6c757d;
   }
 }
 

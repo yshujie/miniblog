@@ -58,8 +58,19 @@ export function updateArticle(data) {
  */
 export function publishArticle(data) {
   return request({
-    url: '/article/publish',
-    method: 'post',
-    data
+    url: '/articles/' + data.id + '/publish',
+    method: 'put'
+  })
+}
+
+/**
+ * 下架文章
+ * @param {Object} data 文章数据
+ * @returns {Promise} 下架结果
+ */
+export function unpublishArticle(data) {
+  return request({
+    url: '/articles/' + data.id + '/unpublish',
+    method: 'put'
   })
 }
