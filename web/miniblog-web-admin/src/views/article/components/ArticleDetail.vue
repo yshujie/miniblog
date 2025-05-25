@@ -23,13 +23,13 @@
             <div class="postInfo-container">
               <el-row>
                 <el-col :span="8">
-                  <el-form-item label-width="60px" label="Author:" class="postInfo-container-item">
+                  <el-form-item label-width="60px" label="Author:" class="postInfo-container-item" prop="author">
                     <el-input v-model="postForm.author" placeholder="Please enter the author" />
                   </el-form-item>
                 </el-col>
 
                 <el-col :span="10">
-                  <el-form-item label-width="120px" label="Tags:" class="postInfo-container-item">
+                  <el-form-item label-width="120px" label="Tags:" class="postInfo-container-item" prop="tags">
                     <el-select
                       v-model="postForm.tags"
                       multiple
@@ -54,7 +54,7 @@
             <div class="postInfo-container">
               <el-row>
                 <el-col :span="8">
-                  <el-form-item label-width="60px" label="Module" class="postInfo-container-item">
+                  <el-form-item label-width="60px" label="Module" class="postInfo-container-item" prop="module_code">
                     <el-select v-model="postForm.module_code" placeholder="Module Code" class="module-select" @change="initSections">
                       <el-option v-for="module in modules" :key="module.code" :label="module.title" :value="module.code" />
                     </el-select>
@@ -62,7 +62,7 @@
                 </el-col>
 
                 <el-col :span="10">
-                  <el-form-item label-width="120px" label="Section" class="postInfo-container-item">
+                  <el-form-item label-width="120px" label="Section" class="postInfo-container-item" prop="section_code">
                     <el-select v-model="postForm.section_code" placeholder="Section Code" class="section-select">
                       <el-option v-for="section in sections" :key="section.code" :label="section.title" :value="section.code" />
                     </el-select>
@@ -73,8 +73,17 @@
           </el-col>
         </el-row>
 
-        <el-form-item style="margin-bottom: 40px;" label="ExternalLink:">
+        <el-form-item style="margin-bottom: 40px;" label="ExternalLink:" prop="external_link">
           <el-input v-model="postForm.external_link" :rows="1" type="textarea" class="article-textarea" autosize placeholder="Please enter the ExternalLink URL" />
+        </el-form-item>
+
+        <el-form-item v-show="isEdit" prop="content" style="margin-bottom: 30px;">
+          <markdown-editor
+            ref="editor"
+            v-model="postForm.content"
+            height="800px"
+            :options="{hideModeSwitch:true,previewStyle:'tab'}"
+          />
         </el-form-item>
       </div>
     </el-form>
@@ -84,13 +93,14 @@
 <script>
 import MDinput from '@/components/MDinput'
 import Sticky from '@/components/Sticky' // 粘性header组件
+import MarkdownEditor from '@/components/MarkdownEditor'
 import { fetchArticle, createArticle, publishArticle, updateArticle } from '@/api/article'
 import { fetchModules } from '@/api/module'
 import { fetchSections } from '@/api/section'
 
 const defaultForm = {
   id: '',
-  status: 'draft',
+  status: '',
   title: '', // 文章题目
   module_code: '', // 模块代码
   section_code: '', // 章节代码
@@ -101,7 +111,7 @@ const defaultForm = {
 
 export default {
   name: 'ArticleDetail',
-  components: { MDinput, Sticky },
+  components: { MDinput, Sticky, MarkdownEditor },
   props: {
     isEdit: {
       type: Boolean,
@@ -110,7 +120,7 @@ export default {
   },
   data() {
     const validateRequire = (rule, value, callback) => {
-      if (value === '') {
+      if (value === null || value === undefined || value.length === 0 || value === '') {
         this.$message({
           message: rule.field + '为必传项',
           type: 'error'
@@ -120,8 +130,9 @@ export default {
         callback()
       }
     }
+
     const validateTags = (rule, value, callback) => {
-      if (value === '') {
+      if (value === null || value === undefined || value.length === 0) {
         this.$message({
           message: '标签不能为空',
           type: 'error'
@@ -130,6 +141,7 @@ export default {
       }
       callback()
     }
+
     return {
       modules: [],
       sections: [],
@@ -138,8 +150,11 @@ export default {
       userListOptions: [],
       rules: {
         title: [{ validator: validateRequire }],
-        content: [{ validator: validateRequire }],
-        tags: [{ validator: validateTags }]
+        tags: [{ validator: validateTags }],
+        author: [{ validator: validateRequire }],
+        module_code: [{ validator: validateRequire }],
+        section_code: [{ validator: validateRequire }],
+        external_link: [{ validator: validateRequire }]
       },
       tempRoute: {}
     }
@@ -245,19 +260,35 @@ export default {
     async createArticle() {
       this.loading = true
 
-      // 创建文章
-      const resp = await createArticle(this.postForm)
-      this.postForm.id = resp.article.id
-      this.postForm.status = resp.article.status
+      try {
+        // 创建文章
+        const resp = await createArticle(this.postForm)
+        this.postForm.id = resp.article.id
+        this.postForm.status = resp.article.status
 
-      this.$message({
-        message: '保存成功，文章已创建',
-        type: 'success',
-        showClose: true,
-        duration: 1000
-      })
-
-      this.loading = false
+        // 保存成功
+        this.$message({
+          message: '保存成功，文章已创建',
+          type: 'success',
+          showClose: true,
+          duration: 1000,
+          onClose: () => {
+            this.$router.push({
+              path: '/article/edit/' + this.postForm.id
+            })
+          }
+        })
+      } catch (error) {
+        console.log('error', error)
+        this.$message({
+          message: '保存失败，错误信息：' + error.message,
+          type: 'error',
+          showClose: true,
+          duration: 3000
+        })
+      } finally {
+        this.loading = false
+      }
     },
 
     // 更新文章
