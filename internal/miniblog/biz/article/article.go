@@ -61,6 +61,8 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 		Author:      r.Author,
 		Tags:        strings.Join(r.Tags, ","),
 	}
+	// 存草稿
+	article.SaveDraft()
 	if err := b.ds.Articles().Create(article); err != nil {
 		return nil, err
 	}
@@ -88,6 +90,9 @@ func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) (*v
 	article.Tags = strings.Join(r.Tags, ",")
 	article.SectionCode = r.SectionCode
 	article.Content = r.Content
+
+	// 存草稿
+	article.SaveDraft()
 	if err := b.ds.Articles().Update(article); err != nil {
 		return nil, err
 	}
@@ -111,7 +116,6 @@ func (b *articleBiz) Publish(ctx context.Context, r *v1.ArticleIdRequest) error 
 
 	// 发布文章
 	article.Publish()
-
 	if err := b.ds.Articles().Update(article); err != nil {
 		return errno.ErrUpdateArticleFailed
 	}
@@ -128,7 +132,6 @@ func (b *articleBiz) Unpublish(ctx context.Context, r *v1.ArticleIdRequest) erro
 
 	// 下架文章
 	article.Unpublish()
-
 	if err := b.ds.Articles().Update(article); err != nil {
 		return errno.ErrUpdateArticleFailed
 	}

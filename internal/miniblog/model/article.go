@@ -45,26 +45,32 @@ func (a *Article) BeforeUpdate(tx *gorm.DB) (err error) {
 	return
 }
 
-// 发布文章
+// SaveDraft 存草稿
+func (a *Article) SaveDraft() {
+	a.Status = ArticleStatusDraft
+}
+
+// Publish 发布文章
 func (a *Article) Publish() {
 	a.Status = ArticleStatusPublished
 }
 
-// 下架文章
+// Unpublish 下架文章
 func (a *Article) Unpublish() {
 	a.Status = ArticleStatusUnpublished
 }
 
-// 删除文章
+// Delete 删除文章
 func (a *Article) Delete() {
 	a.Status = ArticleStatusDeleted
 }
 
-// 获取文章状态
+// GetStatus 获取文章状态
 func (a *Article) GetStatus() int {
 	return a.Status
 }
 
+// GetStatusString 获取文章状态字符串
 func (a *Article) GetStatusString() string {
 	switch a.Status {
 	case ArticleStatusDraft:
