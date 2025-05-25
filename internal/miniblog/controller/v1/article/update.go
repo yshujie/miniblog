@@ -29,11 +29,12 @@ func (c *ArticleController) Update(ctx *gin.Context) {
 	}
 
 	// 更新文章
-	if err := c.biz.ArticleBiz().Update(ctx, request); err != nil {
+	response, err := c.biz.ArticleBiz().Update(ctx, request)
+	if err != nil {
 		log.C(ctx).Errorw("update article failed", "error", err, fmt.Sprintf("%T", err))
 		core.WriteResponse(ctx, err, nil)
 		return
 	}
 
-	core.WriteResponse(ctx, nil, nil)
+	core.WriteResponse(ctx, nil, response)
 }

@@ -15,8 +15,8 @@ import (
 
 // ArticleBiz 文章业务接口
 type IArticleBiz interface {
-	Create(ctx context.Context, r *v1.CreateArticleRequest) (*v1.CreateArticleResponse, error)
-	Update(ctx context.Context, r *v1.UpdateArticleRequest) error
+	Create(ctx context.Context, r *v1.CreateArticleRequest) (*v1.ArticleInfoResponse, error)
+	Update(ctx context.Context, r *v1.UpdateArticleRequest) (*v1.ArticleInfoResponse, error)
 	Publish(ctx context.Context, r *v1.ArticleIdRequest) error
 	Unpublish(ctx context.Context, r *v1.ArticleIdRequest) error
 	GetList(ctx context.Context, r *v1.ArticleListRequest) (*v1.GetArticleListResponse, error)
@@ -37,7 +37,7 @@ func New(ds store.IStore) *articleBiz {
 }
 
 // Create 创建文章
-func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v1.CreateArticleResponse, error) {
+func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v1.ArticleInfoResponse, error) {
 	// 检查 section_code 是否已存在
 	existingSection, err := b.ds.Sections().GetByCode(r.SectionCode)
 	if err != nil {
@@ -65,14 +65,21 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 		return nil, err
 	}
 
-	return &v1.CreateArticleResponse{
+	section, err := b.ds.Sections().GetByCode(r.SectionCode)
+	if err != nil {
+		return nil, err
+	}
+
+	return &v1.ArticleInfoResponse{
 		Article: &v1.ArticleInfo{
 			ID:          article.ID,
 			Title:       article.Title,
 			Content:     article.Content,
+			ModuleCode:  section.ModuleCode,
 			SectionCode: article.SectionCode,
 			Author:      article.Author,
 			Tags:        strings.Split(article.Tags, ","),
+			Status:      article.GetStatusString(),
 			CreatedAt:   article.CreatedAt.Format("2006-01-02 15:04:05"),
 			UpdatedAt:   article.UpdatedAt.Format("2006-01-02 15:04:05"),
 		},
@@ -80,10 +87,10 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 }
 
 // Update 更新文章
-func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) error {
+func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) (*v1.ArticleInfoResponse, error) {
 	article, err := b.ds.Articles().GetOne(r.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// 更新文章
@@ -93,10 +100,28 @@ func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) err
 	article.Content = r.Content
 
 	if err := b.ds.Articles().Update(article); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	section, err := b.ds.Sections().GetByCode(article.SectionCode)
+	if err != nil {
+		return nil, err
+	}
+
+	return &v1.ArticleInfoResponse{
+		Article: &v1.ArticleInfo{
+			ID:          article.ID,
+			Title:       article.Title,
+			Content:     article.Content,
+			ModuleCode:  section.ModuleCode,
+			SectionCode: article.SectionCode,
+			Author:      article.Author,
+			Tags:        strings.Split(article.Tags, ","),
+			Status:      article.GetStatusString(),
+			CreatedAt:   article.CreatedAt.Format("2006-01-02 15:04:05"),
+			UpdatedAt:   article.UpdatedAt.Format("2006-01-02 15:04:05"),
+		},
+	}, nil
 }
 
 // Publish 发布文章

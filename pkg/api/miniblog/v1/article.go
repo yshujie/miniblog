@@ -33,8 +33,8 @@ type ArticleListRequest struct {
 	Limit       int    `form:"limit" valid:"required,numeric"`
 }
 
-// CreateArticleResponse 创建文章响应
-type CreateArticleResponse struct {
+// ArticleInfoResponse 文章信息响应
+type ArticleInfoResponse struct {
 	Article *ArticleInfo `json:"article"`
 }
 
@@ -54,6 +54,7 @@ type ArticleInfo struct {
 	ID          int      `json:"id"`
 	Title       string   `json:"title"`
 	Content     string   `json:"content"`
+	ModuleCode  string   `json:"module_code"`
 	SectionCode string   `json:"section_code"`
 	Author      string   `json:"author"`
 	Tags        []string `json:"tags"`
