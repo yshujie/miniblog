@@ -3,6 +3,7 @@ package blog
 import (
 	"strings"
 
+	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/log"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
@@ -50,7 +51,11 @@ func (b *blogBiz) GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModule
 		}
 
 		// 获取文章列表
-		articles, _ := b.ds.Articles().GetListBySectionCode(section.Code, 1, 100)
+		filter := map[string]interface{}{
+			"section_code": section.Code,
+			"status":       model.ArticleStatusPublished,
+		}
+		articles, _ := b.ds.Articles().GetList(filter, 1, 100)
 		for _, article := range articles {
 			articleDetail := &v1.ArticleDetail{
 				ID:          article.ID,

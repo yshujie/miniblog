@@ -159,8 +159,14 @@ func loadArticleContent(externalLink string, ctx context.Context) (string, error
 
 // GetList 获取所有文章
 func (b *articleBiz) GetList(ctx context.Context, r *v1.ArticleListRequest) (*v1.GetArticleListResponse, error) {
-	log.Infow("GetList", "sectionCode", r.SectionCode, "page", r.Page, "limit", r.Limit)
-	articles, err := b.ds.Articles().GetListBySectionCode(r.SectionCode, r.Page, r.Limit)
+	filter := map[string]interface{}{}
+
+	if r.SectionCode != "" {
+		filter["section_code"] = r.SectionCode
+	}
+
+	log.Infow("GetList", "filter", filter, "page", r.Page, "limit", r.Limit)
+	articles, err := b.ds.Articles().GetList(filter, r.Page, r.Limit)
 	if err != nil {
 		return nil, err
 	}
