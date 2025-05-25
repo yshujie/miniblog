@@ -73,7 +73,7 @@
           </el-col>
         </el-row>
 
-        <el-form-item style="margin-bottom: 40px;" label="ExternalLink:" prop="external_link">
+        <el-form-item v-show="! isEdit" label="ExternalLink:" prop="external_link" style="margin-bottom: 40px;">
           <el-input v-model="postForm.external_link" :rows="1" type="textarea" class="article-textarea" autosize placeholder="Please enter the ExternalLink URL" />
         </el-form-item>
 
@@ -142,6 +142,23 @@ export default {
       callback()
     }
 
+    const validateExternalLink = (rule, value, callback) => {
+      if (this.isEdit) {
+        callback()
+      } else {
+        if (value === null || value === undefined || value.length === 0 || value === '') {
+          callback(new Error('外部链接不能为空'))
+        }
+
+        // 不是 URL 格式
+        if (!value.startsWith('http') || !value.startsWith('https')) {
+          callback(new Error('外部链接格式错误'))
+        }
+
+        callback()
+      }
+    }
+
     return {
       modules: [],
       sections: [],
@@ -154,7 +171,7 @@ export default {
         author: [{ validator: validateRequire }],
         module_code: [{ validator: validateRequire }],
         section_code: [{ validator: validateRequire }],
-        external_link: [{ validator: validateRequire }]
+        external_link: [{ validator: validateExternalLink }]
       },
       tempRoute: {}
     }
@@ -176,14 +193,15 @@ export default {
       }
     }
   },
-  created() {
+  async created() {
     console.log('ArticleDetail created')
     // 初始化 modules
-    this.initModules()
+    await this.initModules()
 
     if (this.isEdit) {
-      const id = this.$route.params && this.$route.params.id
-      this.fetchData(id)
+      await this.fetchData()
+
+      await this.initSections()
     }
 
     // Why need to make a copy of this.$route here?
@@ -192,27 +210,22 @@ export default {
     this.tempRoute = Object.assign({}, this.$route)
   },
   methods: {
-    fetchData(id) {
-      fetchArticle(id).then(response => {
-        this.postForm = response.data
+    async fetchData() {
+      const id = this.queryArticleId()
+      console.log('in fetchData, articleid', id)
 
-        // just for test
-        this.postForm.title += `   Article Id:${this.postForm.id}`
-        this.postForm.content_short += `   Article Id:${this.postForm.id}`
+      const response = await fetchArticle(id)
 
-        // set tagsview title
-        this.setTagsViewTitle()
+      this.postForm = response.article || {}
+      console.log('postForm', this.postForm)
+    },
 
-        // set page title
-        this.setPageTitle()
-      }).catch(err => {
-        console.log(err)
-      })
+    queryArticleId() {
+      return this.$route.params && this.$route.params.id
     },
 
     async initModules() {
       // 清空模块选择
-      this.postForm.module_code = ''
       this.modules = []
 
       // 获取模块
@@ -224,22 +237,11 @@ export default {
 
     async initSections() {
       // 清空章节选择
-      this.postForm.section_code = ''
       this.sections = []
 
       // 获取章节
       const sectionsResp = await fetchSections(this.postForm.module_code)
       this.sections = sectionsResp.sections
-    },
-
-    setTagsViewTitle() {
-      const title = 'Edit Article'
-      const route = Object.assign({}, this.tempRoute, { title: `${title}-${this.postForm.id}` })
-      this.$store.dispatch('tagsView/updateVisitedView', route)
-    },
-    setPageTitle() {
-      const title = 'Edit Article'
-      document.title = `${title} - ${this.postForm.id}`
     },
 
     save() {
@@ -295,19 +297,31 @@ export default {
     async updateArticle() {
       this.loading = true
 
-      // 更新文章
-      const resp = await updateArticle(this.postForm)
-      this.postForm.id = resp.article.id
-      this.postForm.status = resp.article.status
+      try {
+        // 更新文章
+        const resp = await updateArticle(this.postForm)
+        this.postForm = resp.article || {}
 
-      this.$message({
-        message: '保存成功，文章已更新',
-        type: 'success',
-        showClose: true,
-        duration: 1000
-      })
+        this.$message({
+          message: '保存成功，文章已更新',
+          type: 'success',
+          showClose: true,
+          duration: 1000
+        })
 
-      this.loading = false
+        // 更新数据
+        this.fetchData()
+      } catch (error) {
+        console.log('error', error)
+        this.$message({
+          message: '保存失败，错误信息：' + error.message,
+          type: 'error',
+          showClose: true,
+          duration: 3000
+        })
+      } finally {
+        this.loading = false
+      }
     },
 
     publish() {

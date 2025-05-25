@@ -20,9 +20,8 @@ export function fetchList(query) {
  */
 export function fetchArticle(id) {
   return request({
-    url: '/article/detail',
-    method: 'get',
-    params: { id }
+    url: '/articles/' + id,
+    method: 'get'
   })
 }
 
@@ -46,8 +45,8 @@ export function createArticle(data) {
  */
 export function updateArticle(data) {
   return request({
-    url: '/article/update',
-    method: 'post',
+    url: '/articles/' + data.id,
+    method: 'put',
     data
   })
 }
