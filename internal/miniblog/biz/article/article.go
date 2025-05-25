@@ -87,7 +87,6 @@ func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) (*v
 	article.Author = r.Author
 	article.Tags = strings.Join(r.Tags, ",")
 	article.Content = r.Content
-
 	if err := b.ds.Articles().Update(article); err != nil {
 		return nil, err
 	}

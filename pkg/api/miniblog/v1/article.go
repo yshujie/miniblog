@@ -17,12 +17,13 @@ type CreateArticleRequest struct {
 
 // UpdateArticleRequest 更新文章请求
 type UpdateArticleRequest struct {
-	ID           int      `json:"id" valid:"required,numeric"`
-	Title        string   `json:"title" valid:"required,stringlength(1|255)"`
-	Content      string   `json:"content" valid:"required,stringlength(1|255)"`
-	Author       string   `json:"author" valid:"required,stringlength(1|255)"`
-	Tags         []string `json:"tags" valid:"required"`
-	ExternalLink string   `json:"external_link" valid:"required"`
+	ID          int      `json:"id" valid:"required,numeric"`
+	Title       string   `json:"title" valid:"required,stringlength(1|255)"`
+	Author      string   `json:"author" valid:"required,stringlength(1|255)"`
+	Tags        []string `json:"tags" valid:"required"`
+	ModuleCode  string   `json:"module_code" valid:"required"`
+	SectionCode string   `json:"section_code" valid:"required"`
+	Content     string   `json:"content" valid:"required"`
 }
 
 // ArticleListRequest 文章列表请求
