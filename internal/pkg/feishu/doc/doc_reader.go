@@ -91,15 +91,27 @@ func (d *DocReader) parseDocToken(docUrl string) (string, error) {
 
 // 解析 content 中的 ASCII 码
 func (d *DocReader) parseContent(content string) (string, error) {
-	// 转义符处理，将 \\ 转换为 \
-	content = strings.ReplaceAll(content, "\\", "\\")
+	// 记录原始内容，用于调试
+	log.Infow("parsing content", "original", content)
 
-	// 使用 strconv.Unquote 处理 ASCII 码
-	unquoted, err := strconv.Unquote(`"` + content + `"`)
-	if err != nil {
-		log.Errorw("failed to unquote content", "error", err)
-		return "", err
+	// 如果内容为空，直接返回
+	if content == "" {
+		return "", nil
 	}
 
+	// 使用 strconv.Unquote 处理转义符、ASCII 码
+	unquoted, err := strconv.Unquote(`"` + content + `"`)
+	if err != nil {
+		log.Errorw("failed to unquote content",
+			"error", err,
+			"content", content,
+			"content_length", len(content))
+		// 如果解析失败，返回原始内容
+		return content, nil
+	}
+
+	log.Infow("successfully parsed content",
+		"original", content,
+		"parsed", unquoted)
 	return unquoted, nil
 }
