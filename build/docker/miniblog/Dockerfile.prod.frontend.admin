@@ -1,5 +1,5 @@
 # ---------- Builder ----------
-FROM node:18-alpine AS builder
+FROM node:17-alpine AS builder
 
 # 设置构建参数
 ARG HTTP_PROXY
@@ -23,7 +23,14 @@ RUN npm install
 
 # 复制项目文件
 COPY . .
-RUN npm run build
+
+# 检查构建脚本是否存在
+RUN if [ ! -f "package.json" ] || ! grep -q '"build:prod"' package.json; then \
+  echo "Error: build:prod script not found in package.json" && exit 1; \
+  fi
+
+# 执行构建
+RUN npm run build:prod
 
 # ---------- Runtime ----------
 FROM nginx:alpine
