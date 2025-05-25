@@ -1,7 +1,7 @@
 <template>
     <div class="article-container">
       <div v-show="!hasArticle" class="no-article-card">
-          <el-empty description="文章不存在" />
+          <el-empty description=" " />
       </div>
 
       <div v-show="hasArticle" class="article-card">
@@ -102,6 +102,7 @@ async function fetchCurrentArticle(articleId: number | null) {
   justify-content: center;
   align-items: center;
   height: 100%;
+  margin-top: 150px;
 }
 
 .article-card {

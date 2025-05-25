@@ -1,5 +1,4 @@
 import type { Article } from './article'
-import { fetchArticlesBySectionCode } from '@/api/article'
 
 // Section 章节
 export class Section {
@@ -21,12 +20,5 @@ export class Section {
     this.title = data.title
     this.code = data.code
     this.articles = data.articles || []
-  }
-
-  // 加载章节下的所有文章
-  async loadArticles(): Promise<Article[]> {
-    const articles = await fetchArticlesBySectionCode(this.code)
-    this.articles = articles
-    return articles
   }
 }

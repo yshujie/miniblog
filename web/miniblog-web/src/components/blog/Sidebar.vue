@@ -13,7 +13,7 @@
         <div class="article-list">
           <div class="article-item" v-for="article in item.articles" :key="article.title">
             <el-link underline="never" target="_self" @click="handleArticleClick(article.id)">
-              <span class="article-title">{{ article.title }}</span>
+              <span class="article-title" :class="{ 'article-title-active': article.id === currentArticleId }">{{ article.title }}</span>
             </el-link>
           </div>
         </div>
@@ -22,7 +22,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { defineProps } from 'vue'
+import { defineProps, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Section } from '@/types/section';
 
@@ -30,7 +30,10 @@ const props = defineProps<{ sections: Section[], moduleCode: string }>()
 
 const router = useRouter()
 
+const currentArticleId = ref<number | null>(null)
+
 const handleArticleClick = (articleId: number) => {
+  currentArticleId.value = articleId
   router.push(`/blog/${props.moduleCode}/article/${articleId}`)
 }
 </script>
@@ -61,13 +64,13 @@ const handleArticleClick = (articleId: number) => {
 
             &:hover {
               .article-title {
-                color: #213547;
+                color: #409eff;
               }
             }
 
             &:active {
               .article-title {
-                color: #213547;
+                color: #409eff;
               }
             }
           }
@@ -78,6 +81,10 @@ const handleArticleClick = (articleId: number) => {
             font-weight: 500;
             color: rgba(60, 60, 60, .7);
             transition: color .5s;
+          }
+
+          .article-title-active {
+            color: #409eff;
           }
         }
     }   

@@ -9,7 +9,7 @@ export interface LoginResponse {
 }
 
 export async function login(username: string, password: string): Promise<LoginResponse> {
-  const { payload } = await http.post<LoginResponse>('/api/v1/login', {
+  const { payload } = await http.post<LoginResponse>('/auth/login', {
     username,
     password
   })
@@ -24,7 +24,7 @@ export interface RegisterResponse {
 }
 
 export async function register(username: string, password: string): Promise<RegisterResponse> {
-  const { payload } = await http.post<RegisterResponse>('/api/v1/register', {
+  const { payload } = await http.post<RegisterResponse>('/auth/register', {
     username,
     password
   })
@@ -33,5 +33,5 @@ export async function register(username: string, password: string): Promise<Regi
 
 export async function logout(): Promise<void> {
   localStorage.removeItem('token')
-  await http.post('/api/v1/logout')
+  await http.post('/auth/logout')
 }

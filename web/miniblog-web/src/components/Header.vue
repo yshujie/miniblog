@@ -1,7 +1,9 @@
 <template>
   <el-header class="header-bar">
     <div class="left">
-      <span class="logo">clack 的技术博客</span>
+      <a href="/">
+        <span class="logo">clack 的技术博客</span>
+      </a>
     </div>
 
     <div class="right">
@@ -9,7 +11,7 @@
     <div class="nav">
       <el-menu mode="horizontal" :default-active="'/'" router>
         <el-menu-item index="/">首页</el-menu-item>
-        <el-menu-item v-for="module in moduleStore.modules" :key="module.code" :index="`/blog/${module.code}`">
+        <el-menu-item v-for="module in moduleStore.modules" :key="module.code" :index="`/blog/${module.code}`" @click="handleModuleClick(module.code)">
           {{ module.title }}
         </el-menu-item>
         <el-menu-item key="github">
@@ -23,22 +25,28 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onBeforeMount } from 'vue'
 import { useModuleStore } from '@/stores/module'
 
 // module store
 const moduleStore = useModuleStore()
 
-// 组件挂载时加载数据
-onMounted(async () => { 
+onBeforeMount(async () => {
+  console.log('onBeforeMount')
+
   // 加载模块数据
   await moduleStore.loadModules()
 
   // 预热所有模块数据
   await moduleStore.loadAllModuleDetail()
-
-  console.log(`moduleStore.modules is ${moduleStore.modules}.`)
 })
+
+
+// 模块点击事件
+const handleModuleClick = (moduleCode: string) => {
+  // 加载模块详情
+  moduleStore.loadModuleDetail(moduleCode)
+}
 
 </script>
 
@@ -63,6 +71,11 @@ onMounted(async () => {
   font-weight: bold;
   font-size: 22px;
   color: #333;
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
 // 右侧，靠屏幕右方

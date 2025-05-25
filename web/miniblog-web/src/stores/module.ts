@@ -38,11 +38,18 @@ export const useModuleStore = defineStore('module', {
       this.modules = await fetchModules()
     },
 
-    // 加载模块详情
+    // 加载所有模块详情
     async loadAllModuleDetail() {
       console.log('in loadAllModuleDetail')
       for (const module of this.modules) {
-        console.log('module: ', module)
+        this.loadModuleDetail(module.code)
+      }
+    },
+
+    // 加载模块详情
+    async loadModuleDetail(moduleCode: string) {
+      const module = this.modules.find(module => module.code === moduleCode)
+      if (module) {
         const moduleDetail = await fetchModuleDetail(module.code)
         module.title = moduleDetail.title
         module.sections = moduleDetail.sections.map(section => new Section(section))
