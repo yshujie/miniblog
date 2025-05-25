@@ -17,8 +17,8 @@ import (
 type IArticleBiz interface {
 	Create(ctx context.Context, r *v1.CreateArticleRequest) (*v1.ArticleInfoResponse, error)
 	Update(ctx context.Context, r *v1.UpdateArticleRequest) (*v1.ArticleInfoResponse, error)
-	Publish(ctx context.Context, r *v1.ArticleIdRequest) error
-	Unpublish(ctx context.Context, r *v1.ArticleIdRequest) error
+	Publish(ctx context.Context, articleId int) error
+	Unpublish(ctx context.Context, articleId int) error
 	GetList(ctx context.Context, r *v1.ArticleListRequest) (*v1.GetArticleListResponse, error)
 	GetOne(ctx context.Context, id int) (*v1.GetArticleResponse, error)
 }
@@ -108,8 +108,8 @@ func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) (*v
 }
 
 // Publish 发布文章
-func (b *articleBiz) Publish(ctx context.Context, r *v1.ArticleIdRequest) error {
-	article, err := b.ds.Articles().GetOne(r.ID)
+func (b *articleBiz) Publish(ctx context.Context, articleId int) error {
+	article, err := b.ds.Articles().GetOne(articleId)
 	if err != nil {
 		return errno.ErrArticleNotFound
 	}
@@ -124,8 +124,8 @@ func (b *articleBiz) Publish(ctx context.Context, r *v1.ArticleIdRequest) error 
 }
 
 // Unpublish 下架文章
-func (b *articleBiz) Unpublish(ctx context.Context, r *v1.ArticleIdRequest) error {
-	article, err := b.ds.Articles().GetOne(r.ID)
+func (b *articleBiz) Unpublish(ctx context.Context, articleId int) error {
+	article, err := b.ds.Articles().GetOne(articleId)
 	if err != nil {
 		return errno.ErrArticleNotFound
 	}

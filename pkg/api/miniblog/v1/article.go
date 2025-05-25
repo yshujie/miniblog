@@ -1,10 +1,5 @@
 package v1
 
-// ArticleIdRequest 文章ID请求
-type ArticleIdRequest struct {
-	ID int `json:"id" valid:"required,numeric"`
-}
-
 // CreateArticleRequest 创建文章请求
 type CreateArticleRequest struct {
 	Title        string   `json:"title" valid:"required,stringlength(1|255)"`
