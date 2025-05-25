@@ -53,6 +53,10 @@ pipeline {
               cp "$WWW_SSL_CRT_FILE" configs/nginx/ssl/www.yangshujie.com.crt
               cp "$WWW_SSL_KEY_FILE" configs/nginx/ssl/www.yangshujie.com.key
               
+              # 复制 admin.yangshujie.com 证书
+              cp "$ADMIN_SSL_CRT_FILE" configs/nginx/ssl/admin.yangshujie.com.crt
+              cp "$ADMIN_SSL_KEY_FILE" configs/nginx/ssl/admin.yangshujie.com.key
+
               # 复制 api.yangshujie.com 证书
               cp "$API_SSL_CRT_FILE" configs/nginx/ssl/api.yangshujie.com.crt
               cp "$API_SSL_KEY_FILE" configs/nginx/ssl/api.yangshujie.com.key
