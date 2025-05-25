@@ -61,7 +61,6 @@ func installRouters(g *gin.Engine) error {
 			blogv1.GET("/modules", mc.GetAll)
 			blogv1.GET("/moduleDetail", bc.GetModuleDetail)
 			blogv1.GET("/articleDetail", bc.GetArticleDetail)
-
 		}
 
 		adminv1 := v1.Group("/admin")
