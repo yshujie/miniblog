@@ -89,13 +89,14 @@ import { fetchModules } from '@/api/module'
 import { fetchSections } from '@/api/section'
 
 const defaultForm = {
+  id: '',
   status: 'draft',
   title: '', // 文章题目
   module_code: '', // 模块代码
   section_code: '', // 章节代码
+  tags: [], // 文章标签
   external_link: '', // 外部链接
-  tags: '', // 文章标签
-  id: ''
+  content: '' // 文章内容
 }
 
 export default {
@@ -227,44 +228,55 @@ export default {
     },
 
     save() {
-      console.log(this.postForm)
       this.$refs.postForm.validate(valid => {
         if (valid) {
-          this.loading = true
-          this.$notify({
-            title: '成功',
-            message: '发布文章成功',
-            type: 'success',
-            duration: 2000
-          })
-          this.postForm.status = 'published'
-          this.loading = false
+          if (this.isEdit) {
+            this.updateArticle()
+          } else {
+            this.createArticle()
+          }
         } else {
-          console.log('error submit!!')
           return false
         }
-      }).then(async() => {
-        if (this.isEdit) {
-          updateArticle(this.postForm)
-
-          this.$message({
-            message: '保存成功，文章已更新',
-            type: 'success',
-            showClose: true,
-            duration: 1000
-          })
-        } else {
-          const resp = await createArticle(this.postForm)
-          this.postForm.id = resp.article.id
-
-          this.$message({
-            message: '保存成功，文章已创建',
-            type: 'success',
-            showClose: true,
-            duration: 1000
-          })
-        }
       })
+    },
+
+    // 创建文章
+    async createArticle() {
+      this.loading = true
+
+      // 创建文章
+      const resp = await createArticle(this.postForm)
+      this.postForm.id = resp.article.id
+      this.postForm.status = resp.article.status
+
+      this.$message({
+        message: '保存成功，文章已创建',
+        type: 'success',
+        showClose: true,
+        duration: 1000
+      })
+
+      this.loading = false
+    },
+
+    // 更新文章
+    async updateArticle() {
+      this.loading = true
+
+      // 更新文章
+      const resp = await updateArticle(this.postForm)
+      this.postForm.id = resp.article.id
+      this.postForm.status = resp.article.status
+
+      this.$message({
+        message: '保存成功，文章已更新',
+        type: 'success',
+        showClose: true,
+        duration: 1000
+      })
+
+      this.loading = false
     },
 
     publish() {
