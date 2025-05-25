@@ -227,10 +227,13 @@ export default {
 
       const response = await fetchArticle(id)
 
-      this.postForm = response.article || {}
-      this.postForm.module_code = this.postForm.module.code
-      this.postForm.section_code = this.postForm.section.code
+      var articleResp = response.article || {}
+      articleResp.module_code = articleResp.module.code
+      articleResp.section_code = articleResp.section.code
 
+      this.postForm = articleResp
+
+      console.log('articleResp', articleResp)
       console.log('postForm', this.postForm)
       console.log('postForm.module_code', this.postForm.module_code)
       console.log('postForm.section_code', this.postForm.section_code)
@@ -281,8 +284,7 @@ export default {
       try {
         // 创建文章
         const resp = await createArticle(this.postForm)
-        this.postForm.id = resp.article.id
-        this.postForm.status = resp.article.status
+        const articleId = resp.article.id
 
         // 保存成功
         this.$message({
@@ -292,7 +294,7 @@ export default {
           duration: 1000,
           onClose: () => {
             this.$router.push({
-              path: '/article/edit/' + this.postForm.id
+              path: '/article/edit/' + articleId
             })
           }
         })
@@ -315,9 +317,7 @@ export default {
 
       try {
         // 更新文章
-        const resp = await updateArticle(this.postForm)
-        this.postForm = resp.article || {}
-
+        await updateArticle(this.postForm)
         this.$message({
           message: '保存成功，文章已更新',
           type: 'success',

@@ -25,9 +25,9 @@
         </template>
       </el-table-column>
 
-      <el-table-column width="180px" align="center" label="Created At">
+      <el-table-column width="180px" align="center" label="Module & Section">
         <template slot-scope="scope">
-          <span>{{ scope.row.created_at }}</span>
+          <span>{{ scope.row.module.title }} - {{ scope.row.section.title }}</span>
         </template>
       </el-table-column>
 
