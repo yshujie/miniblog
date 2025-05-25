@@ -51,11 +51,11 @@
         </template>
       </el-table-column>
 
-      <el-table-column min-width="300px" label="Status">
+      <el-table-column min-width="100px" label="Status">
         <template slot-scope="{row}">
-          <el-tag v-if="row.status === 'published'" type="success" class="tag-item">Published</el-tag>
-          <el-tag v-else-if="row.status === 'draft'" type="info" class="tag-item">Draft</el-tag>
-          <el-tag v-else-if="row.status === 'deleted'" type="danger" class="tag-item">Deleted</el-tag>
+          <el-tag v-if="row.status === 'Published'" type="success" class="tag-item">Published</el-tag>
+          <el-tag v-else-if="row.status === 'Draft'" type="info" class="tag-item">Draft</el-tag>
+          <el-tag v-else-if="row.status === 'Unpublished'" type="danger" class="tag-item">Unpublished</el-tag>
           <el-tag v-else type="warning" class="tag-item">Unknown</el-tag>
         </template>
       </el-table-column>
@@ -112,6 +112,11 @@ export default {
   created() {
     this.init()
   },
+
+  mounted() {
+    this.search()
+  },
+
   methods: {
     init() {
       this.initModules()

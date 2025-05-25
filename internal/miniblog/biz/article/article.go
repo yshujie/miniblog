@@ -67,7 +67,7 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 		return nil, err
 	}
 
-	articleInfo, err := b.transformArticleInfo(article)
+	articleInfo, err := b.transformArticleInfo(article, false)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) (*v
 		return nil, err
 	}
 
-	articleInfo, err := b.transformArticleInfo(article)
+	articleInfo, err := b.transformArticleInfo(article, false)
 	if err != nil {
 		return nil, err
 	}
@@ -168,17 +168,13 @@ func (b *articleBiz) GetList(ctx context.Context, r *v1.ArticleListRequest) (*v1
 	response := &v1.GetArticleListResponse{
 		Articles: make([]*v1.ArticleInfo, len(articles)),
 	}
+
 	for i, article := range articles {
-		response.Articles[i] = &v1.ArticleInfo{
-			ID:          article.ID,
-			Title:       article.Title,
-			SectionCode: article.SectionCode,
-			Author:      article.Author,
-			Tags:        strings.Split(article.Tags, ","),
-			Status:      article.GetStatusString(),
-			CreatedAt:   article.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt:   article.UpdatedAt.Format("2006-01-02 15:04:05"),
+		articleInfo, err := b.transformArticleInfo(article, true)
+		if err != nil {
+			return nil, err
 		}
+		response.Articles[i] = articleInfo
 	}
 
 	response.Total = len(articles)
@@ -193,7 +189,7 @@ func (b *articleBiz) GetOne(ctx context.Context, id int) (*v1.GetArticleResponse
 		return nil, err
 	}
 
-	articleInfo, err := b.transformArticleInfo(article)
+	articleInfo, err := b.transformArticleInfo(article, false)
 	if err != nil {
 		return nil, err
 	}
@@ -203,24 +199,38 @@ func (b *articleBiz) GetOne(ctx context.Context, id int) (*v1.GetArticleResponse
 	}, nil
 }
 
-func (b *articleBiz) transformArticleInfo(article *model.Article) (*v1.ArticleInfo, error) {
+// transformArticleInfo 转换文章信息
+func (b *articleBiz) transformArticleInfo(article *model.Article, isSimple bool) (*v1.ArticleInfo, error) {
 	module, section, err := b.queryArticleModuleAndSection(article)
 	if err != nil {
 		return nil, err
 	}
 
-	return &v1.ArticleInfo{
-		ID:          article.ID,
-		Title:       article.Title,
-		Content:     article.Content,
-		ModuleCode:  module.Code,
-		SectionCode: section.Code,
-		Author:      article.Author,
-		Tags:        strings.Split(article.Tags, ","),
-		Status:      article.GetStatusString(),
-		CreatedAt:   article.CreatedAt.Format("2006-01-02 15:04:05"),
-		UpdatedAt:   article.UpdatedAt.Format("2006-01-02 15:04:05"),
-	}, nil
+	articleInfo := &v1.ArticleInfo{
+		ID:    article.ID,
+		Title: article.Title,
+		Module: v1.ModuleInfo{
+			Code:  module.Code,
+			Title: module.Title,
+		},
+		Section: v1.SectionInfo{
+			Code:  section.Code,
+			Title: section.Title,
+		},
+		Author: article.Author,
+		Tags:   strings.Split(article.Tags, ","),
+		Status: article.GetStatusString(),
+	}
+
+	if isSimple {
+		return articleInfo, nil
+	}
+
+	articleInfo.Content = article.Content
+	articleInfo.CreatedAt = article.CreatedAt.Format("2006-01-02 15:04:05")
+	articleInfo.UpdatedAt = article.UpdatedAt.Format("2006-01-02 15:04:05")
+
+	return articleInfo, nil
 }
 
 // queryArticleModuleAndSection 查询文章所属模块和章节

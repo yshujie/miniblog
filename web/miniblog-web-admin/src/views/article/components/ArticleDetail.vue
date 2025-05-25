@@ -228,7 +228,12 @@ export default {
       const response = await fetchArticle(id)
 
       this.postForm = response.article || {}
+      this.postForm.module_code = this.postForm.module.code
+      this.postForm.section_code = this.postForm.section.code
+
       console.log('postForm', this.postForm)
+      console.log('postForm.module_code', this.postForm.module_code)
+      console.log('postForm.section_code', this.postForm.section_code)
     },
 
     queryArticleId() {
