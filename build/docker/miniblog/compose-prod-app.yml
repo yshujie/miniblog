@@ -13,8 +13,8 @@ services:
     volumes:
       - /data/logs/miniblog:/data/logs/miniblog
 
-  frontend:
-    image: miniblog-frontend:prod
+  frontend-blog:
+    image: miniblog-frontend-blog:prod
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
@@ -22,6 +22,17 @@ services:
     restart: always
     ports:
       - "3000:80"           # 宿主机 3000 -> 容器内 Nginx 的 80
+
+  frontend-admin:
+    image: miniblog-frontend-admin:prod
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - miniblog-network
+    restart: always
+    ports:
+      - "3001:80"           # 宿主机 3001 -> 容器内 Nginx 的 80
+
 
   nginx:
     image: miniblog-nginx:prod
@@ -38,7 +49,8 @@ services:
       - 114.114.114.114
     depends_on:
       - backend
-      - frontend
+      - frontend-blog
+      - frontend-admin
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s

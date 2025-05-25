@@ -14,7 +14,8 @@ pipeline {
     APP_IMAGE    = "${IMAGE_REGISTRY}-app:prod"
     // 应用镜像
     BACKEND_IMAGE_TAG  = "${IMAGE_REGISTRY}-backend:prod"
-    FRONTEND_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend:prod"
+    FRONTEND_BLOG_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend-blog:prod"
+    FRONTEND_ADMIN_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend-admin:prod"
   }
 
   // 阶段
@@ -39,6 +40,8 @@ pipeline {
           withCredentials([
             file(credentialsId: 'www.yangshujie.com.cert.key',  variable: 'WWW_SSL_KEY_FILE'),
             file(credentialsId: 'www.yangshujie.com.cert.pem',  variable: 'WWW_SSL_CRT_FILE'),
+            file(credentialsId: 'admin.yangshujie.com.cert.pem',  variable: 'ADMIN_SSL_CRT_FILE'),
+            file(credentialsId: 'admin.yangshujie.com.cert.key',  variable: 'ADMIN_SSL_KEY_FILE'),
             file(credentialsId: 'api.yangshujie.com.cert.key',  variable: 'API_SSL_KEY_FILE'),
             file(credentialsId: 'api.yangshujie.com.cert.pem',  variable: 'API_SSL_CRT_FILE'),
           ]) {
@@ -111,16 +114,32 @@ pipeline {
       steps {
         dir("${BASE_DIR}") {
           echo '📦 构建前端生产镜像'
+
+          // 构建博客前端生产镜像
+          echo '📦 构建博客前端生产镜像'
           sh """
               docker build \
                 --network host \
                 --add-host host.docker.internal:host-gateway \
                 --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
                 --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
-                -f Dockerfile.prod.frontend \
-                -t ${FRONTEND_IMAGE_TAG} \
+                -f Dockerfile.prod.frontend.blog \
+                -t ${FRONTEND_BLOG_IMAGE_TAG} \
                 ../../../web/miniblog-web
               """
+
+          // 构建管理后台前端生产镜像
+          echo '📦 构建管理后台前端生产镜像'
+          sh """
+            docker build \
+              --network host \
+              --add-host host.docker.internal:host-gateway \
+              --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
+              --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
+              -f Dockerfile.prod.frontend.admin \
+              -t ${FRONTEND_ADMIN_IMAGE_TAG} \
+              ../../../web/miniblog-web-admin
+          """
         }
       }
     }
