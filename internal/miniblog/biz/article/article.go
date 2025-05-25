@@ -65,24 +65,13 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 		return nil, err
 	}
 
-	section, err := b.ds.Sections().GetByCode(r.SectionCode)
+	articleInfo, err := b.transformArticleInfo(article)
 	if err != nil {
 		return nil, err
 	}
 
 	return &v1.ArticleInfoResponse{
-		Article: &v1.ArticleInfo{
-			ID:          article.ID,
-			Title:       article.Title,
-			Content:     article.Content,
-			ModuleCode:  section.ModuleCode,
-			SectionCode: article.SectionCode,
-			Author:      article.Author,
-			Tags:        strings.Split(article.Tags, ","),
-			Status:      article.GetStatusString(),
-			CreatedAt:   article.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt:   article.UpdatedAt.Format("2006-01-02 15:04:05"),
-		},
+		Article: articleInfo,
 	}, nil
 }
 
@@ -103,24 +92,13 @@ func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) (*v
 		return nil, err
 	}
 
-	section, err := b.ds.Sections().GetByCode(article.SectionCode)
+	articleInfo, err := b.transformArticleInfo(article)
 	if err != nil {
 		return nil, err
 	}
 
 	return &v1.ArticleInfoResponse{
-		Article: &v1.ArticleInfo{
-			ID:          article.ID,
-			Title:       article.Title,
-			Content:     article.Content,
-			ModuleCode:  section.ModuleCode,
-			SectionCode: article.SectionCode,
-			Author:      article.Author,
-			Tags:        strings.Split(article.Tags, ","),
-			Status:      article.GetStatusString(),
-			CreatedAt:   article.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt:   article.UpdatedAt.Format("2006-01-02 15:04:05"),
-		},
+		Article: articleInfo,
 	}, nil
 }
 
@@ -212,17 +190,47 @@ func (b *articleBiz) GetOne(ctx context.Context, id int) (*v1.GetArticleResponse
 		return nil, err
 	}
 
+	articleInfo, err := b.transformArticleInfo(article)
+	if err != nil {
+		return nil, err
+	}
+
 	return &v1.GetArticleResponse{
-		Article: &v1.ArticleInfo{
-			ID:          article.ID,
-			Title:       article.Title,
-			Content:     article.Content,
-			SectionCode: article.SectionCode,
-			Author:      article.Author,
-			Tags:        strings.Split(article.Tags, ","),
-			Status:      article.GetStatusString(),
-			CreatedAt:   article.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt:   article.UpdatedAt.Format("2006-01-02 15:04:05"),
-		},
+		Article: articleInfo,
 	}, nil
+}
+
+func (b *articleBiz) transformArticleInfo(article *model.Article) (*v1.ArticleInfo, error) {
+	module, section, err := b.queryArticleModuleAndSection(article)
+	if err != nil {
+		return nil, err
+	}
+
+	return &v1.ArticleInfo{
+		ID:          article.ID,
+		Title:       article.Title,
+		Content:     article.Content,
+		ModuleCode:  module.Code,
+		SectionCode: section.Code,
+		Author:      article.Author,
+		Tags:        strings.Split(article.Tags, ","),
+		Status:      article.GetStatusString(),
+		CreatedAt:   article.CreatedAt.Format("2006-01-02 15:04:05"),
+		UpdatedAt:   article.UpdatedAt.Format("2006-01-02 15:04:05"),
+	}, nil
+}
+
+// queryArticleModuleAndSection 查询文章所属模块和章节
+func (b *articleBiz) queryArticleModuleAndSection(article *model.Article) (*model.Module, *model.Section, error) {
+	section, err := b.ds.Sections().GetByCode(article.SectionCode)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	module, err := b.ds.Modules().GetByCode(section.ModuleCode)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return module, section, nil
 }
