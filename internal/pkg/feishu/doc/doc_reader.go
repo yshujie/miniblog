@@ -104,14 +104,14 @@ func (d *DocReader) parseContent(content string) (string, error) {
 	}
 
 	// 使用 strconv.Unquote 处理转义符、ASCII 码
-	result, err := strconv.Unquote(`"` + content + `"`)
+	unquotedContent, err := strconv.Unquote(content)
 	if err != nil {
 		log.Errorw("failed to unquote content",
 			"error", err,
 			"content", content,
 			"content_length", len(content))
-		// 如果解析失败，返回原始内容
-		return result, nil
+	} else {
+		result = unquotedContent
 	}
 
 	// table 转 markdown

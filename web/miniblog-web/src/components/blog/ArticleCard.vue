@@ -32,6 +32,9 @@
                       gfm: true,
                       tasklists: true,
                       tables: true,
+                      sanitize: false,
+                      smartLists: true,
+                      smartypants: true
                     }
                   }"
                 />
