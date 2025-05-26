@@ -21,7 +21,19 @@
               <div class="article-card-content">
                 <MdPreview 
                   :editorId="editorId" 
-                  :modelValue="currentArticle?.content" 
+                  :modelValue="currentArticle?.content"
+                  :showCodeRowNumber="true"
+                  :previewTheme="'default'"
+                  :previewOnly="true"
+                  :previewOptions="{
+                    markdown: {
+                      breaks: true,
+                      html: true,
+                      gfm: true,
+                      tasklists: true,
+                      tables: true,
+                    }
+                  }"
                 />
               </div>
             </div>          
@@ -34,6 +46,11 @@
                 :editorId="editorId"
                 :modelValue="currentArticle?.content"
                 :scrollElement="scrollElement"
+                :theme="'light'"
+                :scrollElementOffsetTop="80"
+                :scrollElementOffsetBottom="20"
+                :catalogVisible="true"
+                :catalogMaxHeight="'calc(100vh - 300px)'"
               />
             </div>
           </el-col>
@@ -153,7 +170,7 @@ async function fetchCurrentArticle(articleId: number | null) {
   }
 
   .article-card-content {
-    margin: 0 40px 0 0;
+    margin: 0 40px 100px 0;
     padding: 20px 0;
   }
 
