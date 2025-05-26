@@ -29,14 +29,13 @@
       <div class="column">
         <div class="col-title">面向未来的开发者</div>
         <div class="col-desc">
-          需求分析、领域建模、架构设计、编码实现，开发者不可止于码农。
-          AI 是时代的加速器，强者必定愈强
+          需求分析、领域建模、架构设计、编码实现，开发者从不止于编码
         </div>
       </div>
       <div class="column">
         <div class="col-title">终身学习</div>
         <div class="col-desc">
-          今天未完成的，明天更不会完成
+          积少成多，如果放到五六年这个长度上，人和人之间的距离要大到地球到月球了
         </div>
       </div>
     </div>
