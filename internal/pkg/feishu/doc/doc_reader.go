@@ -1,6 +1,7 @@
 package doc
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
 	larkdocs "github.com/larksuite/oapi-sdk-go/v3/service/docs/v1"
 	"github.com/yshujie/miniblog/internal/pkg/log"
+	"golang.org/x/net/html"
 )
 
 // DocReader 文档阅读器
@@ -94,24 +96,154 @@ func (d *DocReader) parseContent(content string) (string, error) {
 	// 记录原始内容，用于调试
 	log.Infow("parsing content", "original", content)
 
+	result := ""
+
 	// 如果内容为空，直接返回
 	if content == "" {
-		return "", nil
+		return result, nil
 	}
 
 	// 使用 strconv.Unquote 处理转义符、ASCII 码
-	unquoted, err := strconv.Unquote(`"` + content + `"`)
+	result, err := strconv.Unquote(`"` + content + `"`)
 	if err != nil {
 		log.Errorw("failed to unquote content",
 			"error", err,
 			"content", content,
 			"content_length", len(content))
 		// 如果解析失败，返回原始内容
-		return content, nil
+		return result, nil
 	}
+
+	// table 转 markdown
+	result = d.tableToMarkdown(result)
 
 	log.Infow("successfully parsed content",
 		"original", content,
-		"parsed", unquoted)
-	return unquoted, nil
+		"parsed", result)
+	return result, nil
+}
+
+// tableToMarkdown converts an HTML <table> into Markdown format,
+// supporting irregular row lengths and escaping Markdown special characters.
+func (d *DocReader) tableToMarkdown(content string) string {
+	// Parse the HTML content
+	doc, err := html.Parse(strings.NewReader(content))
+	if err != nil {
+		return ""
+	}
+
+	// Locate the first <table> node
+	var table *html.Node
+	var findTable func(*html.Node)
+	findTable = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "table" {
+			table = n
+			return
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			findTable(c)
+			if table != nil {
+				return
+			}
+		}
+	}
+	findTable(doc)
+	if table == nil {
+		return ""
+	}
+
+	// Extract rows (cells without colspan/rowspan handling)
+	var rows [][]string
+	var parseRows func(*html.Node)
+	parseRows = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "tr" {
+			var row []string
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				if c.Type == html.ElementNode && (c.Data == "td" || c.Data == "th") {
+					text := extractText(c)
+					row = append(row, strings.TrimSpace(text))
+				}
+			}
+			if len(row) > 0 {
+				rows = append(rows, row)
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			parseRows(c)
+		}
+	}
+	parseRows(table)
+	if len(rows) == 0 {
+		return ""
+	}
+
+	// Determine maximum number of columns
+	maxCols := 0
+	for _, row := range rows {
+		if len(row) > maxCols {
+			maxCols = len(row)
+		}
+	}
+
+	// Pad rows to have equal columns
+	for i, row := range rows {
+		if len(row) < maxCols {
+			pad := make([]string, maxCols-len(row))
+			rows[i] = append(row, pad...)
+		}
+	}
+
+	// Escape Markdown characters in cells
+	escapeCell := func(cell string) string {
+		// Escape pipe '|' and replace newlines with <br>
+		cell = strings.ReplaceAll(cell, "|", "\\|")
+		cell = strings.ReplaceAll(cell, "\n", "<br>")
+		return cell
+	}
+	for i := range rows {
+		for j := range rows[i] {
+			rows[i][j] = escapeCell(rows[i][j])
+		}
+	}
+
+	// Build Markdown
+	var buf bytes.Buffer
+
+	// Header row
+	buf.WriteString("|")
+	for _, cell := range rows[0] {
+		buf.WriteString(" " + cell + " |")
+	}
+
+	// Separator row
+	buf.WriteString("\n|")
+	for range rows[0] {
+		buf.WriteString(" --- |")
+	}
+
+	// Data rows
+	for _, row := range rows[1:] {
+		buf.WriteString("\n|")
+		for _, cell := range row {
+			buf.WriteString(" " + cell + " |")
+		}
+	}
+
+	return buf.String()
+}
+
+// extractText retrieves all text within an HTML node.
+func extractText(n *html.Node) string {
+	var buf bytes.Buffer
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.TextNode {
+			buf.WriteString(n.Data)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+	f(n)
+	return buf.String()
 }
