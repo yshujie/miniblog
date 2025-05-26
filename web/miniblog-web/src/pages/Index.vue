@@ -12,7 +12,7 @@
         <br />
         这里便是我创造的：对 AI 的探索、对技术的思考、对生活的记录。
       </p>
-      <el-button type="success" size="large" class="read-btn">开始阅读</el-button>
+      <el-button type="success" size="large" class="read-btn" @click="goToBlog">开始阅读</el-button>
     </div>
 
     <!-- 分割线 -->
@@ -45,6 +45,19 @@
 
 <script setup lang="ts">
 import logo from '@/assets/logo.jpeg'
+import { useModuleStore } from '@/stores/module'
+
+const moduleStore = useModuleStore()
+
+const goToBlog = async () => {
+  const modules = moduleStore.modules
+  if (modules.length === 0) {
+    await moduleStore.loadModules()
+  }
+  if (modules.length > 0) {
+    window.location.href = `/blog/${modules[0].code}`
+  }
+}
 </script>
 
 <style lang="less" scoped>
