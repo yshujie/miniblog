@@ -109,45 +109,73 @@ func (d *DocReader) parseContent(content string) (string, error) {
 	return result, nil
 }
 
-// tableToMarkdown converts an HTML <table> into Markdown format,
-// supporting irregular row lengths and escaping Markdown special characters.
+// tableToMarkdown processes only the first <table> in content, converting it to Markdown
+// while preserving any other text before and after the table.
 func (d *DocReader) tableToMarkdown(content string) string {
-	// Parse the HTML content
+	// Locate table start (case-insensitive)
+	lower := strings.ToLower(content)
+	start := strings.Index(lower, "<table")
+	if start == -1 {
+		return content // no table found, return original
+	}
+	// Find end of opening <table> tag
+	openEnd := strings.Index(content[start:], ">")
+	if openEnd == -1 {
+		return content
+	}
+	openEnd += start + 1
+	// Find closing </table> tag
+	endIdx := strings.Index(lower, "</table>")
+	if endIdx == -1 {
+		return content
+	}
+	closeEnd := endIdx + len("</table>")
+
+	// Extract only the table HTML
+	tableHTML := content[start:closeEnd]
+	// Convert to Markdown
+	md := d.convertTable(tableHTML)
+
+	// Reconstruct content
+	return content[:start] + md + content[closeEnd:]
+}
+
+// convertTable converts a standalone <table> HTML snippet to Markdown
+func (d *DocReader) convertTable(content string) string {
 	doc, err := html.Parse(strings.NewReader(content))
 	if err != nil {
-		return ""
+		return content
 	}
-
-	// Locate the first <table> node
+	// Find <table> node
 	var table *html.Node
-	var findTable func(*html.Node)
-	findTable = func(n *html.Node) {
+	var find func(*html.Node)
+	find = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Data == "table" {
 			table = n
 			return
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			findTable(c)
+			find(c)
 			if table != nil {
 				return
 			}
 		}
 	}
-	findTable(doc)
+	find(doc)
 	if table == nil {
-		return ""
+		return content
 	}
 
-	// Extract rows (cells without colspan/rowspan handling)
+	// Extract rows
 	var rows [][]string
-	var parseRows func(*html.Node)
-	parseRows = func(n *html.Node) {
+	var extractRows func(*html.Node)
+	extractRows = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Data == "tr" {
 			var row []string
 			for c := n.FirstChild; c != nil; c = c.NextSibling {
 				if c.Type == html.ElementNode && (c.Data == "td" || c.Data == "th") {
-					text := extractText(c)
-					row = append(row, strings.TrimSpace(text))
+					text := strings.TrimSpace(extractText(c))
+					row = append(row, text)
 				}
 			}
 			if len(row) > 0 {
@@ -155,81 +183,67 @@ func (d *DocReader) tableToMarkdown(content string) string {
 			}
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			parseRows(c)
+			extractRows(c)
 		}
 	}
-	parseRows(table)
+	extractRows(table)
 	if len(rows) == 0 {
 		return ""
 	}
 
-	// Determine maximum number of columns
+	// Normalize columns
 	maxCols := 0
-	for _, row := range rows {
-		if len(row) > maxCols {
-			maxCols = len(row)
+	for _, r := range rows {
+		if len(r) > maxCols {
+			maxCols = len(r)
+		}
+	}
+	for i, r := range rows {
+		if len(r) < maxCols {
+			pad := make([]string, maxCols-len(r))
+			rows[i] = append(r, pad...)
 		}
 	}
 
-	// Pad rows to have equal columns
-	for i, row := range rows {
-		if len(row) < maxCols {
-			pad := make([]string, maxCols-len(row))
-			rows[i] = append(row, pad...)
-		}
-	}
-
-	// Escape Markdown characters in cells
-	escapeCell := func(cell string) string {
-		// Escape pipe '|' and replace newlines with <br>
+	// Escape and build
+	var buf bytes.Buffer
+	escape := func(cell string) string {
 		cell = strings.ReplaceAll(cell, "|", "\\|")
 		cell = strings.ReplaceAll(cell, "\n", "<br>")
 		return cell
 	}
-	for i := range rows {
-		for j := range rows[i] {
-			rows[i][j] = escapeCell(rows[i][j])
-		}
-	}
-
-	// Build Markdown
-	var buf bytes.Buffer
-
-	// Header row
+	// Header
 	buf.WriteString("|")
 	for _, cell := range rows[0] {
-		buf.WriteString(" " + cell + " |")
+		buf.WriteString(" " + escape(cell) + " |")
 	}
-
-	// Separator row
+	// Separator
 	buf.WriteString("\n|")
 	for range rows[0] {
 		buf.WriteString(" --- |")
 	}
-
 	// Data rows
 	for _, row := range rows[1:] {
 		buf.WriteString("\n|")
 		for _, cell := range row {
-			buf.WriteString(" " + cell + " |")
+			buf.WriteString(" " + escape(cell) + " |")
 		}
 	}
-
 	return buf.String()
 }
 
-// extractText retrieves all text within an HTML node.
+// extractText retrieves all inner text of an HTML node
 func extractText(n *html.Node) string {
 	var buf bytes.Buffer
-	var f func(*html.Node)
-	f = func(n *html.Node) {
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
 		if n.Type == html.TextNode {
 			buf.WriteString(n.Data)
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			f(c)
+			walk(c)
 		}
 	}
-	f(n)
+	walk(n)
 	return buf.String()
 }
