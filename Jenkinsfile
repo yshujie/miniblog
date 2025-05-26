@@ -71,47 +71,47 @@ pipeline {
     }
 
     // 构建基础设施镜像
-    stage('Infra: build') {
-      steps {
-        dir("${env.WORKSPACE}") {
-          echo '🔧 构建基础设施镜像'
+    // stage('Infra: build') {
+    //   steps {
+    //     dir("${env.WORKSPACE}") {
+    //       echo '🔧 构建基础设施镜像'
 
-          sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.mysql -t ${MYSQL_IMAGE} ."
-          sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
+    //       sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.mysql -t ${MYSQL_IMAGE} ."
+    //       sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
 
-          // 查看镜像
-          sh "docker images | grep ${IMAGE_REGISTRY}"
-        }
-      }
-    }
+    //       // 查看镜像
+    //       sh "docker images | grep ${IMAGE_REGISTRY}"
+    //     }
+    //   }
+    // }
 
     // 拉取基础设施镜像并启动基础设施容器
-    stage('Infra: Up') {
-      steps {
-        dir("${BASE_DIR}") {
-          echo '🔧 拉取基础设施镜像'
+    // stage('Infra: Up') {
+    //   steps {
+    //     dir("${BASE_DIR}") {
+    //       echo '🔧 拉取基础设施镜像'
 
-          // 启动基础设施容器
-          sh 'docker-compose -f compose-prod-infra.yml up -d --remove-orphans --force-recreate'
+    //       // 启动基础设施容器
+    //       sh 'docker-compose -f compose-prod-infra.yml up -d --remove-orphans --force-recreate'
 
-          // 等待 MySQL 就绪
-          sh '''
-            until docker exec miniblog-mysql-1 mysqladmin ping -h localhost --silent; do
-              echo "Waiting for MySQL..."
-              sleep 2
-            done
-          '''
+    //       // 等待 MySQL 就绪
+    //       sh '''
+    //         until docker exec miniblog-mysql-1 mysqladmin ping -h localhost --silent; do
+    //           echo "Waiting for MySQL..."
+    //           sleep 2
+    //         done
+    //       '''
           
-          // 等待 Redis 就绪
-          sh '''
-            until docker exec miniblog-redis-1 redis-cli ping; do
-              echo "Waiting for Redis..."
-              sleep 2
-            done
-          '''
-        }
-      }
-    }
+    //       // 等待 Redis 就绪
+    //       sh '''
+    //         until docker exec miniblog-redis-1 redis-cli ping; do
+    //           echo "Waiting for Redis..."
+    //           sleep 2
+    //         done
+    //       '''
+    //     }
+    //   }
+    // }
 
     // 构建前端生产镜像
     stage('Build: Frontend') {
