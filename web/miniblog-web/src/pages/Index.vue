@@ -35,7 +35,7 @@
       <div class="column">
         <div class="col-title">终身学习</div>
         <div class="col-desc">
-          积少成多，如果放到五六年这个长度上，人和人之间的距离要大到地球到月球了
+          积少成多，如果放到五到十年这个长度上，人和人之间的距离要大到地球到月球上了
         </div>
       </div>
     </div>
@@ -61,7 +61,7 @@ const goToBlog = async () => {
 
 <style lang="less" scoped>
 .home-root {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 48px auto 0 auto;
   padding: 24px 12px;
 }
@@ -111,7 +111,7 @@ const goToBlog = async () => {
     background: #fff;
     border-radius: 10px;
     text-align: center;
-    min-width: 180px;
+    min-width: 250px;
   }
   .col-title {
     font-size: 18px;
