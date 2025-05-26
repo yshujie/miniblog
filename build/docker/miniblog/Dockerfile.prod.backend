@@ -12,6 +12,7 @@ ENV GOPROXY=${GOPROXY}
 ENV HTTP_PROXY=${HTTP_PROXY}
 ENV HTTPS_PROXY=${HTTPS_PROXY}
 ENV GO111MODULE=${GO111MODULE}
+ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 
 # 安装依赖
 RUN apk add --no-cache git ca-certificates
@@ -30,8 +31,11 @@ COPY . .
 
 # 构建可执行文件
 WORKDIR /app/cmd/miniblog
-ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
-RUN go build -o miniblog .
+
+# 使用 Go 构建缓存
+RUN --mount=type=cache,target=/root/.cache/go-build \
+  --mount=type=cache,target=/go/pkg/mod \
+  go build -o miniblog .
 
 # ---------- Runtime ----------
 
