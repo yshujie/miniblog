@@ -45,7 +45,7 @@ func (s *sections) GetByCode(code string) (*model.Section, error) {
 // GetListByModuleCode 获取章节列表
 func (s *sections) GetListByModuleCode(moduleCode string) ([]*model.Section, error) {
 	var sections []*model.Section
-	return sections, s.db.Where("module_code = ?", moduleCode).Find(&sections).Error
+	return sections, s.db.Where("module_code = ?", moduleCode).Where("status = ?", model.SectionStatusNormal).Order("sort asc").Find(&sections).Error
 }
 
 // Update 更新章节

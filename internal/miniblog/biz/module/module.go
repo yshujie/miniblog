@@ -12,7 +12,7 @@ import (
 // ModuleBiz 模块业务接口
 type IModuleBiz interface {
 	Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.CreateModuleResponse, error)
-	GetAll(ctx context.Context) (*v1.GetAllModulesResponse, error)
+	GetAll(ctx context.Context) (*v1.GetModuleListResponse, error)
 	GetOne(ctx context.Context, code string) (*v1.GetOneModuleResponse, error)
 }
 
@@ -61,14 +61,14 @@ func (b *moduleBiz) Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.
 }
 
 // GetAll 获取所有模块
-func (b *moduleBiz) GetAll(ctx context.Context) (*v1.GetAllModulesResponse, error) {
+func (b *moduleBiz) GetAll(ctx context.Context) (*v1.GetModuleListResponse, error) {
 	modules, err := b.ds.Modules().GetAll()
 	if err != nil {
 		return nil, err
 	}
 
 	// 将 modules 追加到 GetAllModulesResponse.Modules 中
-	response := &v1.GetAllModulesResponse{
+	response := &v1.GetModuleListResponse{
 		Modules: make([]*v1.ModuleInfo, 0),
 	}
 	for _, module := range modules {

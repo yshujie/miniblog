@@ -11,6 +11,7 @@ import (
 
 // BlogBiz 博客业务接口
 type IBlogBiz interface {
+	GetModuleList() (*v1.GetModuleListResponse, error)
 	GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModuleDetailResponse, error)
 	GetArticleDetail(req *v1.GetArticleDetailRequest) (*v1.GetArticleDetailResponse, error)
 }
@@ -26,6 +27,23 @@ var _ IBlogBiz = (*blogBiz)(nil)
 // New 简单工程函数，创建 blogBiz 实例
 func New(ds store.IStore) *blogBiz {
 	return &blogBiz{ds}
+}
+
+func (b *blogBiz) GetModuleList() (*v1.GetModuleListResponse, error) {
+	log.Infow("start to get all modules in biz layer")
+
+	modules, _ := b.ds.Modules().GetNormalModules()
+	response := &v1.GetModuleListResponse{
+		Modules: make([]*v1.ModuleInfo, 0),
+	}
+	for _, module := range modules {
+		response.Modules = append(response.Modules, &v1.ModuleInfo{
+			Code:  module.Code,
+			Title: module.Title,
+		})
+	}
+
+	return response, nil
 }
 
 // Create 创建用户
@@ -46,6 +64,7 @@ func (b *blogBiz) GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModule
 		sectionDetail := &v1.SectionDetail{
 			ID:         section.ID,
 			Code:       section.Code,
+			Sort:       section.Sort,
 			ModuleCode: section.ModuleCode,
 			Title:      section.Title,
 		}

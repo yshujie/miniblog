@@ -9,6 +9,7 @@ type ModuleStore interface {
 	Create(module *model.Module) error
 	GetByCode(code string) (*model.Module, error)
 	GetAll() ([]*model.Module, error)
+	GetNormalModules() ([]*model.Module, error)
 	Update(module *model.Module) error
 }
 
@@ -45,6 +46,15 @@ func (m *modules) GetByCode(code string) (*model.Module, error) {
 func (m *modules) GetAll() ([]*model.Module, error) {
 	var modules []*model.Module
 	if err := m.db.Find(&modules).Error; err != nil {
+		return nil, err
+	}
+	return modules, nil
+}
+
+// GetNormalModules 获取正常状态的模块
+func (m *modules) GetNormalModules() ([]*model.Module, error) {
+	var modules []*model.Module
+	if err := m.db.Where("status = ?", model.ModuleStatusNormal).Find(&modules).Error; err != nil {
 		return nil, err
 	}
 	return modules, nil

@@ -35,6 +35,7 @@ type SectionDetail struct {
 	ID         int              `json:"id"`
 	Code       string           `json:"code"`
 	Title      string           `json:"title"`
+	Sort       int              `json:"sort"`
 	ModuleCode string           `json:"module_code"`
 	Articles   []*ArticleDetail `json:"articles"`
 }

@@ -11,8 +11,8 @@ type CreateModuleResponse struct {
 	Module *ModuleInfo `json:"module"`
 }
 
-// GetAllModulesResponse 获取所有模块响应
-type GetAllModulesResponse struct {
+// GetModuleListResponse 获取模块列表响应
+type GetModuleListResponse struct {
 	Modules []*ModuleInfo `json:"modules"`
 }
 
@@ -23,6 +23,8 @@ type GetOneModuleResponse struct {
 
 // ModuleInfo 模块信息
 type ModuleInfo struct {
-	Code  string `json:"code"`
-	Title string `json:"title"`
+	ID     int    `json:"id"`
+	Code   string `json:"code"`
+	Title  string `json:"title"`
+	Status int    `json:"status"`
 }

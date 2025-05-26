@@ -11,6 +11,7 @@ type Section struct {
 	ID         int       `json:"id"`
 	Code       string    `json:"code"`
 	Title      string    `json:"title"`
+	Sort       int       `json:"sort"`
 	ModuleCode string    `json:"module_code"`
 	Status     int       `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`

@@ -24,6 +24,19 @@ func New(ds store.IStore) *BlogController {
 	}
 }
 
+// GetModuleList 获取模块列表
+func (c *BlogController) GetModuleList(ctx *gin.Context) {
+	log.C(ctx).Infow("Get module list function called")
+
+	moduleListResp, err := c.biz.BlogBiz().GetModuleList()
+	if err != nil {
+		core.WriteResponse(ctx, err, nil)
+		return
+	}
+
+	core.WriteResponse(ctx, nil, moduleListResp)
+}
+
 // GetModuleDetail 获取模块详情
 func (c *BlogController) GetModuleDetail(ctx *gin.Context) {
 	log.C(ctx).Infow("Get module detail function called")
