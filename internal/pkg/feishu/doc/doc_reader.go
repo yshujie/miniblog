@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 
 	lark "github.com/larksuite/oapi-sdk-go/v3"
@@ -96,26 +95,13 @@ func (d *DocReader) parseContent(content string) (string, error) {
 	// 记录原始内容，用于调试
 	log.Infow("parsing content", "original", content)
 
-	result := ""
-
 	// 如果内容为空，直接返回
 	if content == "" {
-		return result, nil
-	}
-
-	// 使用 strconv.Unquote 处理转义符、ASCII 码
-	unquotedContent, err := strconv.Unquote(content)
-	if err != nil {
-		log.Errorw("failed to unquote content",
-			"error", err,
-			"content", content,
-			"content_length", len(content))
-	} else {
-		result = unquotedContent
+		return "", nil
 	}
 
 	// table 转 markdown
-	result = d.tableToMarkdown(result)
+	result := d.tableToMarkdown(content)
 
 	log.Infow("successfully parsed content",
 		"original", content,
