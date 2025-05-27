@@ -43,9 +43,6 @@ func (b *userBiz) Create(ctx context.Context, r *v1.CreateUserRequest) error {
 
 	log.C(ctx).Infow("start to create user in biz layer", "username", r.Username)
 
-	// 加密密码
-	userM.Password, _ = auth.Encrypt(r.Password)
-
 	// 创建用户
 	if err := b.ds.Users().Create(&userM); err != nil {
 		if match, _ := regexp.MatchString("Duplicate entry '.*' for key 'username'", err.Error()); match {
