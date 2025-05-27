@@ -65,8 +65,8 @@ func installRouters(g *gin.Engine) error {
 
 		adminv1 := v1.Group("/admin")
 		{
-			// 修改用户密码
-			adminv1.GET("/users/:name/change-password", uc.ChangePassword)
+			adminv1.POST("/users", uc.Create)                              // 创建用户
+			adminv1.GET("/users/:name/change-password", uc.ChangePassword) // 修改用户密码
 
 			// 使用 Authn 和 Authz 中间件
 			adminv1.Use(mw.Authn(), mw.Authz(authz))
@@ -74,7 +74,6 @@ func installRouters(g *gin.Engine) error {
 			// users 路由分组
 			userv1 := adminv1.Group("/users")
 			{
-				userv1.POST("", uc.Create)          // 创建用户
 				userv1.GET(":name", uc.Get)         // 获取用户信息
 				userv1.GET("/myinfo", uc.GetMyInfo) // 获取当前用户信息
 			}
