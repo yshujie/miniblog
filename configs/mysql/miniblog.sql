@@ -52,6 +52,7 @@ CREATE TABLE `section` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `code` varchar(255) NOT NULL,
   `title` varchar(255) NOT NULL,
+  `sort` int(11) NOT NULL DEFAULT '0',
   `module_code` varchar(255) NOT NULL,
   `status` tinyint(4) NOT NULL DEFAULT '1' COMMENT '1: 上架, 2: 下架',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -81,17 +82,17 @@ CREATE TABLE `article` (
 --
 -- Insert data into table `user`
 --
-INSERT INTO `user` (`username`, `password`, `nickname`, `email`, `phone`, `status`) VALUES ('yangshujie', '1q2w3e4r', '杨舒杰', 'yshujie@163.com', '15711236163', 1);
+INSERT INTO `user` (`username`, `password`, `nickname`, `email`, `phone`, `status`) VALUES ('clack', '1q2w3e4r', '杨舒杰', 'yshujie@163.com', '15711236163', 1);
 
 
 --
 -- Insert data into table `module`
 --
-INSERT INTO `module` (`code`, `title`, `status`) VALUES ('ai', 'AI', 1);
+INSERT INTO `module` (`code`, `title`, `status`) VALUES ('ai', 'AI', 0);
 INSERT INTO `module` (`code`, `title`, `status`) VALUES ('go', 'Golang', 1);
 INSERT INTO `module` (`code`, `title`, `status`) VALUES ('ddd', '领域驱动设计', 1);
-INSERT INTO `module` (`code`, `title`, `status`) VALUES ('architecture', '软件架构设计', 1);
 INSERT INTO `module` (`code`, `title`, `status`) VALUES ('refactor', '重构', 0);
+INSERT INTO `module` (`code`, `title`, `status`) VALUES ('database', '数据库', 1);
 
 --
 -- Insert data into table `section`
@@ -103,12 +104,15 @@ INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('ai_llm
 
 # Golang
 INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('go_base', 'Golang 基础', 'go', 1);
-INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('go_oop', 'Golang 与 面向对象', 'go', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('go_concurrent', 'Golang 中的高并发设计', 'go', 1);
 INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('go_design_pattern', 'Golang 中的设计模式', 'go', 1);
 
 # 领域驱动设计
-INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('ddd_analysis', '需求分析', 'ddd', 1);
-INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('ddd_modeling', '领域建模', 'ddd', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('analysis', '需求分析', 'ddd', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('modeling', '领域建模', 'ddd', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('architecture_base', '架构设计', 'ddd', 1);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('design_pattern', '设计模式', 'ddd', 1);
+
 
 # 软件架构设计
 INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('architecture_base', '架构基础', 'architecture', 1);
@@ -118,3 +122,7 @@ INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('design
 # 重构
 INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('refactor_smell', '坏味道', 'refactor', 0);
 INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('refactor_technique', '重构技巧', 'refactor', 0);
+
+# 数据库
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('mysql', 'MySQL', 'refactor', 0);
+INSERT INTO `section` (`code`, `title`, `module_code`, `status`) VALUES ('redis', 'Redis', 'refactor', 0);

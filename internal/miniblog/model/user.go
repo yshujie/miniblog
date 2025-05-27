@@ -16,6 +16,7 @@ type UserM struct {
 	Email        string    `gorm:"column:email"`
 	Phone        string    `gorm:"column:phone"`
 	Introduction string    `gorm:"column:introduction"`
+	Status       int       `gorm:"column:status"`
 	CreatedAt    time.Time `gorm:"column:created_at"`
 	UpdatedAt    time.Time `gorm:"column:updated_at"`
 }
