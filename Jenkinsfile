@@ -57,32 +57,24 @@ pipeline {
           // 使用 withCredentials 加载环境变量文件
           withCredentials([file(credentialsId: credentialsId, variable: 'ENV_FILE')]) {
             echo "🔧 复制环境变量文件"
-            sh "cp '${ENV_FILE}' .env"
+            // 使用单引号避免 Groovy 字符串插值
+            sh 'cp "$ENV_FILE" .env'
             
-            // 读取 .env 文件内容
-            def envContent = readFile('.env')
-            
-            // 解析环境变量
-            def envVars = [:]
-            envContent.split('\n').each { line ->
-              line = line.trim()
-              if (line && !line.startsWith('#')) {
-                def parts = line.split('=', 2)
-                if (parts.length == 2) {
-                  def key = parts[0].trim()
-                  def value = parts[1].trim()
-                  envVars[key] = value
-                }
-              }
-            }
-            
-            // 将环境变量设置到 Jenkins 构建环境中
-            envVars.each { key, value ->
-              env[key] = value
-            }
-            
-            echo "🔧 检查环境变量是否加载成功"
-            sh 'env | grep -E "DB_|REDIS_|JWT_|FEISHU_"'
+            // 使用 shell 命令读取和设置环境变量
+            sh '''
+                # 读取 .env 文件并设置环境变量
+                while IFS='=' read -r key value; do
+                    # 跳过空行和注释
+                    [[ -z "$key" || "$key" =~ ^# ]] && continue
+                    # 去除可能的引号
+                    value=$(echo "$value" | tr -d '"'"'"')
+                    # 设置环境变量
+                    export "$key=$value"
+                done < .env
+                
+                # 检查环境变量是否加载成功
+                env | grep -E "DB_|REDIS_|JWT_|FEISHU_"
+            '''
           }
         }
       }
