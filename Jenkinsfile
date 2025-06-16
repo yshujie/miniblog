@@ -92,7 +92,7 @@ pipeline {
           echo '🔧 拉取基础设施镜像'
 
           // 启动基础设施容器
-          sh 'docker-compose -f compose-prod-infra.yml up -d --remove-orphans --force-recreate'
+          sh 'docker compose -f compose-prod-infra.yml up -d --remove-orphans --force-recreate'
 
           // 等待 MySQL 就绪
           sh '''
@@ -188,7 +188,7 @@ pipeline {
         dir("${BASE_DIR}") {
           echo '🚀 部署应用'
           sh '''
-            docker-compose -f compose-prod-app.yml up -d
+            docker compose -f compose-prod-app.yml up -d
           '''
           // 检查 Nginx 服务
           sh '''
