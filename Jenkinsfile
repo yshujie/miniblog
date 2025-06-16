@@ -55,7 +55,7 @@ pipeline {
           }
 
           echo "🔧 复制环境变量文件"
-          sh "cp ${envFile} .env"
+          sh "cp '${envFile}' .env"
 
           // 读取 .env 文件内容
           def envContent = readFile('.env')
@@ -80,7 +80,7 @@ pipeline {
           }
           
           echo "🔧 检查环境变量是否加载成功"
-          sh "env | grep -E 'DB_|REDIS_|JWT_|FEISHU_'"
+          sh 'env | grep -E "DB_|REDIS_|JWT_|FEISHU_"'
         }
       }
     }
