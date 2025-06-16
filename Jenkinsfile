@@ -57,11 +57,30 @@ pipeline {
           echo "🔧 复制环境变量文件"
           sh "cp ${envFile} .env"
 
-          echo "🔧 设置环境变量"
-          sh "export $(cat .env | xargs)"
-
-          echo "🔧 检查环境变量"
-          sh "env"
+          // 读取 .env 文件内容
+          def envContent = readFile('.env')
+          
+          // 解析环境变量
+          def envVars = [:]
+          envContent.split('\n').each { line ->
+            line = line.trim()
+            if (line && !line.startsWith('#')) {
+              def parts = line.split('=', 2)
+              if (parts.length == 2) {
+                def key = parts[0].trim()
+                def value = parts[1].trim()
+                envVars[key] = value
+              }
+            }
+          }
+          
+          // 将环境变量设置到 Jenkins 构建环境中
+          envVars.each { key, value ->
+            env[key] = value
+          }
+          
+          echo "🔧 检查环境变量是否加载成功"
+          sh "env | grep -E 'DB_|REDIS_|JWT_|FEISHU_'"
         }
       }
     }
