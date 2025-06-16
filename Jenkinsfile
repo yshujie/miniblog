@@ -153,12 +153,10 @@ pipeline {
       steps {
         dir("${BASE_DIR}") {
           echo '📦 构建后端生产镜像'
-          // 启用 BuildKit 并使用缓存
-          withEnv(["DOCKER_BUILDKIT=1"]) {
-            sh '''
+          sh '''
               docker build \
                 --network host \
-                --add-host=host.docker.internal:host-gateway \
+                --add-host host.docker.internal:host-gateway \
                 --build-arg GOPROXY=https://goproxy.cn,direct \
                 --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
                 --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
@@ -168,7 +166,6 @@ pipeline {
                 -t ${BACKEND_IMAGE_TAG} \
                 ../../../
             '''
-          }
         }
       }
     }
