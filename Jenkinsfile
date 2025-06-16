@@ -62,18 +62,34 @@ pipeline {
             
             // 使用 shell 命令读取和设置环境变量
             sh '''
+                #!/bin/sh
                 set -e
+                
                 # 读取 .env 文件并设置环境变量
-                while IFS="=" read -r key value || [ -n "$key" ]; do
-                    # 跳过空行和注释
-                    [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
-                    # 去除首尾空格
-                    key=$(echo "$key" | xargs)
-                    value=$(echo "$value" | xargs)
+                while read line; do
+                    # 跳过空行
+                    if [ -z "$line" ]; then
+                        continue
+                    fi
+                    
+                    # 跳过注释行
+                    case "$line" in
+                        \#*)
+                            continue
+                            ;;
+                    esac
+                    
+                    # 分割键值对
+                    key=$(echo "$line" | cut -d= -f1 | tr -d " ")
+                    value=$(echo "$line" | cut -d= -f2- | tr -d " ")
+                    
                     # 去除可能的引号
                     value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+                    
                     # 设置环境变量
-                    export "$key=$value"
+                    if [ -n "$key" ] && [ -n "$value" ]; then
+                        export "$key=$value"
+                    fi
                 done < .env
                 
                 # 检查环境变量是否加载成功
