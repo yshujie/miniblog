@@ -74,7 +74,7 @@ pipeline {
                     
                     # 跳过注释行
                     case "$line" in
-                        \#*)
+                        "#"*)
                             continue
                             ;;
                     esac
