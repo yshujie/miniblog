@@ -76,8 +76,8 @@ pipeline {
         dir("${env.WORKSPACE}") {
           echo '🔧 构建基础设施镜像'
 
-          sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.mysql -t ${MYSQL_IMAGE} ."
-          sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
+          sh "docker buildx build --no-cache -f ${BASE_DIR}/Dockerfile.infra.mysql -t ${MYSQL_IMAGE} ."
+          sh "docker buildx build --no-cache -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
 
           // 查看镜像
           sh "docker images | grep ${IMAGE_REGISTRY}"
@@ -122,7 +122,7 @@ pipeline {
           // 构建博客前端生产镜像
           echo '📦 构建博客前端生产镜像'
           sh """
-              docker build \
+              docker buildx build \
                 --network host \
                 --add-host host.docker.internal:host-gateway \
                 --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
@@ -135,7 +135,7 @@ pipeline {
           // 构建管理后台前端生产镜像
           echo '📦 构建管理后台前端生产镜像'
           sh """
-            docker build \
+            docker buildx build \
               --network host \
               --add-host host.docker.internal:host-gateway \
               --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
@@ -154,7 +154,7 @@ pipeline {
         dir("${BASE_DIR}") {
           echo '📦 构建后端生产镜像'
           sh '''
-              docker build \
+              docker buildx build \
                 --network host \
                 --add-host host.docker.internal:host-gateway \
                 --build-arg GOPROXY=https://goproxy.cn,direct \
@@ -175,7 +175,7 @@ pipeline {
       steps {
         dir("${env.WORKSPACE}") {
           echo '📦 构建 Nginx 生产镜像'
-          sh "docker build --no-cache -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
+          sh "docker buildx build --no-cache -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
 
           sh "docker images | grep ${IMAGE_REGISTRY}"
         }
