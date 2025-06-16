@@ -1,6 +1,12 @@
 pipeline {
   agent any
 
+  // 参数
+  parameters {
+    choice(name: 'ENV', choices: ['dev', 'prod'], description: '选择部署环境')
+  }
+
+  // 环境变量
   environment {
     // 项目根目录下 build/docker/miniblog
     BASE_DIR      = "build/docker/miniblog"
@@ -12,10 +18,11 @@ pipeline {
     MYSQL_IMAGE  = "${IMAGE_REGISTRY}-mysql:prod"
     REDIS_IMAGE  = "${IMAGE_REGISTRY}-redis:prod"
     APP_IMAGE    = "${IMAGE_REGISTRY}-app:prod"
+
     // 应用镜像
     BACKEND_IMAGE_TAG  = "${IMAGE_REGISTRY}-backend:prod"
     FRONTEND_BLOG_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend-blog:prod"
-    FRONTEND_ADMIN_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend-admin:prod"
+    FRONTEND_ADMIN_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend-admin:prod"    
   }
 
   // 阶段
@@ -30,6 +37,35 @@ pipeline {
       }
     }
 
+    // 加载环境变量
+    stage('Load Environment') {
+      steps {
+        // 根据环境选择对应的凭证
+        script {
+          echo "🔧 加载环境变量"
+
+          def envFile = ''
+          switch(params.ENV) {
+            case 'dev':
+              envFile = credentials('miniblog-dev-env')
+              break
+            case 'prod':
+              envFile = credentials('miniblog-prod-env')
+              break
+          }
+
+          echo "🔧 复制环境变量文件"
+          sh "cp ${envFile} .env"
+
+          echo "🔧 设置环境变量"
+          sh "export $(cat .env | xargs)"
+
+          echo "🔧 检查环境变量"
+          sh "env"
+        }
+      }
+    }
+    
     // 设置 SSL 证书，由 Jenkins 管理，写到 configs/nginx/ssl 目录下
     stage('Setup SSL') {
       steps {
@@ -219,6 +255,10 @@ pipeline {
     }
     failure {
       echo '❌ 部署失败，请检查日志并修复。'
+    }
+    always {
+      // 清理敏感文件
+      sh 'rm -f .env'
     }
   }
 }
