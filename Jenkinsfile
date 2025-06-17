@@ -93,7 +93,7 @@ pipeline {
                 done < .env
                 
                 # 检查环境变量是否加载成功
-                env | grep -E "DB_|REDIS_|JWT_|FEISHU_"
+                env | grep -E "MYSQL_|REDIS_|JWT_|FEISHU_"
             '''
           }
         }
