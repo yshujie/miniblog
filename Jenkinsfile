@@ -34,8 +34,8 @@ pipeline {
           // 验证加载的变量
           echo "MYSQL_HOST: ${env.MYSQL_HOST}"
           echo "MYSQL_PORT: ${env.MYSQL_PORT}"
-          echo "MYSQL_USER: ${env.MYSQL_USER}"
-          echo "MYSQL_NAME: ${env.MYSQL_NAME}"
+          echo "MYSQL_USERNAME: ${env.MYSQL_USERNAME}"
+          echo "MYSQL_DBNAME: ${env.MYSQL_DBNAME}"
           echo "MYSQL_PASSWORD: ${env.MYSQL_PASSWORD}"
 
           echo "REDIS_HOST: ${env.REDIS_HOST}"
@@ -109,8 +109,8 @@ pipeline {
               -t ${MYSQL_IMAGE} \
               --build-arg DB_HOST=${env.MYSQL_HOST} \
               --build-arg DB_PORT=${env.MYSQL_PORT} \
-              --build-arg DB_USER=${env.MYSQL_USER} \
-              --build-arg DB_NAME=${env.MYSQL_NAME} \
+              --build-arg DB_USERNAME=${env.MYSQL_USERNAME} \
+              --build-arg DB_DBNAME=${env.MYSQL_DBNAME} \
               --build-arg DB_PASSWORD=${env.MYSQL_PASSWORD} \
               .
           """
@@ -137,8 +137,8 @@ pipeline {
           sh """
             MYSQL_HOST=${env.MYSQL_HOST}
             MYSQL_PORT=${env.MYSQL_PORT}
-            MYSQL_USER=${env.MYSQL_USER}
-            MYSQL_NAME=${env.MYSQL_NAME}
+            MYSQL_USERNAME=${env.MYSQL_USERNAME}
+            MYSQL_DBNAME=${env.MYSQL_DBNAME}
             MYSQL_PASSWORD=${env.MYSQL_PASSWORD}
             REDIS_HOST=${env.REDIS_HOST}
             REDIS_PORT=${env.REDIS_PORT}
@@ -206,8 +206,8 @@ pipeline {
               --build-arg GO111MODULE=on \
               --build-arg MYSQL_HOST=${env.MYSQL_HOST} \
               --build-arg MYSQL_PORT=${env.MYSQL_PORT} \
-              --build-arg MYSQL_USER=${env.MYSQL_USER} \
-              --build-arg MYSQL_NAME=${env.MYSQL_NAME} \
+              --build-arg MYSQL_USERNAME=${env.MYSQL_USERNAME} \
+              --build-arg MYSQL_DBNAME=${env.MYSQL_DBNAME} \
               --build-arg MYSQL_PASSWORD=${env.MYSQL_PASSWORD} \
               --build-arg REDIS_HOST=${env.REDIS_HOST} \
               --build-arg REDIS_PORT=${env.REDIS_PORT} \

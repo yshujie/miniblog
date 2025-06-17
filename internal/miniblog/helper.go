@@ -69,9 +69,9 @@ func loadConfigFromEnv() {
 	// 打印环境变量
 	log.Infow("environment variables",
 		"MYSQL_PORT", os.Getenv("MINIBLOG_DATABASE_PORT"),
-		"MYSQL_USER", os.Getenv("MINIBLOG_DATABASE_USERNAME"),
+		"MYSQL_USERNAME", os.Getenv("MINIBLOG_DATABASE_USERNAME"),
 		"MYSQL_PASSWORD", os.Getenv("MINIBLOG_DATABASE_PASSWORD"),
-		"MYSQL_NAME", os.Getenv("MINIBLOG_DATABASE_DBNAME"),
+		"MYSQL_DBNAME", os.Getenv("MINIBLOG_DATABASE_DBNAME"),
 		"MYSQL_HOST", os.Getenv("MINIBLOG_DATABASE_HOST"),
 		"REDIS_HOST", os.Getenv("MINIBLOG_REDIS_HOST"),
 		"REDIS_PORT", os.Getenv("MINIBLOG_REDIS_PORT"),
