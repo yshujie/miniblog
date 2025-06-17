@@ -60,9 +60,11 @@ pipeline {
             // 使用单引号避免 Groovy 字符串插值
             sh 'cp "$ENV_FILE" .env'
             
-            // 读取环境变量文件并设置为 pipeline 环境变量
-            def envFile = readFile('.env').trim()
-            envFile.split('\n').each { line ->
+            // 读取环境变量文件内容
+            def envContent = readFile('.env').trim()
+            
+            // 解析环境变量并设置到环境变量中
+            envContent.split('\n').each { line ->
                 if (line && !line.startsWith('#')) {
                     def parts = line.split('=', 2)
                     if (parts.length == 2) {
@@ -70,7 +72,10 @@ pipeline {
                         def value = parts[1].trim()
                         // 去除可能的引号
                         value = value.replaceAll(/^["']|["']$/, '')
-                        env[key] = value
+                        // 使用 wrap 来设置环境变量
+                        wrap([$class: 'EnvVarsWrapper', envVars: [(key): value]]) {
+                            // 这里不需要做任何事情，wrap 会自动设置环境变量
+                        }
                     }
                 }
             }
