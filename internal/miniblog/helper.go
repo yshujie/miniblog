@@ -32,6 +32,8 @@ const (
 // 第四优先级：配置文件
 // 第五优先级：默认值（优先级最低）
 func initConfig() {
+	log.Infow("init config")
+
 	// 从环境变量中读取配置
 	loadConfigFromEnv()
 
@@ -44,6 +46,9 @@ func initConfig() {
 	} else {
 		fmt.Printf("Using config file: %s\n", viper.ConfigFileUsed())
 	}
+
+	// 打印配置
+	log.Infow("config initialized successfully", "config", viper.AllSettings())
 }
 
 // loadConfigFromEnv 从环境变量中读取配置
