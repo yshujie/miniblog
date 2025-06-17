@@ -1,76 +1,58 @@
 pipeline {
   agent any
 
-  // 定义读取环境变量的方法
-  @NonCPS
-  def getEnvVar(String credentialsId, String key) {
-    def content = credentials(credentialsId)
-    def line = content.split('\n').find { it.startsWith("${key}=") }
-    if (line) {
-      return line.split('=', 2)[1].trim().replaceAll(/^["']|["']$/, '')
-    }
-    return ''
-  }
-
-  // 环境变量
   environment {
-    // 项目根目录下 build/docker/miniblog
-    BASE_DIR      = "build/docker/miniblog"
+    BASE_DIR                = "build/docker/miniblog"
+    IMAGE_REGISTRY          = 'miniblog'
 
-    // 镜像前缀
-    IMAGE_REGISTRY     = 'miniblog'
-    // 基础设施镜像
-    NGINX_IMAGE  = "${IMAGE_REGISTRY}-nginx:prod"
-    MYSQL_IMAGE  = "${IMAGE_REGISTRY}-mysql:prod"
-    REDIS_IMAGE  = "${IMAGE_REGISTRY}-redis:prod"
-    APP_IMAGE    = "${IMAGE_REGISTRY}-app:prod"
+    NGINX_IMAGE             = "${IMAGE_REGISTRY}-nginx:prod"
+    MYSQL_IMAGE             = "${IMAGE_REGISTRY}-mysql:prod"
+    REDIS_IMAGE             = "${IMAGE_REGISTRY}-redis:prod"
+    APP_IMAGE               = "${IMAGE_REGISTRY}-app:prod"
 
-    // 应用镜像
-    BACKEND_IMAGE_TAG  = "${IMAGE_REGISTRY}-backend:prod"
+    BACKEND_IMAGE_TAG       = "${IMAGE_REGISTRY}-backend:prod"
     FRONTEND_BLOG_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend-blog:prod"
-    FRONTEND_ADMIN_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend-admin:prod"
+    FRONTEND_ADMIN_IMAGE_TAG= "${IMAGE_REGISTRY}-frontend-admin:prod"
 
-    // 从环境变量文件中读取的变量
-    CREDENTIALS_ID = 'miniblog-dev-env'
-    MYSQL_HOST = "${getEnvVar(CREDENTIALS_ID, 'MYSQL_HOST')}"
-    MYSQL_PORT = "${getEnvVar(CREDENTIALS_ID, 'MYSQL_PORT')}"
-    MYSQL_USER = "${getEnvVar(CREDENTIALS_ID, 'MYSQL_USER')}"
-    MYSQL_NAME = "${getEnvVar(CREDENTIALS_ID, 'MYSQL_NAME')}"
-    MYSQL_PASSWORD = "${getEnvVar(CREDENTIALS_ID, 'MYSQL_PASSWORD')}"
-
-    echo "MYSQL_HOST: ${MYSQL_HOST}"
-    echo "MYSQL_PORT: ${MYSQL_PORT}"
-    echo "MYSQL_USER: ${MYSQL_USER}"
-    echo "MYSQL_NAME: ${MYSQL_NAME}"
-    echo "MYSQL_PASSWORD: ${MYSQL_PASSWORD}"
+    CREDENTIALS_ID          = 'miniblog-dev-env'
   }
 
-  // 阶段
   stages {
-    // 拉取最新代码
-    stage('Checkout') {
+    stage('Load Env') {
       steps {
-        // 清理旧内容
-        deleteDir()
-        // 拉取最新代码
-        checkout scm
-      }
-    }
+        script {
+          withCredentials([file(credentialsId: env.CREDENTIALS_ID, variable: 'ENV_FILE')]) {
+            def envVars = readFile(ENV_FILE).split("\n")
+            envVars.each { line ->
+              if (line && line.contains('=')) {
+                def (key, value) = line.split('=', 2).collect { it.trim().replaceAll(/^["']|["']$/, '') }
+                env."${key}" = value
+              }
+            }
+          }
 
-   
-
-    // 构建基础设施镜像
-    stage('Infra: build') {
-      steps {
-        dir("${env.WORKSPACE}") {
-          echo '🔧 构建基础设施镜像'
+          // 验证加载的变量
           echo "MYSQL_HOST: ${env.MYSQL_HOST}"
           echo "MYSQL_PORT: ${env.MYSQL_PORT}"
           echo "MYSQL_USER: ${env.MYSQL_USER}"
           echo "MYSQL_NAME: ${env.MYSQL_NAME}"
           echo "MYSQL_PASSWORD: ${env.MYSQL_PASSWORD}"
+        }
+      }
+    }
 
-          // 构建 MySQL 镜像
+    stage('Checkout') {
+      steps {
+        deleteDir()
+        checkout scm
+      }
+    }
+
+    stage('Infra: build') {
+      steps {
+        dir("${env.WORKSPACE}") {
+          echo '🔧 构建基础设施镜像'
+
           sh """
             docker buildx build --no-cache \
               -f ${BASE_DIR}/Dockerfile.infra.mysql \
@@ -83,34 +65,31 @@ pipeline {
               .
           """
 
-          // 构建 Redis 镜像
           sh "docker buildx build --no-cache -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
-
-          // 查看镜像
-          sh "docker images | grep ${IMAGE_REGISTRY}"
         }
       }
     }
 
-    // 拉取基础设施镜像并启动基础设施容器
     stage('Infra: Up') {
       steps {
         dir("${BASE_DIR}") {
-          echo '🔧 拉取基础设施镜像'
+          echo '🔧 拉取基础设施镜像并启动容器'
 
-          // 启动基础设施容器
-          sh 'docker compose -f compose-prod-infra.yml up -d --remove-orphans --force-recreate'
+          sh """
+            MYSQL_HOST=${env.MYSQL_HOST} \
+            MYSQL_PORT=${env.MYSQL_PORT} \
+            MYSQL_USER=${env.MYSQL_USER} \
+            MYSQL_NAME=${env.MYSQL_NAME} \
+            MYSQL_PASSWORD=${env.MYSQL_PASSWORD} \
+            docker compose -f compose-prod-infra.yml up -d --remove-orphans --force-recreate
+          """
 
-          // 等待 MySQL 就绪
           sh '''
             until docker exec miniblog-mysql-1 mysqladmin ping -h localhost --silent; do
               echo "Waiting for MySQL..."
               sleep 2
             done
-          '''
-          
-          // 等待 Redis 就绪
-          sh '''
+
             until docker exec miniblog-redis-1 redis-cli ping; do
               echo "Waiting for Redis..."
               sleep 2
@@ -120,27 +99,22 @@ pipeline {
       }
     }
 
-    // 构建前端生产镜像
     stage('Build: Frontend') {
       steps {
         dir("${BASE_DIR}") {
           echo '📦 构建前端生产镜像'
 
-          // 构建博客前端生产镜像
-          echo '📦 构建博客前端生产镜像'
           sh """
-              docker buildx build \
-                --network host \
-                --add-host host.docker.internal:host-gateway \
-                --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
-                --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
-                -f Dockerfile.prod.frontend.blog \
-                -t ${FRONTEND_BLOG_IMAGE_TAG} \
-                ../../../web/miniblog-web
-              """
+            docker buildx build \
+              --network host \
+              --add-host host.docker.internal:host-gateway \
+              --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
+              --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
+              -f Dockerfile.prod.frontend.blog \
+              -t ${FRONTEND_BLOG_IMAGE_TAG} \
+              ../../../web/miniblog-web
+          """
 
-          // 构建管理后台前端生产镜像
-          echo '📦 构建管理后台前端生产镜像'
           sh """
             docker buildx build \
               --network host \
@@ -155,49 +129,42 @@ pipeline {
       }
     }
 
-    // 构建后端生产镜像
     stage('Build: Backend') {
       steps {
         dir("${BASE_DIR}") {
           echo '📦 构建后端生产镜像'
-          sh '''
-              docker buildx build \
-                --network host \
-                --add-host host.docker.internal:host-gateway \
-                --build-arg GOPROXY=https://goproxy.cn,direct \
-                --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
-                --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
-                --build-arg GO111MODULE=on \
-                --cache-from ${BACKEND_IMAGE_TAG} \
-                -f Dockerfile.prod.backend \
-                -t ${BACKEND_IMAGE_TAG} \
-                ../../../
-            '''
+          sh """
+            docker buildx build \
+              --network host \
+              --add-host host.docker.internal:host-gateway \
+              --build-arg GOPROXY=https://goproxy.cn,direct \
+              --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
+              --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
+              --build-arg GO111MODULE=on \
+              --cache-from ${BACKEND_IMAGE_TAG} \
+              -f Dockerfile.prod.backend \
+              -t ${BACKEND_IMAGE_TAG} \
+              ../../../
+          """
         }
       }
     }
 
-    // 构建 Nginx 镜像
     stage('Build: Nginx') {
       steps {
         dir("${env.WORKSPACE}") {
           echo '📦 构建 Nginx 生产镜像'
           sh "docker buildx build --no-cache -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
-
-          sh "docker images | grep ${IMAGE_REGISTRY}"
         }
       }
     }
-   
-    // 部署应用
+
     stage('App Deploy') {
       steps {
         dir("${BASE_DIR}") {
           echo '🚀 部署应用'
-          sh '''
-            docker compose -f compose-prod-app.yml up -d
-          '''
-          // 检查 Nginx 服务
+          sh "docker compose -f compose-prod-app.yml up -d"
+
           sh '''
             until docker exec miniblog-nginx-1 nginx -t; do
               echo "Waiting for Nginx..."
@@ -209,13 +176,9 @@ pipeline {
       }
     }
 
-    // 清理构建缓存
     stage('Cleanup') {
       steps {
-        dir("${BASE_DIR}") { 
-          echo '🧹 清理构建缓存'
-          sh 'docker system prune -f'
-        }
+        sh 'docker system prune -f'
       }
     }
   }
@@ -226,10 +189,6 @@ pipeline {
     }
     failure {
       echo '❌ 部署失败，请检查日志并修复。'
-    }
-    always {
-      // 清理敏感文件
-      sh 'rm -f .env'
     }
   }
 }
