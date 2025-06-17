@@ -59,8 +59,28 @@ func loadConfigFromEnv() {
 	// 设置环境变量字符转换
 	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "."))
 
+	// 将环境变量中的下划线转换为点号
+	// 例如：MINIBLOG_DATABASE_HOST -> database.host
+	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "."))
+
 	// 设置从环境变量中读取配置
 	viper.AutomaticEnv()
+
+	// 打印环境变量
+	log.Infow("environment variables",
+		"MYSQL_PORT", os.Getenv("MINIBLOG_DATABASE_PORT"),
+		"MYSQL_USER", os.Getenv("MINIBLOG_DATABASE_USERNAME"),
+		"MYSQL_PASSWORD", os.Getenv("MINIBLOG_DATABASE_PASSWORD"),
+		"MYSQL_NAME", os.Getenv("MINIBLOG_DATABASE_DBNAME"),
+		"MYSQL_HOST", os.Getenv("MINIBLOG_DATABASE_HOST"),
+		"REDIS_HOST", os.Getenv("MINIBLOG_REDIS_HOST"),
+		"REDIS_PORT", os.Getenv("MINIBLOG_REDIS_PORT"),
+		"REDIS_PASSWORD", os.Getenv("MINIBLOG_REDIS_PASSWORD"),
+		"REDIS_DB", os.Getenv("MINIBLOG_REDIS_DB"),
+		"JWT_SECRET", os.Getenv("MINIBLOG_JWT_SECRET"),
+		"FEISHU_DOC_READER_APP_ID", os.Getenv("MINIBLOG_FEISHU_DOC_READER_APP_ID"),
+		"FEISHU_DOC_READER_APP_SECRET", os.Getenv("MINIBLOG_FEISHU_DOC_READER_APP_SECRET"),
+	)
 }
 
 // loadConfigFromFile 从配置文件中读取配置
