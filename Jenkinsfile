@@ -22,7 +22,7 @@ pipeline {
     // 应用镜像
     BACKEND_IMAGE_TAG  = "${IMAGE_REGISTRY}-backend:prod"
     FRONTEND_BLOG_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend-blog:prod"
-    FRONTEND_ADMIN_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend-admin:prod"    
+    FRONTEND_ADMIN_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend-admin:prod"
   }
 
   // 阶段
@@ -38,87 +38,25 @@ pipeline {
     }
 
     // 加载环境变量
-    stage('Load Environment') {
+    stage('Load Env') {
       steps {
         script {
-          echo "🔧 加载环境变量"
-          
-          // 根据环境选择对应的凭证
-          def credentialsId = ''
-          switch(params.ENV) {
-            case 'dev':
-              credentialsId = 'miniblog-dev-env'
-              break
-            case 'prod':
-              credentialsId = 'miniblog-prod-env'
-              break
-          }
-          
-          // 使用 withCredentials 加载环境变量文件
+          def credentialsId = params.ENV == 'dev' ? 'miniblog-dev-env' : 'miniblog-prod-env'
           withCredentials([file(credentialsId: credentialsId, variable: 'ENV_FILE')]) {
-            echo "🔧 复制环境变量文件"
-            // 使用单引号避免 Groovy 字符串插值
-            sh 'cp "$ENV_FILE" .env'
-            
-            // 读取环境变量文件内容
-            def envContent = readFile('.env').trim()
-            
-            // 解析环境变量并设置到环境变量中
-            envContent.split('\n').each { line ->
-                if (line && !line.startsWith('#')) {
-                    def parts = line.split('=', 2)
-                    if (parts.length == 2) {
-                        def key = parts[0].trim()
-                        def value = parts[1].trim()
-                        // 去除可能的引号
-                        value = value.replaceAll(/^["']|["']$/, '')
-                        // 使用 wrap 来设置环境变量
-                        wrap([$class: 'EnvVarsWrapper', envVars: [(key): value]]) {
-                            // 这里不需要做任何事情，wrap 会自动设置环境变量
-                        }
-                    }
+            def envMap = [:]
+            readFile(env.ENV_FILE).split('\n').each { line ->
+              if (line && !line.startsWith('#')) {
+                def parts = line.split('=', 2)
+                if (parts.length == 2) {
+                  def key = parts[0].trim()
+                  def value = parts[1].trim().replaceAll(/^\"|\"$/, '').replaceAll(/^'|'$/, '')
+                  env[key] = value
+                  envMap[key] = value
                 }
+              }
             }
-          }
-        }
-      }
-    }
-    
-    // 设置 SSL 证书，由 Jenkins 管理，写到 configs/nginx/ssl 目录下
-    stage('Setup SSL') {
-      steps {
-        dir("${env.WORKSPACE}") {
-          echo '🔧 设置 SSL 证书'
-
-          // 从全局凭据中拉出 Secret File
-          withCredentials([
-            file(credentialsId: 'www.yangshujie.com.cert.key',  variable: 'WWW_SSL_KEY_FILE'),
-            file(credentialsId: 'www.yangshujie.com.cert.pem',  variable: 'WWW_SSL_CRT_FILE'),
-            file(credentialsId: 'admin.yangshujie.com.cert.pem',  variable: 'ADMIN_SSL_CRT_FILE'),
-            file(credentialsId: 'admin.yangshujie.com.cert.key',  variable: 'ADMIN_SSL_KEY_FILE'),
-            file(credentialsId: 'api.yangshujie.com.cert.key',  variable: 'API_SSL_KEY_FILE'),
-            file(credentialsId: 'api.yangshujie.com.cert.pem',  variable: 'API_SSL_CRT_FILE'),
-          ]) {
-            sh '''
-              # 创建 SSL 目录
-              mkdir -p configs/nginx/ssl
-              
-              # 复制 www.yangshujie.com 证书
-              cp "$WWW_SSL_CRT_FILE" configs/nginx/ssl/www.yangshujie.com.crt
-              cp "$WWW_SSL_KEY_FILE" configs/nginx/ssl/www.yangshujie.com.key
-              
-              # 复制 admin.yangshujie.com 证书
-              cp "$ADMIN_SSL_CRT_FILE" configs/nginx/ssl/admin.yangshujie.com.crt
-              cp "$ADMIN_SSL_KEY_FILE" configs/nginx/ssl/admin.yangshujie.com.key
-
-              # 复制 api.yangshujie.com 证书
-              cp "$API_SSL_CRT_FILE" configs/nginx/ssl/api.yangshujie.com.crt
-              cp "$API_SSL_KEY_FILE" configs/nginx/ssl/api.yangshujie.com.key
-              
-              # 设置权限
-              chmod 644 configs/nginx/ssl/*.crt
-              chmod 600 configs/nginx/ssl/*.key
-            '''
+            echo "MYSQL_HOST: ${env.MYSQL_HOST}"
+            echo "MYSQL_PORT: ${env.MYSQL_PORT}"
           }
         }
       }
@@ -129,31 +67,23 @@ pipeline {
       steps {
         dir("${env.WORKSPACE}") {
           echo '🔧 构建基础设施镜像'
-
-          // 输出环境变量
-          echo "MYSQL_HOST: ${MYSQL_HOST}"
-          echo "MYSQL_PORT: ${MYSQL_PORT}"
-          echo "MYSQL_USER: ${MYSQL_USER}"
-          echo "MYSQL_NAME: ${MYSQL_NAME}"
-          echo "MYSQL_PASSWORD: ${MYSQL_PASSWORD}"
-
-          // 构建 MySQL 镜像
+          echo "MYSQL_HOST: ${env.MYSQL_HOST}"
+          echo "MYSQL_PORT: ${env.MYSQL_PORT}"
+          echo "MYSQL_USER: ${env.MYSQL_USER}"
+          echo "MYSQL_NAME: ${env.MYSQL_NAME}"
+          echo "MYSQL_PASSWORD: ${env.MYSQL_PASSWORD}"
           sh """
             docker buildx build --no-cache \
               -f ${BASE_DIR}/Dockerfile.infra.mysql \
               -t ${MYSQL_IMAGE} \
-              --build-arg DB_HOST=${MYSQL_HOST} \
-              --build-arg DB_PORT=${MYSQL_PORT} \
-              --build-arg DB_USER=${MYSQL_USER} \
-              --build-arg DB_NAME=${MYSQL_NAME} \
-              --build-arg DB_PASSWORD=${MYSQL_PASSWORD} \
+              --build-arg DB_HOST=${env.MYSQL_HOST} \
+              --build-arg DB_PORT=${env.MYSQL_PORT} \
+              --build-arg DB_USER=${env.MYSQL_USER} \
+              --build-arg DB_NAME=${env.MYSQL_NAME} \
+              --build-arg DB_PASSWORD=${env.MYSQL_PASSWORD} \
               .
           """
-
-          // 构建 Redis 镜像
           sh "docker buildx build --no-cache -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
-
-          // 查看镜像
           sh "docker images | grep ${IMAGE_REGISTRY}"
         }
       }
