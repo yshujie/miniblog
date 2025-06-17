@@ -52,7 +52,7 @@ func loadConfigFromEnv() {
 	viper.SetEnvPrefix("MINIBLOG")
 
 	// 设置环境变量字符转换
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "."))
 
 	// 设置从环境变量中读取配置
 	viper.AutomaticEnv()
@@ -116,10 +116,10 @@ func initStore() error {
 		Username:              viper.GetString("database.username"),
 		Password:              viper.GetString("database.password"),
 		Database:              viper.GetString("database.dbname"),
-		MaxIdleConns:          viper.GetInt("database.max_idle_conns"),
-		MaxOpenConns:          viper.GetInt("database.max_open_conns"),
-		MaxConnectionLifeTime: viper.GetDuration("database.conn_max_lifetime"),
-		LogLevel:              viper.GetInt("database.log_level"),
+		MaxIdleConns:          viper.GetInt("database.max-idle-conns"),
+		MaxOpenConns:          viper.GetInt("database.max-open-conns"),
+		MaxConnectionLifeTime: viper.GetDuration("database.conn-max-lifetime"),
+		LogLevel:              viper.GetInt("database.log-level"),
 	}
 
 	db, err := db.NewMySQL(dbOpts)

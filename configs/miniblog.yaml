@@ -8,32 +8,32 @@ server:
   name: "miniblog"
   address: "0.0.0.0"
   port: 8081
-  port_ssl: 8443
-  read_timeout: 60    # 秒
-  write_timeout: 60   # 秒
-  run_mode: "debug"   # Gin 开发模式, 可选值有：debug, release, test
+  port-ssl: 8443
+  read-timeout: 60    # 秒
+  write-timeout: 60   # 秒
+  run-mode: "debug"   # Gin 开发模式, 可选值有：debug, release, test
 
 # 数据库配置
 database:
   driver: "mysql"
   host: "mysql"  # 使用容器名称作为主机名
-  port: ${MYSQL_PORT}
-  username: ${MYSQL_USER}
-  password: ${MYSQL_PASSWORD}
-  dbname: ${MYSQL_NAME}
-  max_idle_conns: 10
-  max_open_conns: 100
-  conn_max_lifetime: 3600  # 秒
-  log_level: 4 # GORM log level, 1: silent, 2:error, 3:warn, 4:info
+  port: ""
+  username: ""
+  password: ""
+  dbname: ""
+  max-idle-conns: 10
+  max-open-conns: 100
+  conn-max-lifetime: 3600  # 秒
+  log-level: 4 # GORM log level, 1: silent, 2:error, 3:warn, 4:info
 
 # redis 配置
 redis:
   host: "redis"  # 使用容器名称作为主机名
-  port: ${REDIS_PORT}
-  password: ${REDIS_PASSWORD}
-  db: ${REDIS_DB}
-  pool_size: 100
-  min_idle_conns: 10
+  port: ""
+  password: ""
+  db: ""
+  pool-size: 100
+  min-idle-conns: 10
 
 # 日志配置
 log:
@@ -45,20 +45,20 @@ log:
 
 # jwt 配置
 jwt:
-  secret: ${JWT_SECRET} # JWT 签发密钥
+  secret: "" # JWT 签发密钥
   expire: 86400      # token 过期时间（秒）
 
 # cors 配置
 cors:
-  allowed_origins:
+  allowed-origins:
     - "*"
-  allowed_methods:
+  allowed-methods:
     - "GET"
     - "POST"
     - "PUT"
     - "DELETE"
     - "OPTIONS"
-  allowed_headers:
+  allowed-headers:
     - "Content-Type"
     - "Authorization"
 
@@ -69,6 +69,6 @@ tls:
 
 # feishu 配置
 feishu:
-  doc_reader:
-    app_id: ${FEISHU_DOC_READER_APP_ID}
-    app_secret: ${FEISHU_DOC_READER_APP_SECRET}
+  doc-reader:
+    app-id: ""
+    app-secret: ""

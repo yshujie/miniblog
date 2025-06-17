@@ -75,7 +75,7 @@ func run() error {
 	token.Init(viper.GetString("jwt.secret"), known.XUsernameKey)
 
 	// 设置 Gin 模式
-	gin.SetMode(viper.GetString("server.run_mode"))
+	gin.SetMode(viper.GetString("server.run-mode"))
 
 	// 创建 Gin 引擎
 	g := gin.New()
@@ -148,7 +148,7 @@ func startInsecureServer(g *gin.Engine) *http.Server {
 func startSecureServer(g *gin.Engine) *http.Server {
 	// 创建 HTTPS Server 实例
 	httpsSrv := &http.Server{
-		Addr:    viper.GetString("server.address") + ":" + viper.GetString("server.port_ssl"),
+		Addr:    viper.GetString("server.address") + ":" + viper.GetString("server.port-ssl"),
 		Handler: g,
 	}
 

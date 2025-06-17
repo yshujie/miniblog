@@ -143,8 +143,8 @@ func (b *articleBiz) Unpublish(ctx context.Context, articleId int) error {
 func loadArticleContent(externalLink string, ctx context.Context) (string, error) {
 	// 读取文档内容
 	content, err := feishu.GetClient(
-		viper.GetString("feishu.doc_reader.app_id"),
-		viper.GetString("feishu.doc_reader.app_secret"),
+		viper.GetString("feishu.doc-reader.app-id"),
+		viper.GetString("feishu.doc-reader.app-secret"),
 		ctx,
 	).
 		DocReader.ReadContent(externalLink, "docx", "markdown")
