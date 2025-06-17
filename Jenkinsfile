@@ -41,7 +41,14 @@ pipeline {
       }
     }
 
- // 设置 SSL 证书，由 Jenkins 管理，写到 configs/nginx/ssl 目录下
+    stage('Checkout') {
+      steps {
+        deleteDir()
+        checkout scm
+      }
+    }
+
+    // 设置 SSL 证书，由 Jenkins 管理，写到 configs/nginx/ssl 目录下
     stage('Setup SSL') {
       steps {
         dir("${env.WORKSPACE}") {
@@ -78,13 +85,6 @@ pipeline {
             '''
           }
         }
-      }
-    }
-
-    stage('Checkout') {
-      steps {
-        deleteDir()
-        checkout scm
       }
     }
 
