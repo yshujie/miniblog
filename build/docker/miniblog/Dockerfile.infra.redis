@@ -1,10 +1,22 @@
 # build/docker/miniblog/Dockerfile.infra.redis
 FROM redis:alpine
 
+# 接收参数
+ARG REDIS_HOST
+ARG REDIS_PORT
+ARG REDIS_PASSWORD
+ARG REDIS_DB
+
+# 设置环境变量
+ENV REDIS_HOST=${REDIS_HOST}
+ENV REDIS_PORT=${REDIS_PORT}
+ENV REDIS_PASSWORD=${REDIS_PASSWORD}
+ENV REDIS_DB=${REDIS_DB}
+
 # 如果有自定义 redis.conf，可以一起打包
 # COPY configs/redis/redis.conf /usr/local/etc/redis/redis.conf
 
 # 也可以在这里设置默认命令为加载自定义配置：
 # CMD ["redis-server", "/usr/local/etc/redis/redis.conf"]
 
-EXPOSE 6379
+EXPOSE ${REDIS_PORT}

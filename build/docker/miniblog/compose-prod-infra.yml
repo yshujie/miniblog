@@ -28,10 +28,15 @@ services:
   redis:
     image: miniblog-redis:prod
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:${REDIS_PORT}"
     volumes:
       - /data/redis/data:/data
       - /data/logs/redis:/var/log/redis
+    environment:
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_DB: ${REDIS_DB}
     networks:
       - miniblog-network
     restart: always

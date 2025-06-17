@@ -115,7 +115,16 @@ pipeline {
               .
           """
 
-          sh "docker buildx build --no-cache -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
+          sh """
+            docker buildx build --no-cache \
+              -f ${BASE_DIR}/Dockerfile.infra.redis \
+              -t ${REDIS_IMAGE} \
+              --build-arg REDIS_HOST=${env.REDIS_HOST} \
+              --build-arg REDIS_PORT=${env.REDIS_PORT} \
+              --build-arg REDIS_PASSWORD=${env.REDIS_PASSWORD} \
+              --build-arg REDIS_DB=${env.REDIS_DB} \
+              .
+          """
         }
       }
     }
@@ -126,11 +135,15 @@ pipeline {
           echo '🔧 拉取基础设施镜像并启动容器'
 
           sh """
-            MYSQL_HOST=${env.MYSQL_HOST} \
-            MYSQL_PORT=${env.MYSQL_PORT} \
-            MYSQL_USER=${env.MYSQL_USER} \
-            MYSQL_NAME=${env.MYSQL_NAME} \
-            MYSQL_PASSWORD=${env.MYSQL_PASSWORD} \
+            MYSQL_HOST=${env.MYSQL_HOST}
+            MYSQL_PORT=${env.MYSQL_PORT}
+            MYSQL_USER=${env.MYSQL_USER}
+            MYSQL_NAME=${env.MYSQL_NAME}
+            MYSQL_PASSWORD=${env.MYSQL_PASSWORD}
+            REDIS_HOST=${env.REDIS_HOST}
+            REDIS_PORT=${env.REDIS_PORT}
+            REDIS_PASSWORD=${env.REDIS_PASSWORD}
+            REDIS_DB=${env.REDIS_DB}
             docker compose -f compose-prod-infra.yml up -d --remove-orphans --force-recreate
           """
 
