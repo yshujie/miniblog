@@ -57,11 +57,13 @@ func loadConfigFromEnv() {
 	viper.SetEnvPrefix("MINIBLOG")
 
 	// 设置环境变量字符转换
-	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "."))
-
-	// 将环境变量中的下划线转换为点号
+	// 1. 将 MINIBLOG_ 前缀替换为空
+	// 2. 将下划线转换为点号
 	// 例如：MINIBLOG_DATABASE_HOST -> database.host
-	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "."))
+	viper.SetEnvKeyReplacer(strings.NewReplacer(
+		"MINIBLOG_", "",
+		"_", ".",
+	))
 
 	// 设置从环境变量中读取配置
 	viper.AutomaticEnv()
