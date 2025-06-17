@@ -1,9 +1,15 @@
 pipeline {
   agent any
 
-  // 参数
-  parameters {
-    choice(name: 'ENV', choices: ['dev', 'prod'], description: '选择部署环境')
+  // 定义读取环境变量的方法
+  @NonCPS
+  def getEnvVar(String credentialsId, String key) {
+    def content = credentials(credentialsId)
+    def line = content.split('\n').find { it.startsWith("${key}=") }
+    if (line) {
+      return line.split('=', 2)[1].trim().replaceAll(/^["']|["']$/, '')
+    }
+    return ''
   }
 
   // 环境变量
@@ -23,6 +29,20 @@ pipeline {
     BACKEND_IMAGE_TAG  = "${IMAGE_REGISTRY}-backend:prod"
     FRONTEND_BLOG_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend-blog:prod"
     FRONTEND_ADMIN_IMAGE_TAG = "${IMAGE_REGISTRY}-frontend-admin:prod"
+
+    // 从环境变量文件中读取的变量
+    CREDENTIALS_ID = 'miniblog-dev-env'
+    MYSQL_HOST = "${getEnvVar(CREDENTIALS_ID, 'MYSQL_HOST')}"
+    MYSQL_PORT = "${getEnvVar(CREDENTIALS_ID, 'MYSQL_PORT')}"
+    MYSQL_USER = "${getEnvVar(CREDENTIALS_ID, 'MYSQL_USER')}"
+    MYSQL_NAME = "${getEnvVar(CREDENTIALS_ID, 'MYSQL_NAME')}"
+    MYSQL_PASSWORD = "${getEnvVar(CREDENTIALS_ID, 'MYSQL_PASSWORD')}"
+
+    echo "MYSQL_HOST: ${MYSQL_HOST}"
+    echo "MYSQL_PORT: ${MYSQL_PORT}"
+    echo "MYSQL_USER: ${MYSQL_USER}"
+    echo "MYSQL_NAME: ${MYSQL_NAME}"
+    echo "MYSQL_PASSWORD: ${MYSQL_PASSWORD}"
   }
 
   // 阶段
@@ -37,30 +57,7 @@ pipeline {
       }
     }
 
-    // 加载环境变量
-    stage('Load Env') {
-      steps {
-        script {
-          def credentialsId = params.ENV == 'dev' ? 'miniblog-dev-env' : 'miniblog-prod-env'
-          withCredentials([file(credentialsId: credentialsId, variable: 'ENV_FILE')]) {
-            def envMap = [:]
-            readFile(env.ENV_FILE).split('\n').each { line ->
-              if (line && !line.startsWith('#')) {
-                def parts = line.split('=', 2)
-                if (parts.length == 2) {
-                  def key = parts[0].trim()
-                  def value = parts[1].trim().replaceAll(/^\"|\"$/, '').replaceAll(/^'|'$/, '')
-                  env[key] = value
-                  envMap[key] = value
-                }
-              }
-            }
-            echo "MYSQL_HOST: ${env.MYSQL_HOST}"
-            echo "MYSQL_PORT: ${env.MYSQL_PORT}"
-          }
-        }
-      }
-    }
+   
 
     // 构建基础设施镜像
     stage('Infra: build') {
@@ -72,6 +69,8 @@ pipeline {
           echo "MYSQL_USER: ${env.MYSQL_USER}"
           echo "MYSQL_NAME: ${env.MYSQL_NAME}"
           echo "MYSQL_PASSWORD: ${env.MYSQL_PASSWORD}"
+
+          // 构建 MySQL 镜像
           sh """
             docker buildx build --no-cache \
               -f ${BASE_DIR}/Dockerfile.infra.mysql \
@@ -83,7 +82,11 @@ pipeline {
               --build-arg DB_PASSWORD=${env.MYSQL_PASSWORD} \
               .
           """
+
+          // 构建 Redis 镜像
           sh "docker buildx build --no-cache -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
+
+          // 查看镜像
           sh "docker images | grep ${IMAGE_REGISTRY}"
         }
       }
