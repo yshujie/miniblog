@@ -17,10 +17,10 @@ server:
 database:
   driver: "mysql"
   host: "mysql"  # 使用容器名称作为主机名
-  port: 3306
-  username: "miniblog"
-  password: "miniblog123"
-  dbname: "miniblog"
+  port: ${MYSQL_PORT}
+  username: ${MYSQL_USER}
+  password: ${MYSQL_PASSWORD}
+  dbname: ${MYSQL_NAME}
   max_idle_conns: 10
   max_open_conns: 100
   conn_max_lifetime: 3600  # 秒
@@ -29,9 +29,9 @@ database:
 # redis 配置
 redis:
   host: "redis"  # 使用容器名称作为主机名
-  port: 6379
-  password: ""       # 如果没有密码则留空
-  db: 0
+  port: ${REDIS_PORT}
+  password: ${REDIS_PASSWORD}
+  db: ${REDIS_DB}
   pool_size: 100
   min_idle_conns: 10
 
@@ -45,7 +45,7 @@ log:
 
 # jwt 配置
 jwt:
-  secret: Rtg8BPKNEf2mB4mgvKONGPZZQSaJWNLijxR42qRgq0iBb5 # JWT 签发密钥
+  secret: ${JWT_SECRET} # JWT 签发密钥
   expire: 86400      # token 过期时间（秒）
 
 # cors 配置
@@ -70,5 +70,5 @@ tls:
 # feishu 配置
 feishu:
   doc_reader:
-    app_id: "cli_a8a6833e6859501c"
-    app_secret: "A87ckTk0iNJRSta5zD1XNgqdnbpSoKNv"
+    app_id: ${FEISHU_DOC_READER_APP_ID}
+    app_secret: ${FEISHU_DOC_READER_APP_SECRET}

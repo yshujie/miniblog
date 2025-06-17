@@ -37,6 +37,16 @@ pipeline {
           echo "MYSQL_USER: ${env.MYSQL_USER}"
           echo "MYSQL_NAME: ${env.MYSQL_NAME}"
           echo "MYSQL_PASSWORD: ${env.MYSQL_PASSWORD}"
+
+          echo "REDIS_HOST: ${env.REDIS_HOST}"
+          echo "REDIS_PORT: ${env.REDIS_PORT}"
+          echo "REDIS_PASSWORD: ${env.REDIS_PASSWORD}"
+          echo "REDIS_DB: ${env.REDIS_DB}"
+
+          echo "JWT_SECRET: ${env.JWT_SECRET}"
+
+          echo "FEISHU_DOC_READER_APP_ID: ${env.FEISHU_DOC_READER_APP_ID}"
+          echo "FEISHU_DOC_READER_APP_SECRET: ${env.FEISHU_DOC_READER_APP_SECRET}"
         }
       }
     }
@@ -181,6 +191,18 @@ pipeline {
               --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
               --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
               --build-arg GO111MODULE=on \
+              --build-arg MYSQL_HOST=${env.MYSQL_HOST} \
+              --build-arg MYSQL_PORT=${env.MYSQL_PORT} \
+              --build-arg MYSQL_USER=${env.MYSQL_USER} \
+              --build-arg MYSQL_NAME=${env.MYSQL_NAME} \
+              --build-arg MYSQL_PASSWORD=${env.MYSQL_PASSWORD} \
+              --build-arg REDIS_HOST=${env.REDIS_HOST} \
+              --build-arg REDIS_PORT=${env.REDIS_PORT} \
+              --build-arg REDIS_PASSWORD=${env.REDIS_PASSWORD} \
+              --build-arg REDIS_DB=${env.REDIS_DB} \
+              --build-arg JWT_SECRET=${env.JWT_SECRET} \
+              --build-arg FEISHU_DOC_READER_APP_ID=${env.FEISHU_DOC_READER_APP_ID} \
+              --build-arg FEISHU_DOC_READER_APP_SECRET=${env.FEISHU_DOC_READER_APP_SECRET} \
               --cache-from ${BACKEND_IMAGE_TAG} \
               -f Dockerfile.prod.backend \
               -t ${BACKEND_IMAGE_TAG} \
