@@ -5,7 +5,7 @@ services:
   mysql:
     image: miniblog-mysql:prod
     ports:
-      - "${MYSQL_PORT}:3306"
+      - "${MYSQL_PORT}:${MYSQL_PORT}"
     volumes:
       - /data/mysql/data:/var/lib/mysql
       - /data/logs/mysql:/var/log/mysql
