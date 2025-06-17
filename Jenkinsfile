@@ -60,41 +60,20 @@ pipeline {
             // 使用单引号避免 Groovy 字符串插值
             sh 'cp "$ENV_FILE" .env'
             
-            // 使用 shell 命令读取和设置环境变量
-            sh '''
-                #!/bin/sh
-                set -e
-                
-                # 读取 .env 文件并设置环境变量
-                while read line; do
-                    # 跳过空行
-                    if [ -z "$line" ]; then
-                        continue
-                    fi
-                    
-                    # 跳过注释行
-                    case "$line" in
-                        "#"*)
-                            continue
-                            ;;
-                    esac
-                    
-                    # 分割键值对
-                    key=$(echo "$line" | cut -d= -f1 | tr -d " ")
-                    value=$(echo "$line" | cut -d= -f2- | tr -d " ")
-                    
-                    # 去除可能的引号
-                    value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
-                    
-                    # 设置环境变量
-                    if [ -n "$key" ] && [ -n "$value" ]; then
-                        export "$key=$value"
-                    fi
-                done < .env
-                
-                # 检查环境变量是否加载成功
-                env | grep -E "MYSQL_|REDIS_|JWT_|FEISHU_"
-            '''
+            // 读取环境变量文件并设置为 pipeline 环境变量
+            def envFile = readFile('.env').trim()
+            envFile.split('\n').each { line ->
+                if (line && !line.startsWith('#')) {
+                    def parts = line.split('=', 2)
+                    if (parts.length == 2) {
+                        def key = parts[0].trim()
+                        def value = parts[1].trim()
+                        // 去除可能的引号
+                        value = value.replaceAll(/^["']|["']$/, '')
+                        env[key] = value
+                    }
+                }
+            }
           }
         }
       }
