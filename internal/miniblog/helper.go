@@ -53,19 +53,13 @@ func initConfig() {
 
 // loadConfigFromEnv 从环境变量中读取配置
 func loadConfigFromEnv() {
-	// 设置环境变量前缀
+	// 1. 所有 env 都以 MINIBLOG_ 开头
 	viper.SetEnvPrefix("MINIBLOG")
 
-	// 设置环境变量字符转换
-	// 1. 将 MINIBLOG_ 前缀替换为空
-	// 2. 将下划线转换为点号
-	// 例如：MINIBLOG_DATABASE_HOST -> database.host
-	viper.SetEnvKeyReplacer(strings.NewReplacer(
-		"MINIBLOG_", "",
-		"_", ".",
-	))
+	// 2. key path 用点分隔，自动变成下划线
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// 设置从环境变量中读取配置
+	// 3. 开启自动读取
 	viper.AutomaticEnv()
 
 	// 打印环境变量
