@@ -146,7 +146,27 @@ pipeline {
         dir("${env.WORKSPACE}") {
           echo '🔧 构建基础设施镜像'
 
-          sh "docker buildx build --no-cache -f ${BASE_DIR}/Dockerfile.infra.mysql -t ${MYSQL_IMAGE} ."
+          // 输出环境变量
+          echo "MYSQL_HOST: ${MYSQL_HOST}"
+          echo "MYSQL_PORT: ${MYSQL_PORT}"
+          echo "MYSQL_USER: ${MYSQL_USER}"
+          echo "MYSQL_NAME: ${MYSQL_NAME}"
+          echo "MYSQL_PASSWORD: ${MYSQL_PASSWORD}"
+
+          // 构建 MySQL 镜像
+          sh """
+            docker buildx build --no-cache \
+              -f ${BASE_DIR}/Dockerfile.infra.mysql \
+              -t ${MYSQL_IMAGE} \
+              --build-arg DB_HOST=${MYSQL_HOST} \
+              --build-arg DB_PORT=${MYSQL_PORT} \
+              --build-arg DB_USER=${MYSQL_USER} \
+              --build-arg DB_NAME=${MYSQL_NAME} \
+              --build-arg DB_PASSWORD=${MYSQL_PASSWORD} \
+              .
+          """
+
+          // 构建 Redis 镜像
           sh "docker buildx build --no-cache -f ${BASE_DIR}/Dockerfile.infra.redis -t ${REDIS_IMAGE} ."
 
           // 查看镜像
