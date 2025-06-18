@@ -69,6 +69,6 @@ tls:
 
 # feishu 配置
 feishu:
-  doc-reader:
-    app-id: ""
-    app-secret: ""
+  docreader:
+    appid: ""
+    appsecret: ""
