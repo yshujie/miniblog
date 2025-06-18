@@ -27,10 +27,13 @@
 <script setup lang="ts">
 import { computed, onBeforeMount } from 'vue'
 import { useModuleStore } from '@/stores/module'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 // module store
 const moduleStore = useModuleStore()
+
+// 获取路由实例
+const router = useRouter()
 
 // 获取路由实例
 const route = useRoute()
@@ -62,6 +65,12 @@ onBeforeMount(async () => {
 const handleModuleClick = (moduleCode: string) => {
   // 加载模块详情
   moduleStore.loadModuleDetail(moduleCode)
+
+  // 尝试选择第一篇文章
+  const firstArticle = moduleStore.modules.find(module => module.code === moduleCode)?.sections[0].articles[0]
+  if (firstArticle) {
+    router.push(`/blog/${moduleCode}/article/${firstArticle.id}`)
+  }
 }
 
 </script>
