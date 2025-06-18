@@ -22,7 +22,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { defineProps, ref } from 'vue'
+import { computed, defineProps } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Section } from '@/types/section';
 
@@ -30,10 +30,17 @@ const props = defineProps<{ sections: Section[], moduleCode: string }>()
 
 const router = useRouter()
 
-const currentArticleId = ref<number | null>(null)
+// 当前选中的文章 ID
+const currentArticleId = computed(() => {
+  const articleId = router.currentRoute.value.params.article
+  if (articleId) {
+    return Number(articleId)
+  }
+  return null
+})
 
+// 文章点击事件
 const handleArticleClick = (articleId: number) => {
-  currentArticleId.value = articleId
   router.push(`/blog/${props.moduleCode}/article/${articleId}`)
 }
 </script>
