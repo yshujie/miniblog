@@ -45,8 +45,8 @@ pipeline {
 
           echo "JWT_SECRET: ${env.JWT_SECRET}"
 
-          echo "FEISHU_DOC_READER_APP_ID: ${env.FEISHU_DOC_READER_APP_ID}"
-          echo "FEISHU_DOC_READER_APP_SECRET: ${env.FEISHU_DOC_READER_APP_SECRET}"
+          echo "FEISHU_DOC-READER_APP-ID: ${env.FEISHU_DOC-READER_APP-ID}"
+          echo "FEISHU_DOC-READER_APP-SECRET: ${env.FEISHU_DOC-READER_APP-SECRET}"
         }
       }
     }
@@ -214,8 +214,8 @@ pipeline {
               --build-arg REDIS_PASSWORD=${env.REDIS_PASSWORD} \
               --build-arg REDIS_DB=${env.REDIS_DB} \
               --build-arg JWT_SECRET=${env.JWT_SECRET} \
-              --build-arg FEISHU_DOC_READER_APP_ID=${env.FEISHU_DOC_READER_APP_ID} \
-              --build-arg FEISHU_DOC_READER_APP_SECRET=${env.FEISHU_DOC_READER_APP_SECRET} \
+              --build-arg FEISHU_DOC-READER_APP-ID=${env.FEISHU_DOC-READER_APP-ID} \
+              --build-arg FEISHU_DOC-READER_APP-SECRET=${env.FEISHU_DOC-READER_APP-SECRET} \
               --cache-from ${BACKEND_IMAGE_TAG} \
               -f Dockerfile.prod.backend \
               -t ${BACKEND_IMAGE_TAG} \
