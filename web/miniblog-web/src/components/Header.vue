@@ -9,7 +9,7 @@
     <div class="right">
  
     <div class="nav">
-      <el-menu mode="horizontal" :default-active="'/'" router>
+      <el-menu mode="horizontal" :default-active="currentFullPath" router>
         <el-menu-item index="/">首页</el-menu-item>
         <el-menu-item v-for="module in moduleStore.modules" :key="module.code" :index="`/blog/${module.code}`" @click="handleModuleClick(module.code)">
           {{ module.title }}
@@ -25,11 +25,21 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount } from 'vue'
+import { computed, onBeforeMount } from 'vue'
 import { useModuleStore } from '@/stores/module'
+import { useRoute } from 'vue-router'
 
 // module store
 const moduleStore = useModuleStore()
+
+// 获取路由实例
+const route = useRoute()
+
+// 计算属性 currentFullPath
+const currentFullPath = computed(() => {
+  return route.path
+})
+
 
 onBeforeMount(async () => {
   console.log('onBeforeMount')
