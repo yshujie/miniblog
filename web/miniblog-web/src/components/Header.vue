@@ -37,7 +37,13 @@ const route = useRoute()
 
 // 计算属性 currentFullPath
 const currentFullPath = computed(() => {
-  return route.path
+  // 如果 route.path 以 /blog/ 开头，则返回 /blog/xxx 前两位
+  if (route.path.startsWith('/blog/')) {
+    const path = route.path.split('/')
+    return '/' + path[1] + '/' + path[2]
+  }
+
+  return '/'
 })
 
 
