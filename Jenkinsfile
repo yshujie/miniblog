@@ -98,69 +98,69 @@ pipeline {
       }
     }
 
-    stage('Infra: build') {
-      steps {
-        dir("${env.WORKSPACE}") {
-          echo '🔧 构建基础设施镜像'
+    // stage('Infra: build') {
+    //   steps {
+    //     dir("${env.WORKSPACE}") {
+    //       echo '🔧 构建基础设施镜像'
 
-          sh """
-            docker buildx build --no-cache \
-              -f ${BASE_DIR}/Dockerfile.infra.mysql \
-              -t ${MYSQL_IMAGE} \
-              --build-arg DB_HOST=${env.MYSQL_HOST} \
-              --build-arg DB_PORT=${env.MYSQL_PORT} \
-              --build-arg DB_USERNAME=${env.MYSQL_USERNAME} \
-              --build-arg DB_DBNAME=${env.MYSQL_DBNAME} \
-              --build-arg DB_PASSWORD=${env.MYSQL_PASSWORD} \
-              .
-          """
+    //       sh """
+    //         docker buildx build --no-cache \
+    //           -f ${BASE_DIR}/Dockerfile.infra.mysql \
+    //           -t ${MYSQL_IMAGE} \
+    //           --build-arg DB_HOST=${env.MYSQL_HOST} \
+    //           --build-arg DB_PORT=${env.MYSQL_PORT} \
+    //           --build-arg DB_USERNAME=${env.MYSQL_USERNAME} \
+    //           --build-arg DB_DBNAME=${env.MYSQL_DBNAME} \
+    //           --build-arg DB_PASSWORD=${env.MYSQL_PASSWORD} \
+    //           .
+    //       """
 
-          sh """
-            docker buildx build --no-cache \
-              -f ${BASE_DIR}/Dockerfile.infra.redis \
-              -t ${REDIS_IMAGE} \
-              --build-arg REDIS_HOST=${env.REDIS_HOST} \
-              --build-arg REDIS_PORT=${env.REDIS_PORT} \
-              --build-arg REDIS_PASSWORD=${env.REDIS_PASSWORD} \
-              --build-arg REDIS_DB=${env.REDIS_DB} \
-              .
-          """
-        }
-      }
-    }
+    //       sh """
+    //         docker buildx build --no-cache \
+    //           -f ${BASE_DIR}/Dockerfile.infra.redis \
+    //           -t ${REDIS_IMAGE} \
+    //           --build-arg REDIS_HOST=${env.REDIS_HOST} \
+    //           --build-arg REDIS_PORT=${env.REDIS_PORT} \
+    //           --build-arg REDIS_PASSWORD=${env.REDIS_PASSWORD} \
+    //           --build-arg REDIS_DB=${env.REDIS_DB} \
+    //           .
+    //       """
+    //     }
+    //   }
+    // }
 
-    stage('Infra: Up') {
-      steps {
-        dir("${BASE_DIR}") {
-          echo '🔧 拉取基础设施镜像并启动容器'
+    // stage('Infra: Up') {
+    //   steps {
+    //     dir("${BASE_DIR}") {
+    //       echo '🔧 拉取基础设施镜像并启动容器'
 
-          sh """
-            MYSQL_HOST=${env.MYSQL_HOST}
-            MYSQL_PORT=${env.MYSQL_PORT}
-            MYSQL_USERNAME=${env.MYSQL_USERNAME}
-            MYSQL_DBNAME=${env.MYSQL_DBNAME}
-            MYSQL_PASSWORD=${env.MYSQL_PASSWORD}
-            REDIS_HOST=${env.REDIS_HOST}
-            REDIS_PORT=${env.REDIS_PORT}
-            REDIS_PASSWORD=${env.REDIS_PASSWORD}
-            REDIS_DB=${env.REDIS_DB}
-            docker compose -f compose-prod-infra.yml up -d --remove-orphans --force-recreate
-          """
+    //       sh """
+    //         MYSQL_HOST=${env.MYSQL_HOST}
+    //         MYSQL_PORT=${env.MYSQL_PORT}
+    //         MYSQL_USERNAME=${env.MYSQL_USERNAME}
+    //         MYSQL_DBNAME=${env.MYSQL_DBNAME}
+    //         MYSQL_PASSWORD=${env.MYSQL_PASSWORD}
+    //         REDIS_HOST=${env.REDIS_HOST}
+    //         REDIS_PORT=${env.REDIS_PORT}
+    //         REDIS_PASSWORD=${env.REDIS_PASSWORD}
+    //         REDIS_DB=${env.REDIS_DB}
+    //         docker compose -f compose-prod-infra.yml up -d --remove-orphans --force-recreate
+    //       """
 
-          sh '''
-            until docker exec miniblog-mysql-1 mysqladmin ping -h localhost --silent; do
-              echo "Waiting for MySQL..."
-              sleep 2
-            done
+    //       sh '''
+    //         until docker exec miniblog-mysql-1 mysqladmin ping -h localhost --silent; do
+    //           echo "Waiting for MySQL..."
+    //           sleep 2
+    //         done
 
-            until docker exec miniblog-redis-1 redis-cli ping; do
-              echo "Waiting for Redis..."
-              sleep 2
-            done
-          '''
-        }
-      }
-    }
+    //         until docker exec miniblog-redis-1 redis-cli ping; do
+    //           echo "Waiting for Redis..."
+    //           sleep 2
+    //         done
+    //       '''
+    //     }
+    //   }
+    // }
 
     stage('Build: Frontend') {
       steps {
@@ -192,47 +192,47 @@ pipeline {
       }
     }
 
-    stage('Build: Backend') {
-      steps {
-        dir("${BASE_DIR}") {
-          echo '📦 构建后端生产镜像'
-          sh """
-            docker buildx build \
-              --network host \
-              --add-host host.docker.internal:host-gateway \
-              --build-arg GOPROXY=https://goproxy.cn,direct \
-              --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
-              --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
-              --build-arg GO111MODULE=on \
-              --build-arg MYSQL_HOST=${env.MYSQL_HOST} \
-              --build-arg MYSQL_PORT=${env.MYSQL_PORT} \
-              --build-arg MYSQL_USERNAME=${env.MYSQL_USERNAME} \
-              --build-arg MYSQL_DBNAME=${env.MYSQL_DBNAME} \
-              --build-arg MYSQL_PASSWORD=${env.MYSQL_PASSWORD} \
-              --build-arg REDIS_HOST=${env.REDIS_HOST} \
-              --build-arg REDIS_PORT=${env.REDIS_PORT} \
-              --build-arg REDIS_PASSWORD=${env.REDIS_PASSWORD} \
-              --build-arg REDIS_DB=${env.REDIS_DB} \
-              --build-arg JWT_SECRET=${env.JWT_SECRET} \
-              --build-arg FEISHU_DOCREADER_APPID=${env.FEISHU_DOCREADER_APPID} \
-              --build-arg FEISHU_DOCREADER_APPSECRET=${env.FEISHU_DOCREADER_APPSECRET} \
-              --cache-from ${BACKEND_IMAGE_TAG} \
-              -f Dockerfile.prod.backend \
-              -t ${BACKEND_IMAGE_TAG} \
-              ../../../
-          """
-        }
-      }
-    }
+    // stage('Build: Backend') {
+    //   steps {
+    //     dir("${BASE_DIR}") {
+    //       echo '📦 构建后端生产镜像'
+    //       sh """
+    //         docker buildx build \
+    //           --network host \
+    //           --add-host host.docker.internal:host-gateway \
+    //           --build-arg GOPROXY=https://goproxy.cn,direct \
+    //           --build-arg HTTP_PROXY=http://host.docker.internal:7890 \
+    //           --build-arg HTTPS_PROXY=http://host.docker.internal:7890 \
+    //           --build-arg GO111MODULE=on \
+    //           --build-arg MYSQL_HOST=${env.MYSQL_HOST} \
+    //           --build-arg MYSQL_PORT=${env.MYSQL_PORT} \
+    //           --build-arg MYSQL_USERNAME=${env.MYSQL_USERNAME} \
+    //           --build-arg MYSQL_DBNAME=${env.MYSQL_DBNAME} \
+    //           --build-arg MYSQL_PASSWORD=${env.MYSQL_PASSWORD} \
+    //           --build-arg REDIS_HOST=${env.REDIS_HOST} \
+    //           --build-arg REDIS_PORT=${env.REDIS_PORT} \
+    //           --build-arg REDIS_PASSWORD=${env.REDIS_PASSWORD} \
+    //           --build-arg REDIS_DB=${env.REDIS_DB} \
+    //           --build-arg JWT_SECRET=${env.JWT_SECRET} \
+    //           --build-arg FEISHU_DOCREADER_APPID=${env.FEISHU_DOCREADER_APPID} \
+    //           --build-arg FEISHU_DOCREADER_APPSECRET=${env.FEISHU_DOCREADER_APPSECRET} \
+    //           --cache-from ${BACKEND_IMAGE_TAG} \
+    //           -f Dockerfile.prod.backend \
+    //           -t ${BACKEND_IMAGE_TAG} \
+    //           ../../../
+    //       """
+    //     }
+    //   }
+    // }
 
-    stage('Build: Nginx') {
-      steps {
-        dir("${env.WORKSPACE}") {
-          echo '📦 构建 Nginx 生产镜像'
-          sh "docker buildx build --no-cache -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
-        }
-      }
-    }
+    // stage('Build: Nginx') {
+    //   steps {
+    //     dir("${env.WORKSPACE}") {
+    //       echo '📦 构建 Nginx 生产镜像'
+    //       sh "docker buildx build --no-cache -f ${BASE_DIR}/Dockerfile.infra.nginx -t ${NGINX_IMAGE} ."
+    //     }
+    //   }
+    // }
 
     stage('App Deploy') {
       steps {
