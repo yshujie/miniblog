@@ -57,6 +57,7 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 	article := &model.Article{
 		Title:       r.Title,
 		Content:     content,
+		ExternalUrl: r.ExternalLink,
 		SectionCode: r.SectionCode,
 		Author:      r.Author,
 		Tags:        strings.Join(r.Tags, ","),
@@ -88,6 +89,7 @@ func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) (*v
 	article.Title = r.Title
 	article.Author = r.Author
 	article.Tags = strings.Join(r.Tags, ",")
+	article.ExternalUrl = r.ExternalLink
 	article.SectionCode = r.SectionCode
 	article.Content = r.Content
 

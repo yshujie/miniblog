@@ -11,6 +11,7 @@ type Article struct {
 	ID          int       `json:"id"`
 	Title       string    `json:"title"`
 	Content     string    `json:"content"`
+	ExternalUrl string    `json:"external_url"`
 	SectionCode string    `json:"section_code"`
 	Author      string    `json:"author"`
 	Tags        string    `json:"tags"`
