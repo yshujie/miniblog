@@ -7,16 +7,17 @@
       <div v-show="hasArticle" class="article-card">
         <div class="article-card-content">
           <iframe
-          :src="currentArticle?.ExternalLink"
-          frameborder="0"
-          style="width: 100%; height: 100%;"
-        ></iframe>
+            ref="articleFrame"
+            :src="currentArticle?.ExternalLink"
+            frameborder="0"
+            style="width: 100%; height: 100%;"
+          ></iframe>
         </div>
       </div>
     </div>
 </template>
 <script setup lang="ts">
-import { computed, defineProps, ref, onMounted, onUpdated } from 'vue'
+import { computed, defineProps, ref, onMounted, onUpdated, watch } from 'vue'
 import { Article } from '@/types/article'
 import { fetchArticleDetail } from '@/api/blog'
 
@@ -29,6 +30,16 @@ const currentArticle = ref<Article | null>(null)
 // 计算属性：hasArticle
 const hasArticle = computed(() => {
   return currentArticle.value !== null && currentArticle.value instanceof Article
+})
+
+const articleFrame = ref<HTMLIFrameElement | null>(null)
+
+watch(() => currentArticle.value?.ExternalLink, (val) => {
+  if (val && articleFrame.value) {
+    articleFrame.value.onload = () => {
+      console.log('✅ iframe 加载成功')
+    }
+  }
 })
 
 // 组件挂载时，获取文章
