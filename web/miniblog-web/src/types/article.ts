@@ -24,7 +24,7 @@ export class Article {
     this.id = data.id
     this.sectionCode = data.sectionCode
     this.title = data.title
-    this.ExternalLink = data.ExternalLink || ''
+    this.ExternalLink = 'https://vdbapmvz0i.feishu.cn/docx/LHjidY6dBo22vGxfaFMcRQiXnd2?from=from_copylink'
     this.author = data.author
     this.content = data.content || ''
     this.tags = data.tags || []
