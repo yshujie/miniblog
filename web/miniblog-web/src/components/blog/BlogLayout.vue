@@ -2,12 +2,12 @@
 
     <el-row class="blog-layout">
       <!-- 侧边栏 -->
-      <el-col :span="5" class="sidebar">
+      <el-col :span="3" class="sidebar">
         <aside class="sidebar"><slot name="sidebar" /></aside>
       </el-col>
 
       <!-- 主内容 -->
-      <el-col :span="19" class="main">
+      <el-col :span="21" class="main">
         <main class="main"><slot name="main" /></main>
       </el-col>
     </el-row>

@@ -83,15 +83,19 @@ const handleArticleClick = (articleId: number) => {
           }
 
           .article-title {
-            line-height: 16px;
+            line-height: 26px;
             font-size: 14px;
-            font-weight: 500;
-            color: rgba(60, 60, 60, .7);
+            font-weight: 400;
+            color: #646a73;
             transition: color .5s;
           }
 
+          .article-title:hover {
+            color: rgb(51, 109, 244);
+          }
+
           .article-title-active {
-            color: #409eff;
+            color: rgb(20, 86, 240);
           }
         }
     }   
