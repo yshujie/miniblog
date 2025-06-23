@@ -4,7 +4,7 @@
       <Sidebar :sections="sections" :moduleCode="moduleCode" />
     </template>
     <template #main>
-      <ArticleCard :articleId="chosenArticleId" />
+      <ExternalArticleCard :articleId="chosenArticleId" />
     </template>
   </BlogLayout>
 </template>
@@ -16,7 +16,7 @@ import { useModuleStore } from '@/stores/module'
 
 import BlogLayout from '../components/blog/BlogLayout.vue'
 import Sidebar from '../components/blog/Sidebar.vue'
-import ArticleCard from '../components/blog/ArticleCard.vue'
+import ExternalArticleCard from '../components/blog/ExternalArticleCard.vue'
 
 // 获取路由对象
 const route = useRoute()
