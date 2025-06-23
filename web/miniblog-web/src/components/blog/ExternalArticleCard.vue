@@ -38,7 +38,7 @@ onMounted(async () => {
 
 // 组件更新时，获取文章
 onUpdated(async () => {
-  if (props.articleId !== null && currentArticle.value === null) {
+  if (props.articleId !== null && currentArticle.value?.id != props.articleId) {
     await fetchCurrentArticle(props.articleId)
   }
 })
