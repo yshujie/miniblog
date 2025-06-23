@@ -8,16 +8,16 @@ import (
 
 // Article 文章
 type Article struct {
-	ID          int       `json:"id"`
-	Title       string    `json:"title"`
-	Content     string    `json:"content"`
-	ExternalUrl string    `json:"external_url"`
-	SectionCode string    `json:"section_code"`
-	Author      string    `json:"author"`
-	Tags        string    `json:"tags"`
-	Status      int       `json:"status"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID           int       `json:"id"`
+	Title        string    `json:"title"`
+	Content      string    `json:"content"`
+	ExternalLink string    `json:"external_link"`
+	SectionCode  string    `json:"section_code"`
+	Author       string    `json:"author"`
+	Tags         string    `json:"tags"`
+	Status       int       `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // 文章状态

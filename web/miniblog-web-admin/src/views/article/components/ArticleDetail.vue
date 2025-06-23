@@ -86,7 +86,7 @@
           </el-tag>
         </el-form-item>
 
-        <el-form-item label="ExternalLink:" prop="external_link" style="margin-bottom: 40px;">
+        <el-form-item label="ExternalLink" prop="external_link" style="margin-bottom: 40px;">
           <el-input v-model="postForm.external_link" :rows="1" type="textarea" class="article-textarea" autosize placeholder="Please enter the ExternalLink URL" />
         </el-form-item>
 
@@ -156,20 +156,16 @@ export default {
     }
 
     const validateExternalLink = (rule, value, callback) => {
-      if (this.isEdit) {
-        callback()
-      } else {
-        if (value === null || value === undefined || value.length === 0 || value === '') {
-          callback(new Error('外部链接不能为空'))
-        }
-
-        // 不是 URL 格式
-        if (!value.startsWith('http') || !value.startsWith('https')) {
-          callback(new Error('外部链接格式错误'))
-        }
-
-        callback()
+      if (value === null || value === undefined || value.length === 0 || value === '') {
+        callback(new Error('外部链接不能为空'))
       }
+
+      // 不是 URL 格式
+      if (!value.startsWith('http') || !value.startsWith('https')) {
+        callback(new Error('外部链接格式错误'))
+      }
+
+      callback()
     }
 
     return {
@@ -196,9 +192,6 @@ export default {
         Published: 'success',
         Unpublished: 'danger'
       }
-
-      console.log('status', this.postForm.status)
-      console.log('tagType', statusMap[this.postForm.status])
 
       return statusMap[this.postForm.status] || 'info'
     }
@@ -232,11 +225,6 @@ export default {
       articleResp.section_code = articleResp.section.code
 
       this.postForm = articleResp
-
-      console.log('articleResp', articleResp)
-      console.log('postForm', this.postForm)
-      console.log('postForm.module_code', this.postForm.module_code)
-      console.log('postForm.section_code', this.postForm.section_code)
     },
 
     queryArticleId() {
@@ -250,8 +238,6 @@ export default {
       // 获取模块
       const modulesResp = await fetchModules()
       this.modules = modulesResp.modules
-
-      console.log('modules', this.modules)
     },
 
     async initSections() {

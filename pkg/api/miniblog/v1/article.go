@@ -48,14 +48,15 @@ type GetArticleResponse struct {
 
 // ArticleInfo 文章信息
 type ArticleInfo struct {
-	ID        int         `json:"id"`
-	Title     string      `json:"title"`
-	Content   string      `json:"content"`
-	Module    ModuleInfo  `json:"module"`
-	Section   SectionInfo `json:"section"`
-	Author    string      `json:"author"`
-	Tags      []string    `json:"tags"`
-	Status    string      `json:"status"`
-	CreatedAt string      `json:"created_at"`
-	UpdatedAt string      `json:"updated_at"`
+	ID           int         `json:"id"`
+	Title        string      `json:"title"`
+	Content      string      `json:"content"`
+	ExternalLink string      `json:"external_link"`
+	Module       ModuleInfo  `json:"module"`
+	Section      SectionInfo `json:"section"`
+	Author       string      `json:"author"`
+	Tags         []string    `json:"tags"`
+	Status       string      `json:"status"`
+	CreatedAt    string      `json:"created_at"`
+	UpdatedAt    string      `json:"updated_at"`
 }

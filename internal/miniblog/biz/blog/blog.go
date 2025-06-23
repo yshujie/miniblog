@@ -100,15 +100,15 @@ func (b *blogBiz) GetArticleDetail(req *v1.GetArticleDetailRequest) (*v1.GetArti
 	// 获取文章
 	article, _ := b.ds.Articles().GetOne(req.ArticleID)
 	articleDetail := &v1.ArticleDetail{
-		ID:          article.ID,
-		Title:       article.Title,
-		Content:     article.Content,
-		ExternalUrl: article.ExternalUrl,
-		SectionCode: article.SectionCode,
-		Author:      article.Author,
-		Tags:        strings.Split(article.Tags, ","),
-		CreatedAt:   article.CreatedAt,
-		UpdatedAt:   article.UpdatedAt,
+		ID:           article.ID,
+		Title:        article.Title,
+		Content:      article.Content,
+		ExternalLink: article.ExternalLink,
+		SectionCode:  article.SectionCode,
+		Author:       article.Author,
+		Tags:         strings.Split(article.Tags, ","),
+		CreatedAt:    article.CreatedAt,
+		UpdatedAt:    article.UpdatedAt,
 	}
 
 	return &v1.GetArticleDetailResponse{

@@ -4,7 +4,7 @@ export class Article {
   sectionCode: string
   title: string
   content: string
-  externalUrl: string
+  ExternalLink: string
   author: string
   tags: string[]
   createdAt: string
@@ -14,7 +14,7 @@ export class Article {
     id: number
     sectionCode: string
     title: string
-    externalUrl: string
+    ExternalLink: string
     author: string
     content: string | undefined
     tags: string[] | undefined
@@ -24,7 +24,7 @@ export class Article {
     this.id = data.id
     this.sectionCode = data.sectionCode
     this.title = data.title
-    this.externalUrl = data.externalUrl || ''
+    this.ExternalLink = data.ExternalLink || ''
     this.author = data.author
     this.content = data.content || ''
     this.tags = data.tags || []

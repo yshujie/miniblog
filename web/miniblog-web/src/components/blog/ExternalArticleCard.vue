@@ -7,7 +7,7 @@
       <div v-show="hasArticle" class="article-card">
         <div class="article-card-content">
           <iframe
-          :src="currentArticle?.externalUrl"
+          :src="currentArticle?.ExternalLink"
           frameborder="0"
           style="width: 100%; height: 100%;"
         ></iframe>
@@ -38,7 +38,9 @@ onMounted(async () => {
 
 // 组件更新时，获取文章
 onUpdated(async () => {
-  await fetchCurrentArticle(props.articleId)
+  if (props.articleId !== null && currentArticle.value === null) {
+    await fetchCurrentArticle(props.articleId)
+  }
 })
 
 // 获取文章详情
