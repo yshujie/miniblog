@@ -7,8 +7,9 @@
       <div v-show="hasArticle" class="article-card">
         <div class="article-card-content">
           <iframe
+            :key="currentArticle?.externalLink"
+            :src="currentArticle?.externalLink"
             ref="articleFrame"
-            :src="currentArticle?.ExternalLink"
             frameborder="0"
             style="width: 100%; height: 100%;"
           ></iframe>
@@ -20,6 +21,7 @@
 import { computed, defineProps, ref, onMounted, onUpdated, watch } from 'vue'
 import { Article } from '@/types/article'
 import { fetchArticleDetail } from '@/api/blog'
+import { ElLoading } from 'element-plus'
 
 // 组件 props
 const props = defineProps<{ articleId: number|null }>()
@@ -32,9 +34,12 @@ const hasArticle = computed(() => {
   return currentArticle.value !== null && currentArticle.value instanceof Article
 })
 
+// iframe 引用
 const articleFrame = ref<HTMLIFrameElement | null>(null)
 
-watch(() => currentArticle.value?.ExternalLink, (val) => {
+// 监听外部链接变化
+watch(() => currentArticle.value?.externalLink, (val) => {
+  console.log('watch currentArticle.value?.externalLink: ', val)
   if (val && articleFrame.value) {
     articleFrame.value.onload = () => {
       console.log('✅ iframe 加载成功')
@@ -42,20 +47,23 @@ watch(() => currentArticle.value?.ExternalLink, (val) => {
   }
 })
 
+watch(() => props.articleId, async (newId, oldId) => {
+  if (newId && newId !== currentArticle.value?.id) {
+    await fetchCurrentArticle(newId)
+  }
+}, { immediate: true })
+
+
 // 组件挂载时，获取文章
 onMounted(async () => {
+  console.log('onMounted', props.articleId)
   await fetchCurrentArticle(props.articleId)
-})
-
-// 组件更新时，获取文章
-onUpdated(async () => {
-  if (props.articleId !== null && currentArticle.value?.id != props.articleId) {
-    await fetchCurrentArticle(props.articleId)
-  }
+  console.log('onMounted done', currentArticle.value?.id) 
 })
 
 // 获取文章详情
 async function fetchCurrentArticle(articleId: number | null) {
+  showLoading()
   if (!articleId) {
     return null
   }
@@ -66,6 +74,18 @@ async function fetchCurrentArticle(articleId: number | null) {
   }
 
   currentArticle.value = article
+  hideLoading()
+}
+
+function showLoading() { 
+  const loading = ElLoading.service({
+    lock: true,
+    text: 'Loading...',
+  })
+}
+
+function hideLoading() {
+  ElLoading.service().close()
 }
 
 </script>

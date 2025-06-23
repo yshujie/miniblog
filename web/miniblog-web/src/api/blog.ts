@@ -15,5 +15,15 @@ export async function fetchArticleDetail(articleID: number): Promise<Article> {
   console.log('fetchArticleDetail', articleID)
   const { payload } = await http.get<{ article_detail: any }>(`/blog/articleDetail?article_id=${articleID}`)
   console.log('payload', payload)
-  return new Article(payload.article_detail)
+  return new Article({
+    id: payload.article_detail.id,
+    sectionCode: payload.article_detail.section_code,
+    title: payload.article_detail.title,
+    author: payload.article_detail.author,
+    content: payload.article_detail.content,
+    externalLink: payload.article_detail.external_link,
+    tags: payload.article_detail.tags,
+    createdAt: payload.article_detail.created_at,
+    updatedAt: payload.article_detail.updated_at,
+  })
 }

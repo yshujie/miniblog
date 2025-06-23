@@ -4,7 +4,7 @@ export class Article {
   sectionCode: string
   title: string
   content: string
-  ExternalLink: string
+  externalLink: string
   author: string
   tags: string[]
   createdAt: string
@@ -14,7 +14,7 @@ export class Article {
     id: number
     sectionCode: string
     title: string
-    ExternalLink: string
+    externalLink: string
     author: string
     content: string | undefined
     tags: string[] | undefined
@@ -24,8 +24,8 @@ export class Article {
     this.id = data.id
     this.sectionCode = data.sectionCode
     this.title = data.title
-    this.ExternalLink = 'https://vdbapmvz0i.feishu.cn/docx/LHjidY6dBo22vGxfaFMcRQiXnd2?from=from_copylink'
     this.author = data.author
+    this.externalLink = data.externalLink
     this.content = data.content || ''
     this.tags = data.tags || []
     this.createdAt = data.createdAt || ''
