@@ -86,7 +86,7 @@
           </el-tag>
         </el-form-item>
 
-        <el-form-item v-show="! isEdit" label="ExternalLink:" prop="external_link" style="margin-bottom: 40px;">
+        <el-form-item label="ExternalLink:" prop="external_link" style="margin-bottom: 40px;">
           <el-input v-model="postForm.external_link" :rows="1" type="textarea" class="article-textarea" autosize placeholder="Please enter the ExternalLink URL" />
         </el-form-item>
 
