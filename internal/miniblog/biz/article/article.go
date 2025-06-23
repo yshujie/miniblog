@@ -225,9 +225,10 @@ func (b *articleBiz) transformArticleInfo(article *model.Article, isSimple bool)
 			Code:  section.Code,
 			Title: section.Title,
 		},
-		Author: article.Author,
-		Tags:   strings.Split(article.Tags, ","),
-		Status: article.GetStatusString(),
+		Author:       article.Author,
+		Tags:         strings.Split(article.Tags, ","),
+		Status:       article.GetStatusString(),
+		ExternalLink: article.ExternalLink,
 	}
 
 	if isSimple {
