@@ -32,7 +32,8 @@ func Cors(ctx *gin.Context) {
 // Secure 安全中间件
 func Secure(ctx *gin.Context) {
 	ctx.Header("Access-Control-Allow-Origin", "*")
-	ctx.Header("X-Frame-Options", "DENY")
+	ctx.Header("X-Frame-Options", "ALLOWALL")
+	ctx.Header("Content-Security-Policy", "frame-ancestors *")
 	ctx.Header("X-Content-Type-Options", "nosniff")
 	ctx.Header("X-XSS-Protection", "1; mode=block")
 	if ctx.Request.TLS != nil {
