@@ -18,7 +18,7 @@
     </div>
 </template>
 <script setup lang="ts">
-import { computed, defineProps, ref, onMounted, onUpdated, watch } from 'vue'
+import { computed, defineProps, ref, watch, onUnmounted } from 'vue'
 import { Article } from '@/types/article'
 import { fetchArticleDetail } from '@/api/blog'
 import { ElLoading } from 'element-plus'
@@ -29,9 +29,20 @@ const props = defineProps<{ articleId: number|null }>()
 // 当前文章
 const currentArticle = ref<Article | null>(null)
 
+// loading 实例
+let loadingInstance: any = null
+
 // 计算属性：hasArticle
 const hasArticle = computed(() => {
-  return currentArticle.value !== null && currentArticle.value instanceof Article
+  const hasData = currentArticle.value !== null && 
+                  currentArticle.value?.externalLink && 
+                  currentArticle.value.externalLink.trim() !== ''
+  console.log('🔍 hasArticle 计算:', { 
+    currentArticle: currentArticle.value, 
+    hasData,
+    externalLink: currentArticle.value?.externalLink 
+  })
+  return hasData
 })
 
 // iframe 引用
@@ -48,44 +59,64 @@ watch(() => currentArticle.value?.externalLink, (val) => {
 })
 
 watch(() => props.articleId, async (newId, oldId) => {
-  if (newId && newId !== currentArticle.value?.id) {
+  console.log('👀 watch articleId 变化:', { newId, oldId, currentId: currentArticle.value?.id })
+  if (newId !== currentArticle.value?.id) {
     await fetchCurrentArticle(newId)
   }
 }, { immediate: true })
 
-
-// 组件挂载时，获取文章
-onMounted(async () => {
-  console.log('onMounted', props.articleId)
-  await fetchCurrentArticle(props.articleId)
-  console.log('onMounted done', currentArticle.value?.id) 
+// 组件卸载时清理 loading
+onUnmounted(() => {
+  hideLoading()
 })
 
 // 获取文章详情
 async function fetchCurrentArticle(articleId: number | null) {
-  showLoading()
-  if (!articleId) {
-    return null
-  }
+  try {
+    showLoading()
+    
+    if (!articleId) {
+      console.log('📝 articleId 为空，清空当前文章')
+      currentArticle.value = null
+      return
+    }
 
-  const article = await fetchArticleDetail(articleId)
-  if (!article) {
-    return
-  }
+    console.log('🔄 开始获取文章详情，articleId:', articleId)
+    const article = await fetchArticleDetail(articleId)
+    
+    if (!article) {
+      console.log('❌ 获取文章详情失败')
+      currentArticle.value = null
+      return
+    }
 
-  currentArticle.value = article
-  hideLoading()
+    console.log('✅ 获取文章详情成功:', article)
+    currentArticle.value = article
+  } catch (error) {
+    console.error('❌ 获取文章详情异常:', error)
+    currentArticle.value = null
+  } finally {
+    hideLoading()
+  }
 }
 
-function showLoading() { 
-  const loading = ElLoading.service({
+function showLoading() {
+  // 如果已有 loading 实例，先关闭
+  if (loadingInstance) {
+    loadingInstance.close()
+  }
+  
+  loadingInstance = ElLoading.service({
     lock: true,
-    text: 'Loading...',
+    text: '正在加载文章内容...',
   })
 }
 
 function hideLoading() {
-  ElLoading.service().close()
+  if (loadingInstance) {
+    loadingInstance.close()
+    loadingInstance = null
+  }
 }
 
 </script>
@@ -134,9 +165,7 @@ function hideLoading() {
   .article-card-content {
     height: 100vh;
     width: 100%;
-    padding-bottom: 128px;
     position: relative;
-
     
     iframe {
       width: 100%;
