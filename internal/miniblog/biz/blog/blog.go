@@ -98,7 +98,7 @@ func (b *blogBiz) GetArticleDetail(req *v1.GetArticleDetailRequest) (*v1.GetArti
 	log.Infow("start to get article detail in biz layer", "articleID", req.ArticleID)
 
 	// 获取文章
-	article, _ := b.ds.Articles().GetOne(req.ArticleID)
+	article, _ := b.ds.Articles().GetOne(uint64(req.ArticleID))
 	articleDetail := &v1.ArticleDetail{
 		ID:           article.ID,
 		Title:        article.Title,

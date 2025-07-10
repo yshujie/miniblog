@@ -8,7 +8,7 @@ import (
 
 type ArticleStore interface {
 	Create(article *model.Article) error
-	GetOne(id int) (*model.Article, error)
+	GetOne(id uint64) (*model.Article, error)
 	GetList(filter interface{}, page int, limit int) ([]*model.Article, error)
 	Update(article *model.Article) error
 }
@@ -35,7 +35,7 @@ func (a *articles) Create(article *model.Article) error {
 }
 
 // Get 获取文章
-func (a *articles) GetOne(id int) (*model.Article, error) {
+func (a *articles) GetOne(id uint64) (*model.Article, error) {
 	var article model.Article
 	if err := a.db.Where("id = ?", id).First(&article).Error; err != nil {
 		return nil, err

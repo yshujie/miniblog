@@ -21,7 +21,7 @@ func (c *ArticleController) Publish(ctx *gin.Context) {
 		return
 	}
 
-	if err := c.biz.ArticleBiz().Publish(ctx, articleId); err != nil {
+	if err := c.biz.ArticleBiz().Publish(ctx, uint64(articleId)); err != nil {
 		log.C(ctx).Errorw("publish article failed", "error", err, fmt.Sprintf("%T", err))
 		core.WriteResponse(ctx, err, nil)
 		return
@@ -42,7 +42,7 @@ func (c *ArticleController) Unpublish(ctx *gin.Context) {
 		return
 	}
 
-	if err := c.biz.ArticleBiz().Unpublish(ctx, articleId); err != nil {
+	if err := c.biz.ArticleBiz().Unpublish(ctx, uint64(articleId)); err != nil {
 		log.C(ctx).Errorw("unpublish article failed", "error", err, fmt.Sprintf("%T", err))
 		core.WriteResponse(ctx, err, nil)
 		return

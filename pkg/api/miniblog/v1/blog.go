@@ -14,7 +14,7 @@ type GetModuleDetailResponse struct {
 
 // GetArticleDetailRequest 获取文章详情请求
 type GetArticleDetailRequest struct {
-	ArticleID int `form:"article_id" valid:"required"`
+	ArticleID uint64 `form:"article_id" valid:"required"`
 }
 
 // GetArticleDetailResponse 获取文章详情响应
@@ -24,7 +24,7 @@ type GetArticleDetailResponse struct {
 
 // ModuleDetail 模块详情
 type ModuleDetail struct {
-	ID       uint64           `json:"id"`
+	ID       uint64           `json:"id,string"`
 	Code     string           `json:"code"`
 	Title    string           `json:"title"`
 	Sections []*SectionDetail `json:"sections"`
@@ -32,7 +32,7 @@ type ModuleDetail struct {
 
 // SectionDetail 章节详情
 type SectionDetail struct {
-	ID         uint64           `json:"id"`
+	ID         uint64           `json:"id,string"`
 	Code       string           `json:"code"`
 	Title      string           `json:"title"`
 	Sort       int              `json:"sort"`
@@ -42,7 +42,7 @@ type SectionDetail struct {
 
 // ArticleDetail 文章详情
 type ArticleDetail struct {
-	ID           uint64    `json:"id"`
+	ID           uint64    `json:"id,string"`
 	Title        string    `json:"title"`
 	Content      string    `json:"content"`
 	ExternalLink string    `json:"external_link"`

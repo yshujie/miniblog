@@ -49,7 +49,7 @@ func (c *ArticleController) GetOne(ctx *gin.Context) {
 	}
 
 	// 获取文章详情
-	article, err := c.biz.ArticleBiz().GetOne(ctx, id)
+	article, err := c.biz.ArticleBiz().GetOne(ctx, uint64(id))
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
