@@ -126,13 +126,13 @@ function queryModuleCode() {
 }
 
 // 获取 articleId
-function queryArticleId(): number | null {
+function queryArticleId(): string | null {
   const articleId = route.params.article as string
   if (!articleId) {
     console.log('articleId is not found')
     return null
   }
-  return parseInt(articleId)
+  return articleId
 }
 
 </script>

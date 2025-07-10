@@ -3,7 +3,7 @@ import http from '../util/http'
 export interface LoginResponse {
   token: string
   user: {
-    id: number
+    id: string
     username: string
   }
 }
@@ -19,7 +19,7 @@ export async function login(username: string, password: string): Promise<LoginRe
 }
 
 export interface RegisterResponse {
-  id: number
+  id: string
   username: string
 }
 
