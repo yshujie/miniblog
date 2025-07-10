@@ -3,12 +3,13 @@ package model
 import (
 	"time"
 
+	"github.com/yshujie/miniblog/pkg/util/idutil"
 	"gorm.io/gorm"
 )
 
 // Module 模块
 type Module struct {
-	ID        int       `json:"id"`
+	ID        uint64    `json:"id"`
 	Code      string    `json:"code"`
 	Title     string    `json:"title"`
 	Status    int       `json:"status"`
@@ -29,6 +30,7 @@ func (m *Module) TableName() string {
 
 // BeforeCreate 在创建前设置信息
 func (m *Module) BeforeCreate(tx *gorm.DB) (err error) {
+	m.ID = idutil.GetIntID()
 	m.CreatedAt = time.Now()
 	m.UpdatedAt = time.Now()
 	return

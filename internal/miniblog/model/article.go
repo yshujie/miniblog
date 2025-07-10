@@ -3,12 +3,13 @@ package model
 import (
 	"time"
 
+	"github.com/yshujie/miniblog/pkg/util/idutil"
 	"gorm.io/gorm"
 )
 
 // Article 文章
 type Article struct {
-	ID           int       `json:"id"`
+	ID           uint64    `json:"id"`
 	Title        string    `json:"title"`
 	Content      string    `json:"content"`
 	ExternalLink string    `json:"external_link"`
@@ -35,6 +36,7 @@ func (a *Article) TableName() string {
 
 // BeforeCreate 在创建前设置信息
 func (a *Article) BeforeCreate(tx *gorm.DB) (err error) {
+	a.ID = idutil.GetIntID()
 	a.CreatedAt = time.Now()
 	a.UpdatedAt = time.Now()
 	return

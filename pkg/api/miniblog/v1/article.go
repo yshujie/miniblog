@@ -48,7 +48,7 @@ type GetArticleResponse struct {
 
 // ArticleInfo 文章信息
 type ArticleInfo struct {
-	ID           int         `json:"id"`
+	ID           uint64      `json:"id"`
 	Title        string      `json:"title"`
 	Content      string      `json:"content"`
 	ExternalLink string      `json:"external_link"`
