@@ -1,6 +1,6 @@
 // Article 文章
 export class Article {
-  id: number
+  id: string
   sectionCode: string
   title: string
   content: string
@@ -11,7 +11,7 @@ export class Article {
   updatedAt: string
 
   constructor(data: {
-    id: number
+    id: string
     sectionCode: string
     title: string
     externalLink: string
