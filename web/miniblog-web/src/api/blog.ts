@@ -7,7 +7,18 @@ export async function fetchModuleDetail(moduleCode: string): Promise<Module> {
   console.log('fetchModuleDetail', moduleCode)
   const { payload } = await http.get<{ module_detail: any }>(`/blog/moduleDetail?module_code=${moduleCode}`)
   console.log('payload', payload)
-  return new Module(payload.module_detail)
+  return new Module({
+    ...payload.module_detail,
+    id: String(payload.module_detail.id),
+    sections: payload.module_detail.sections?.map((section: any) => ({
+      ...section,
+      id: String(section.id),
+      articles: section.articles?.map((article: any) => ({
+        ...article,
+        id: String(article.id)
+      }))
+    }))
+  })
 }
 
 // fetchArticleDetail 获取文章详情

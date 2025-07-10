@@ -2,13 +2,13 @@ import type { Section } from './section'
 
 // Module 模块
 export class Module {
-  id: number
+  id: string
   title: string
   code: string
   sections: Section[]
 
   constructor(data: {
-    id: number
+    id: string
     title: string
     code: string
     sections?: Section[]

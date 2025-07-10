@@ -3,14 +3,14 @@ import type { Article } from './article'
 // Section 章节
 export class Section {
   moduleCode: string
-  id: number
+  id: string
   title: string
   code: string
   articles: Article[]
 
   constructor(data: {
     moduleCode: string
-    id: number
+    id: string
     title: string
     code: string
     articles?: Article[]

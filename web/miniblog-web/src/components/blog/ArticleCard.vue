@@ -69,7 +69,7 @@ import { Article } from '@/types/article'
 import { fetchArticleDetail } from '@/api/blog'
 
 // 组件 props
-const props = defineProps<{ articleId: number|null }>()
+const props = defineProps<{ articleId: string|null }>()
 
 // 组件数据
 const editorId = `article-${props.articleId}`
@@ -97,7 +97,7 @@ onUpdated(async () => {
 })
 
 // 获取文章详情
-async function fetchCurrentArticle(articleId: number | null) {
+async function fetchCurrentArticle(articleId: string | null) {
   if (!articleId) {
     return null
   }

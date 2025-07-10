@@ -4,5 +4,8 @@ import { Module } from '../types/module'
 // fetchModules 获取所有模块
 export async function fetchModules(): Promise<Module[]> {
   const { payload } = await http.get<{ modules: any[] }>('/blog/modules')
-  return payload.modules.map(moduleData => new Module(moduleData))
+  return payload.modules.map(moduleData => new Module({
+    ...moduleData,
+    id: String(moduleData.id)
+  }))
 }
