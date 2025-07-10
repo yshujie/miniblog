@@ -24,7 +24,7 @@ import { fetchArticleDetail } from '@/api/blog'
 import { ElLoading } from 'element-plus'
 
 // 组件 props
-const props = defineProps<{ articleId: number|null }>()
+const props = defineProps<{ articleId: string|null }>()
 
 // 当前文章
 const currentArticle = ref<Article | null>(null)
@@ -71,7 +71,7 @@ onUnmounted(() => {
 })
 
 // 获取文章详情
-async function fetchCurrentArticle(articleId: number | null) {
+async function fetchCurrentArticle(articleId: string | null) {
   try {
     showLoading()
     

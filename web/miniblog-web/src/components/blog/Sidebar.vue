@@ -34,13 +34,13 @@ const router = useRouter()
 const currentArticleId = computed(() => {
   const articleId = router.currentRoute.value.params.article
   if (articleId) {
-    return Number(articleId)
+    return String(articleId)
   }
   return null
 })
 
 // 文章点击事件
-const handleArticleClick = (articleId: number) => {
+const handleArticleClick = (articleId: string) => {
   router.push(`/blog/${props.moduleCode}/article/${articleId}`)
 }
 </script>

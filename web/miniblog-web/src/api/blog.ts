@@ -11,7 +11,7 @@ export async function fetchModuleDetail(moduleCode: string): Promise<Module> {
 }
 
 // fetchArticleDetail 获取文章详情
-export async function fetchArticleDetail(articleID: number): Promise<Article> {
+export async function fetchArticleDetail(articleID: string): Promise<Article> {
   console.log('fetchArticleDetail', articleID)
   const { payload } = await http.get<{ article_detail: any }>(`/blog/articleDetail?article_id=${articleID}`)
   console.log('payload', payload)
