@@ -12,7 +12,12 @@ const ADMIN_BASE_URL = 'https://api.yangshujie.com/v1/admin'
  * @returns {Object} axios 实例
  */
 const service = axios.create({
-  timeout: 5000 // 请求超时时间
+  timeout: 5000, // 请求超时时间
+  transformResponse: [(data) => {
+    // 在 JSON 解析之前，将大整数转换为字符串
+    const processedData = data.replace(/"id":(\d{15,})/g, '"id":"$1"')
+    return JSON.parse(processedData)
+  }]
 })
 
 /**
