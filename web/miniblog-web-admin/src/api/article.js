@@ -9,7 +9,17 @@ export function fetchList(query) {
   return request({
     url: '/articles',
     method: 'get',
-    params: query
+    params: query,
+    transformResponse: [(data) => {
+      const response = JSON.parse(data)
+      if (response.payload && Array.isArray(response.payload)) {
+        response.payload = response.payload.map(article => ({
+          ...article,
+          id: article.id.toString() // 将 ID 转换为字符串
+        }))
+      }
+      return response
+    }]
   })
 }
 
