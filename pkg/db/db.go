@@ -26,7 +26,7 @@ type MySQLOptions struct {
 
 // DNS 生成MySQL的连接字符串
 func (o *MySQLOptions) DNS() string {
-	return fmt.Sprintf(`%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=%t&loc=%s`,
+	return fmt.Sprintf(`%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=%t&loc=%s`,
 		o.Username,
 		o.Password,
 		o.Host,
