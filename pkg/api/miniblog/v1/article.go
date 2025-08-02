@@ -12,7 +12,7 @@ type CreateArticleRequest struct {
 
 // UpdateArticleRequest 更新文章请求
 type UpdateArticleRequest struct {
-	ID           uint64   `json:"id" valid:"required,numeric"`
+	ID           string   `json:"id" valid:"required"`
 	Title        string   `json:"title" valid:"required,stringlength(1|255)"`
 	Author       string   `json:"author" valid:"required,stringlength(1|255)"`
 	Tags         []string `json:"tags" valid:"required"`

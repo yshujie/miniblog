@@ -2,6 +2,7 @@ package article
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -80,7 +81,12 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 
 // Update 更新文章
 func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) (*v1.ArticleInfoResponse, error) {
-	article, err := b.ds.Articles().GetOne(r.ID)
+	// 将字符串转换为 int64
+	id, err := strconv.ParseInt(r.ID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	article, err := b.ds.Articles().GetOne(uint64(id))
 	if err != nil {
 		return nil, err
 	}
