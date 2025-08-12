@@ -2,12 +2,12 @@
 
     <el-row class="blog-layout">
       <!-- 侧边栏 -->
-      <el-col :span="3" class="sidebar">
+      <el-col :span="4" class="sidebar">
         <aside class="sidebar"><slot name="sidebar" /></aside>
       </el-col>
 
       <!-- 主内容 -->
-      <el-col :span="21" class="main">
+      <el-col :span="20" class="main">
         <main class="main"><slot name="main" /></main>
       </el-col>
     </el-row>
@@ -25,7 +25,9 @@
   .sidebar {
     width: 100%;
     height: calc(100vh - 64px);
-    border-right: 1px solid #eaecef;
+    border-right: 1px solid #e2e8f0;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px #e2e8f0;
   }  
 }
 

@@ -46,56 +46,93 @@ const handleArticleClick = (articleId: string) => {
 </script>
 <style scoped lang="less">
 .sidebar-root {
-  width: 100%;
-  height: 100%;
-  overflow-y: scroll;
+  overflow-y: auto;
+  background: #ffffff;
+  padding: 24px 20px;
 
   .section-list {
 
     .section-item {
-      padding: 8px;
-      border-radius: 5px;
+      margin-bottom: 32px;
 
         .section-title {
-          line-height: 16px;
-          font-size: 14px;
+          line-height: 1.3;
+          font-size: 16px;
           font-weight: 600;
-          color: #213547;
-          padding: 4px 0;
+          color: #1e293b;
+          padding: 0 0 16px 0;
+          margin: 0 0 20px 0;
+          position: relative;
+          
+          &::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 40px;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            border-radius: 2px;
+          }
         }
 
         .article-list {
           .article-item {
             cursor: pointer;
-            padding: 4px 0;
+            padding: 10px 16px;
+            margin: 4px 0;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            position: relative;
 
             &:hover {
+              background: #f8fafc;
+              // transform: translateX(4px);
+              
               .article-title {
-                color: #409eff;
+                color: #3b82f6;
               }
             }
 
             &:active {
+              background: #f1f5f9;
+              
               .article-title {
-                color: #409eff;
+                color: #2563eb;
               }
             }
           }
 
           .article-title {
-            line-height: 26px;
-            font-size: 14px;
-            font-weight: 400;
-            color: #646a73;
-            transition: color .5s;
+            line-height: 1.3;
+            font-size: 13px;
+            font-weight: 500;
+            color: #475569;
+            transition: all 0.2s ease;
+            display: block;
+            text-decoration: none;
+            position: relative;
           }
 
           .article-title:hover {
-            color: rgb(51, 109, 244);
+            color: #3b82f6;
           }
 
           .article-title-active {
-            color: rgb(20, 86, 240);
+            color: #2563eb;
+            font-weight: 600;
+            
+            &::before {
+              content: '';
+              position: absolute;
+              left: -16px;
+              top: 50%;
+              transform: translateY(-50%);
+              width: 4px;
+              height: 20px;
+              background: linear-gradient(180deg, #3b82f6, #8b5cf6);
+              border-radius: 2px;
+            }
           }
         }
     }   
