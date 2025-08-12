@@ -15,7 +15,8 @@ export async function fetchModuleDetail(moduleCode: string): Promise<Module> {
       id: String(section.id),
       articles: section.articles?.map((article: any) => ({
         ...article,
-        id: String(article.id)
+        id: String(article.id),
+        pos: article.pos || 0
       }))
     }))
   })
@@ -37,6 +38,7 @@ export async function fetchArticleDetail(articleID: string): Promise<Article> {
     content: payload.article_detail.content,
     externalLink: payload.article_detail.external_link,
     tags: payload.article_detail.tags,
+    pos: payload.article_detail.pos,
     createdAt: payload.article_detail.created_at,
     updatedAt: payload.article_detail.updated_at,
   })

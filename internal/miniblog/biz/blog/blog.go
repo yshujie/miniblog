@@ -107,6 +107,7 @@ func (b *blogBiz) GetArticleDetail(req *v1.GetArticleDetailRequest) (*v1.GetArti
 		SectionCode:  article.SectionCode,
 		Author:       article.Author,
 		Tags:         strings.Split(article.Tags, ","),
+		Pos:          article.Pos,
 		CreatedAt:    article.CreatedAt,
 		UpdatedAt:    article.UpdatedAt,
 	}

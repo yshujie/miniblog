@@ -7,6 +7,7 @@ export class Article {
   externalLink: string
   author: string
   tags: string[]
+  pos: number
   createdAt: string
   updatedAt: string
 
@@ -18,6 +19,7 @@ export class Article {
     author: string
     content: string | undefined
     tags: string[] | undefined
+    pos: number | undefined
     createdAt: string | undefined
     updatedAt: string | undefined
   }) {
@@ -28,6 +30,7 @@ export class Article {
     this.externalLink = data.externalLink
     this.content = data.content || ''
     this.tags = data.tags || []
+    this.pos = data.pos || 0
     this.createdAt = data.createdAt || ''
     this.updatedAt = data.updatedAt || ''
   }

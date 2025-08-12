@@ -54,6 +54,27 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 		return nil, err
 	}
 
+	// 获取当前 section 下的文章列表，计算下一个 pos 值
+	filter := map[string]interface{}{
+		"section_code": r.SectionCode,
+	}
+	existingArticles, err := b.ds.Articles().GetList(filter, 1, 1000) // 获取所有文章
+	if err != nil {
+		return nil, err
+	}
+
+	// 计算下一个 pos 值
+	nextPos := 1
+	if len(existingArticles) > 0 {
+		maxPos := 0
+		for _, existingArticle := range existingArticles {
+			if existingArticle.Pos > maxPos {
+				maxPos = existingArticle.Pos
+			}
+		}
+		nextPos = maxPos + 1
+	}
+
 	// 创建文章
 	article := &model.Article{
 		Title:        r.Title,
@@ -62,6 +83,7 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 		SectionCode:  r.SectionCode,
 		Author:       r.Author,
 		Tags:         strings.Join(r.Tags, ","),
+		Pos:          nextPos,
 	}
 	// 存草稿
 	article.SaveDraft()
@@ -98,6 +120,7 @@ func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) (*v
 	article.ExternalLink = r.ExternalLink
 	article.SectionCode = r.SectionCode
 	article.Content = r.Content
+	// 注意：更新时不修改 pos 字段，保持原有排序
 
 	// 存草稿
 	article.SaveDraft()
@@ -233,6 +256,7 @@ func (b *articleBiz) transformArticleInfo(article *model.Article, isSimple bool)
 		},
 		Author:       article.Author,
 		Tags:         strings.Split(article.Tags, ","),
+		Pos:          article.Pos,
 		Status:       article.GetStatusString(),
 		ExternalLink: article.ExternalLink,
 	}

@@ -56,6 +56,7 @@ type ArticleInfo struct {
 	Section      SectionInfo `json:"section"`
 	Author       string      `json:"author"`
 	Tags         []string    `json:"tags"`
+	Pos          int         `json:"pos"`
 	Status       string      `json:"status"`
 	CreatedAt    string      `json:"created_at"`
 	UpdatedAt    string      `json:"updated_at"`
