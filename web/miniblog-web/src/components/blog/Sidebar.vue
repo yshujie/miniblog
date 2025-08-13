@@ -46,9 +46,32 @@ const handleArticleClick = (articleId: string) => {
 </script>
 <style scoped lang="less">
 .sidebar-root {
+  height: 100%;
   overflow-y: auto;
   background: #ffffff;
   padding: 24px 20px;
+  
+  // 自定义滚动条样式
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 2px;
+    
+    &:hover {
+      background: #9ca3af;
+    }
+  }
+  
+  &::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
 
   .section-list {
 

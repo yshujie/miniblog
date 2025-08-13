@@ -19,12 +19,12 @@
 
 .blog-layout {
   width: 100%;
-  height: calc(100vh - 64px);
+  height: calc(100vh - 64px - 48px);
   overflow: hidden;
 
   .sidebar {
     width: 100%;
-    height: calc(100vh - 64px);
+    height: calc(100vh - 64px - 48px);
     border-right: 1px solid #e2e8f0;
     overflow: hidden;
     box-shadow: inset 0 0 0 1px #e2e8f0;
