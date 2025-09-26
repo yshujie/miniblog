@@ -226,14 +226,6 @@ make logs-backend        # 查看后端日志
 make logs-infra          # 查看基础设施日志
 ```
 
-**SSL 证书管理：**
-
-```bash
-make ssl-info            # 查看证书信息
-make ssl-setup           # 设置 SSL 证书
-make ssl-validate        # 验证证书有效性
-```
-
 更多 API 详情请参考 `api/openapi/openapi.yaml` 文档。
 
 ## 如何贡献
