@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  miniblog-backend:
+    build:
+      context: .
+      dockerfile: build/docker/miniblog/Dockerfile.prod.backend
+      target: runner
+    container_name: miniblog-backend
+    restart: unless-stopped
+    environment:
+      - GIN_MODE=${GIN_MODE:-release}
+      - MINIBLOG_CONFIG_PATH=/app/configs
+      # 连接到外部基础设施服务
+      - MYSQL_HOST=infra-mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-miniblog}
+      - MYSQL_USERNAME=${MYSQL_USERNAME:-miniblog}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-miniblog123}
+      - REDIS_HOST=infra-redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-1}
+      - JWT_SECRET=${JWT_SECRET:-miniblog_jwt_secret_key_change_in_production}
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./logs:/app/logs
+      - miniblog-uploads:/app/uploads
+    networks:
+      - infra_shared
+    ports:
+      - "8080:8080"  # 用于直接访问，生产环境通过 nginx 代理
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  miniblog-frontend-blog:
+    build:
+      context: ./web/miniblog-web
+      dockerfile: ../../build/docker/miniblog/Dockerfile.prod.frontend.blog
+      args:
+        - NODE_ENV=production
+        - VITE_API_URL=http://localhost/api/v1
+    container_name: miniblog-frontend-blog
+    restart: unless-stopped
+    networks:
+      - infra_shared
+    volumes:
+      - blog-dist:/app/dist
+
+  miniblog-frontend-admin:
+    build:
+      context: ./web/miniblog-web-admin
+      dockerfile: ../../build/docker/miniblog/Dockerfile.prod.frontend.admin
+      args:
+        - NODE_ENV=production
+        - VUE_APP_API_URL=http://localhost/api/v1
+    container_name: miniblog-frontend-admin
+    restart: unless-stopped
+    networks:
+      - infra_shared
+    volumes:
+      - admin-dist:/app/dist
+
+volumes:
+  miniblog-uploads:
+    name: miniblog-uploads
+  blog-dist:
+    name: miniblog-blog-dist
+  admin-dist:
+    name: miniblog-admin-dist
+
+networks:
+  infra_shared:
+    external: true
+    name: infra_shared

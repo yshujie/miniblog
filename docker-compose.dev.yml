@@ -1,0 +1,62 @@
+version: '3.8'
+
+# 开发环境配置覆盖文件
+# 使用方法: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  miniblog-backend:
+    build:
+      dockerfile: build/docker/miniblog/Dockerfile.dev.backend
+      target: development
+    volumes:
+      - .:/app
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      - GIN_MODE=debug
+      - DEBUG=true
+      - LOG_LEVEL=debug
+    ports:
+      - "8080:8080"
+      - "2345:2345"  # delve 调试端口
+    command: |
+      sh -c "
+        if [ -f /app/air ]; then
+          /app/air -c .air.toml
+        else
+          go run cmd/miniblog/main.go -c configs/miniblog.yaml
+        fi
+      "
+
+  miniblog-frontend-blog:
+    build:
+      target: development
+    volumes:
+      - ./web/miniblog-web:/app
+      - blog-node-modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8080/api/v1
+    ports:
+      - "5173:5173"  # Vite dev server
+    command: npm run dev -- --host 0.0.0.0
+
+  miniblog-frontend-admin:
+    build:
+      target: development
+    volumes:
+      - ./web/miniblog-web-admin:/app
+      - admin-node-modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VUE_APP_API_URL=http://localhost:8080/api/v1
+    ports:
+      - "8081:8080"  # Vue CLI dev server
+    command: npm run serve -- --host 0.0.0.0
+
+volumes:
+  go-mod-cache:
+    name: miniblog-go-mod-cache
+  blog-node-modules:
+    name: miniblog-blog-node-modules
+  admin-node-modules:
+    name: miniblog-admin-node-modules

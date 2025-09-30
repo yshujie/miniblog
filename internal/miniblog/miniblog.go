@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -93,6 +94,7 @@ func run() error {
 	httpSrv := startInsecureServer(g)
 
 	// 启动 HTTPS 服务器
+	// 启动 HTTPS 服务（如果证书存在则启动，否则跳过，由 infra 负责 TLS 终端）
 	httpsSrv := startSecureServer(g)
 
 	// 等待中断信号优雅地关闭服务器（10 秒超时)。
@@ -113,9 +115,11 @@ func run() error {
 		log.Errorw("Insecure Server forced to shutdown", "err", err)
 		return err
 	}
-	if err := httpsSrv.Shutdown(ctx); err != nil {
-		log.Errorw("Secure Server forced to shutdown", "err", err)
-		return err
+	if httpsSrv != nil {
+		if err := httpsSrv.Shutdown(ctx); err != nil {
+			log.Errorw("Secure Server forced to shutdown", "err", err)
+			return err
+		}
 	}
 
 	log.Infow("Server exiting")
@@ -155,12 +159,41 @@ func startSecureServer(g *gin.Engine) *http.Server {
 	// 打印日志
 	log.Infow("Start to listening the incoming requests on port " + viper.GetString("server.address"))
 
-	// 检查证书和密钥文件是否存在
-	if _, err := os.Stat(viper.GetString("tls.cert")); os.IsNotExist(err) {
-		log.Fatalw("TLS certificate file does not exist", "file", viper.GetString("tls.cert"))
+	// 检查证书和密钥文件是否存在；若不存在，则根据 TLS_STRICT 控制是 fatal 还是跳过 HTTPS
+	certPath := viper.GetString("tls.cert")
+	keyPath := viper.GetString("tls.key")
+
+	// TLS_STRICT 优先从 viper 配置读取（tls.strict），否则从环境变量 TLS_STRICT 读取（true/1 表示严格）
+	tlsStrict := false
+	if viper.IsSet("tls.strict") {
+		tlsStrict = viper.GetBool("tls.strict")
+	} else {
+		if val := strings.ToLower(strings.TrimSpace(os.Getenv("TLS_STRICT"))); val == "1" || val == "true" || val == "yes" {
+			tlsStrict = true
+		}
 	}
-	if _, err := os.Stat(viper.GetString("tls.key")); os.IsNotExist(err) {
-		log.Fatalw("TLS key file does not exist", "file", viper.GetString("tls.key"))
+
+	certInfo, certErr := os.Stat(certPath)
+	keyInfo, keyErr := os.Stat(keyPath)
+
+	if certErr != nil || keyErr != nil {
+		// 如果严格模式，停止启动并记录错误；否则仅发出警告并跳过 HTTPS
+		if tlsStrict {
+			log.Fatalw("TLS certificate or key missing (TLS_STRICT enabled)", "cert", certErr, "key", keyErr, "certPath", certPath, "keyPath", keyPath)
+			return nil
+		}
+		log.Warnw("TLS certificate/key not found, skipping HTTPS server startup", "certErr", certErr, "keyErr", keyErr, "certPath", certPath, "keyPath", keyPath)
+		return nil
+	}
+
+	// 记录证书/密钥的大小和权限信息，便于排查
+	certPerm := certInfo.Mode().Perm()
+	keyPerm := keyInfo.Mode().Perm()
+	log.Infow("TLS certificate and key found, starting HTTPS server", "cert", certPath, "cert_size", certInfo.Size(), "cert_perm", certPerm, "key", keyPath, "key_size", keyInfo.Size(), "key_perm", keyPerm)
+
+	// 私钥权限不应过于宽松（建议 0600），如权限包含 group/others 可读则警告
+	if keyPerm&0077 != 0 {
+		log.Warnw("TLS private key permissions are too permissive, consider setting to 0600", "key", keyPath, "perm", keyPerm)
 	}
 
 	// 运行 HTTPS Server

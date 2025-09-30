@@ -1,306 +1,310 @@
-# ==============================================================================
-# MiniBlog 项目 Makefile
-# 用于统一管理项目的构建、测试、部署等操作
-# ==============================================================================
+# MiniBlog 项目 Makefile - 专注后端和前端服务管理
+# 依赖外部 MySQL、Redis、Nginx 服务，不关心服务提供方式
+.DEFAULT_GOAL := help
 
-# 定义全局变量
-COMMON_SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
-ROOT_DIR := $(abspath $(shell cd $(COMMON_SELF_DIR)/ && pwd -P))
-OUTPUT_DIR := $(ROOT_DIR)/_output
-BUILD_DIR := $(ROOT_DIR)/build
-SCRIPTS_DIR := $(ROOT_DIR)/scripts
-
-# 项目信息
+# 项目变量
 PROJECT_NAME := miniblog
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "v0.0.0-dev")
-BUILD_TIME := $(shell date +%Y-%m-%dT%H:%M:%S%z)
-GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+OUTPUT_DIR := ./_output
 
-# Go 相关变量
+# Go 构建变量
 GO_MODULE := $(shell head -1 go.mod | awk '{print $$2}')
-MAIN_FILE := $(ROOT_DIR)/cmd/$(PROJECT_NAME)/main.go
-BINARY_NAME := $(PROJECT_NAME)
-LDFLAGS := -X '$(GO_MODULE)/internal/pkg/core.Version=$(VERSION)' \
-           -X '$(GO_MODULE)/internal/pkg/core.BuildTime=$(BUILD_TIME)' \
-           -X '$(GO_MODULE)/internal/pkg/core.GitCommit=$(GIT_COMMIT)'
+LDFLAGS := -X '$(GO_MODULE)/internal/pkg/core.Version=$(VERSION)'
 
-# 前端项目路径
-WEB_BLOG_DIR := $(ROOT_DIR)/web/miniblog-web
-WEB_ADMIN_DIR := $(ROOT_DIR)/web/miniblog-web-admin
+# 前端服务路径
+BLOG_FRONTEND_DIR := web/miniblog-web
+ADMIN_FRONTEND_DIR := web/miniblog-web-admin
 
-# Docker 相关
-DOCKER_COMPOSE_DEV := $(BUILD_DIR)/docker/miniblog/compose-dev.yml
-DOCKER_COMPOSE_PROD_INFRA := $(BUILD_DIR)/docker/miniblog/compose-prod-infra.yml
-DOCKER_COMPOSE_PROD_APP := $(BUILD_DIR)/docker/miniblog/compose-prod-app.yml
-
-# 颜色定义
-RED := \033[31m
-GREEN := \033[32m
-YELLOW := \033[33m
-BLUE := \033[34m
-RESET := \033[0m
-
-# ==============================================================================
-# 默认目标
-# ==============================================================================
-.PHONY: all
-all: help
-
-# ==============================================================================
-# 帮助信息
-# ==============================================================================
 .PHONY: help
 help: ## 显示帮助信息
+	@echo "MiniBlog 项目管理命令:"
 	@echo ""
-	@echo "$(YELLOW)MiniBlog 项目管理 Makefile$(RESET)"
-	@echo ""
-	@echo "$(BLUE)使用方法:$(RESET)"
-	@echo "  make <target>"
-	@echo ""
-	@echo "$(BLUE)可用目标:$(RESET)"
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(GREEN)%-20s$(RESET) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@echo ""
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_0-9-]+:.*?## / {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+.PHONY: check-deps
+check-deps: ## 检查依赖服务
+	@echo "检查依赖服务..."
+	@echo "检查 Docker..."
+	@docker --version > /dev/null 2>&1 || (echo "❌ Docker 未安装或未启动" && exit 1)
+	@echo "✅ Docker 正常"
+	@echo "检查 MySQL 服务..."
+	@docker ps --format '{{.Names}}' | grep -E "(mysql|infra-mysql)" > /dev/null || (echo "⚠️  MySQL 服务未运行，请确保有可用的 MySQL 服务")
+	@echo "检查 Redis 服务..."
+	@docker ps --format '{{.Names}}' | grep -E "(redis|infra-redis)" > /dev/null || (echo "⚠️  Redis 服务未运行，请确保有可用的 Redis 服务")
+	@echo "检查 Nginx 服务..."
+	@docker ps --format '{{.Names}}' | grep -E "(nginx|infra-nginx)" > /dev/null || (echo "⚠️  Nginx 服务未运行，请确保有可用的 Nginx 服务")
+	@echo "✅ 依赖服务检查完成"
 
 # ==============================================================================
-# 开发相关目标
+# 后端服务管理
 # ==============================================================================
-.PHONY: deps
-deps: ## 安装项目依赖
-	@echo "$(BLUE)安装 Go 依赖...$(RESET)"
+
+.PHONY: build-backend
+build-backend: ## 构建后端服务
+	@echo "构建后端服务..."
+	@mkdir -p $(OUTPUT_DIR)
 	@go mod download
-	@go mod tidy
-	@echo "$(BLUE)安装前端依赖...$(RESET)"
-	@cd $(WEB_BLOG_DIR) && npm install
-	@cd $(WEB_ADMIN_DIR) && npm install
-	@echo "$(GREEN)✅ 依赖安装完成$(RESET)"
+	@go build -ldflags "$(LDFLAGS)" -o $(OUTPUT_DIR)/$(PROJECT_NAME) ./cmd/$(PROJECT_NAME)
+	@echo "✅ 后端服务构建完成"
 
-.PHONY: tidy
-tidy: ## 整理 Go 模块依赖
-	@echo "$(BLUE)整理 Go 模块依赖...$(RESET)"
-	@go mod tidy
-	@echo "$(GREEN)✅ 依赖整理完成$(RESET)"
+.PHONY: run-backend
+run-backend: build-backend ## 运行后端服务
+	@echo "启动后端服务..."
+	@$(OUTPUT_DIR)/$(PROJECT_NAME) -c configs/miniblog.yaml
 
-.PHONY: format
-format: ## 格式化代码
-	@echo "$(BLUE)格式化 Go 代码...$(RESET)"
-	@gofmt -s -w ./
-	@go vet ./...
-	@echo "$(BLUE)格式化前端代码...$(RESET)"
-	@cd $(WEB_BLOG_DIR) && npm run format 2>/dev/null || echo "跳过 blog 格式化"
-	@cd $(WEB_ADMIN_DIR) && npm run lint:fix 2>/dev/null || echo "跳过 admin 格式化"
-	@echo "$(GREEN)✅ 代码格式化完成$(RESET)"
+.PHONY: dev-backend
+dev-backend: ## 后端开发模式（热重载）
+	@echo "启动后端开发模式..."
+	@air -c .air.toml
 
-.PHONY: lint
-lint: ## 代码质量检查
-	@echo "$(BLUE)Go 代码检查...$(RESET)"
-	@go vet ./...
-	@golangci-lint run 2>/dev/null || echo "golangci-lint 未安装，跳过检查"
-	@echo "$(BLUE)前端代码检查...$(RESET)"
-	@cd $(WEB_BLOG_DIR) && npm run lint 2>/dev/null || echo "跳过 blog 检查"
-	@cd $(WEB_ADMIN_DIR) && npm run lint 2>/dev/null || echo "跳过 admin 检查"
-	@echo "$(GREEN)✅ 代码检查完成$(RESET)"
+.PHONY: test-backend
+test-backend: ## 运行后端测试
+	@echo "运行后端测试..."
+	@go test -v ./...
 
-.PHONY: test
-test: ## 运行测试
-	@echo "$(BLUE)运行 Go 测试...$(RESET)"
-	@go test -v -race -cover ./...
-	@echo "$(GREEN)✅ 测试完成$(RESET)"
-
-.PHONY: add-copyright
-add-copyright: ## 添加版权头信息
-	@echo "$(BLUE)添加版权头信息...$(RESET)"
-	@addlicense -v -f $(SCRIPTS_DIR)/boilerplate.txt $(ROOT_DIR) --skip-dirs=third_party,vendor,$(OUTPUT_DIR),web 2>/dev/null || echo "addlicense 未安装，跳过版权添加"
-	@echo "$(GREEN)✅ 版权头添加完成$(RESET)"
+.PHONY: format-backend
+format-backend: ## 格式化后端代码
+	@echo "格式化后端代码..."
+	@go fmt ./...
 
 # ==============================================================================
-# 构建相关目标
+# 博客前端服务管理
 # ==============================================================================
+
+.PHONY: build-blog
+build-blog: ## 构建博客前端
+	@echo "构建博客前端..."
+	@if [ -d "$(BLOG_FRONTEND_DIR)" ]; then \
+		cd $(BLOG_FRONTEND_DIR) && npm install && npm run build; \
+		echo "✅ 博客前端构建完成"; \
+	else \
+		echo "❌ 博客前端目录不存在: $(BLOG_FRONTEND_DIR)"; \
+	fi
+
+.PHONY: dev-blog
+dev-blog: ## 博客前端开发模式
+	@echo "启动博客前端开发服务器..."
+	@if [ -d "$(BLOG_FRONTEND_DIR)" ]; then \
+		echo "博客前端: http://localhost:3000"; \
+		cd $(BLOG_FRONTEND_DIR) && npm install && npm run dev; \
+	else \
+		echo "❌ 博客前端目录不存在: $(BLOG_FRONTEND_DIR)"; \
+	fi
+
+.PHONY: install-blog
+install-blog: ## 安装博客前端依赖
+	@echo "安装博客前端依赖..."
+	@if [ -d "$(BLOG_FRONTEND_DIR)" ]; then \
+		cd $(BLOG_FRONTEND_DIR) && npm install; \
+		echo "✅ 博客前端依赖安装完成"; \
+	else \
+		echo "❌ 博客前端目录不存在: $(BLOG_FRONTEND_DIR)"; \
+	fi
+
+# ==============================================================================
+# 管理后台服务管理
+# ==============================================================================
+
+.PHONY: build-admin
+build-admin: ## 构建管理后台
+	@echo "构建管理后台..."
+	@if [ -d "$(ADMIN_FRONTEND_DIR)" ]; then \
+		cd $(ADMIN_FRONTEND_DIR) && npm install && npm run build:prod; \
+		echo "✅ 管理后台构建完成"; \
+	else \
+		echo "❌ 管理后台目录不存在: $(ADMIN_FRONTEND_DIR)"; \
+	fi
+
+.PHONY: dev-admin
+dev-admin: ## 管理后台开发模式
+	@echo "启动管理后台开发服务器..."
+	@if [ -d "$(ADMIN_FRONTEND_DIR)" ]; then \
+		echo "管理后台: http://localhost:3001"; \
+		cd $(ADMIN_FRONTEND_DIR) && npm install && npm run dev; \
+	else \
+		echo "❌ 管理后台目录不存在: $(ADMIN_FRONTEND_DIR)"; \
+	fi
+
+.PHONY: install-admin
+install-admin: ## 安装管理后台依赖
+	@echo "安装管理后台依赖..."
+	@if [ -d "$(ADMIN_FRONTEND_DIR)" ]; then \
+		cd $(ADMIN_FRONTEND_DIR) && npm install; \
+		echo "✅ 管理后台依赖安装完成"; \
+	else \
+		echo "❌ 管理后台目录不存在: $(ADMIN_FRONTEND_DIR)"; \
+	fi
+
+# ==============================================================================
+# 组合命令 - 兼容性和便利性
+# ==============================================================================
+
 .PHONY: build
-build: tidy ## 构建后端二进制文件
-	@echo "$(BLUE)构建后端服务...$(RESET)"
-	@mkdir -p $(OUTPUT_DIR)
-	@go build -ldflags "$(LDFLAGS)" -o $(OUTPUT_DIR)/$(BINARY_NAME) $(MAIN_FILE)
-	@echo "$(GREEN)✅ 后端构建完成: $(OUTPUT_DIR)/$(BINARY_NAME)$(RESET)"
-
-.PHONY: build-linux
-build-linux: tidy ## 构建 Linux 版本
-	@echo "$(BLUE)构建 Linux 版本...$(RESET)"
-	@mkdir -p $(OUTPUT_DIR)
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(OUTPUT_DIR)/$(BINARY_NAME)-linux $(MAIN_FILE)
-	@echo "$(GREEN)✅ Linux 版本构建完成: $(OUTPUT_DIR)/$(BINARY_NAME)-linux$(RESET)"
-
-.PHONY: build-web
-build-web: ## 构建前端静态文件
-	@echo "$(BLUE)构建博客前端...$(RESET)"
-	@cd $(WEB_BLOG_DIR) && npm run build
-	@echo "$(BLUE)构建管理后台...$(RESET)"
-	@cd $(WEB_ADMIN_DIR) && npm run build:prod
-	@echo "$(GREEN)✅ 前端构建完成$(RESET)"
+build: build-backend ## 构建后端服务（默认）
 
 .PHONY: build-all
-build-all: build build-web ## 构建所有组件
-	@echo "$(GREEN)✅ 全部构建完成$(RESET)"
+build-all: build-backend build-blog build-admin ## 构建所有服务
+
+.PHONY: install-all
+install-all: install-blog install-admin ## 安装所有前端依赖
+
+.PHONY: dev-all
+dev-all: ## 启动所有服务的开发模式
+	@echo "启动所有服务的开发模式..."
+	@echo "后端服务: http://localhost:8081"
+	@echo "博客前端: http://localhost:3000"
+	@echo "管理后台: http://localhost:3001"
+	@echo ""
+	@echo "请在不同终端中运行："
+	@echo "  make dev-backend  # 后端服务"
+	@echo "  make dev-blog     # 博客前端"
+	@echo "  make dev-admin    # 管理后台"
+
+.PHONY: test
+test: test-backend ## 运行测试（默认后端）
+
+.PHONY: format
+format: format-backend ## 格式化代码（默认后端）
+
+# 保持向后兼容
+.PHONY: build-frontend
+build-frontend: build-blog build-admin ## 构建前端（兼容命令）
+
+.PHONY: dev
+dev: dev-backend ## 开发模式（默认后端）
+
+.PHONY: run
+run: run-backend ## 运行服务（默认后端）
+
+# ==============================================================================
+# Docker 部署管理
+# ==============================================================================
+
+.PHONY: deploy
+deploy: ## 部署所有服务
+	@echo "部署 MiniBlog 所有服务..."
+	@docker compose up -d --build
+	@echo "✅ 部署完成"
+	@echo "服务地址："
+	@echo "  后端API: http://localhost:8081"
+	@echo "  博客前端: http://localhost:3000"
+	@echo "  管理后台: http://localhost:3001"
+
+.PHONY: deploy-dev
+deploy-dev: ## 部署开发环境
+	@echo "部署开发环境..."
+	@docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+	@echo "✅ 开发环境部署完成"
+
+.PHONY: deploy-prod
+deploy-prod: ## 部署生产环境  
+	@echo "部署生产环境..."
+	@docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+	@echo "✅ 生产环境部署完成"
+
+.PHONY: db-migrate
+db-migrate: ## 运行数据库迁移（优先使用本地 migrate 二进制，否则使用 dockerized migrate 镜像）
+	@echo "Running DB migrations..."
+	@DB_HOST=${DB_HOST:-infra-mysql} \
+	DB_PORT=${DB_PORT:-3306} \
+	DB_USER=${DB_USER:-miniblog} \
+	DB_PASSWORD=${DB_PASSWORD:-miniblog_password} \
+	DB_NAME=${DB_NAME:-miniblog} ; \
+	DB_URL="mysql://$${DB_USER}:$${DB_PASSWORD}@tcp($${DB_HOST}:$${DB_PORT})/$${DB_NAME}?multiStatements=true" ; \
+	if command -v migrate >/dev/null 2>&1; then \
+		echo "-> Using local migrate binary"; \
+		migrate -path db/migrations/sql -database "$$DB_URL" up ; \
+	else \
+		echo "-> Local migrate binary not found, using dockerized migrate image"; \
+		docker run --rm --network infra_shared -v "$(PWD)/db/migrations/sql:/migrations" migrate/migrate -path /migrations -database "$$DB_URL" up ; \
+	fi
+
+.PHONY: db-init
+db-init: ## 初始化数据库（执行初始 SQL 脚本，幂等）。需要有数据库管理员权限来创建数据库/用户
+	@echo "Running DB initialization..."
+	@DB_HOST=${DB_HOST:-infra-mysql} \
+	DB_PORT=${DB_PORT:-3306} \
+	DB_ROOT_USER=${DB_ROOT_USER:-root} \
+	DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-} ; \
+	SCRIPT=./db/migrations/sql/000001_init.up.sql ; \
+	if command -v mysql >/dev/null 2>&1; then \
+		echo "-> Using local mysql client to execute init script $$SCRIPT"; \
+		mysql -h $$DB_HOST -P $$DB_PORT -u $$DB_ROOT_USER -p"$$DB_ROOT_PASSWORD" < $$SCRIPT; \
+	else \
+		echo "-> Local mysql client not found, using dockerized mysql client"; \
+		docker run --rm --network infra_shared -v "$(PWD)/db/migrations/sql:/work" mysql:8.0 sh -c 'exec mysql -h "'"$$DB_HOST"'" -P "'"$$DB_PORT"'" -u "'"$$DB_ROOT_USER"'" -p"'"$$DB_ROOT_PASSWORD"'"' < /work/000001_init.up.sql ; \
+	fi
+
+.PHONY: down
+down: ## 停止应用服务
+	@docker compose down
+
+.PHONY: status
+status: ## 查看服务状态
+	@echo "应用服务:"
+	@docker compose ps
+	@echo "基础设施服务:"
+	@docker ps --filter "name=infra-" --format "table {{.Names}}\t{{.Status}}"
+
+.PHONY: logs
+logs: ## 查看应用日志
+	@docker compose logs -f
+
+.PHONY: health
+health: ## 健康检查
+	@curl -s http://localhost:8081/health || echo "后端服务未启动"
+
+# ==============================================================================
+# 实用工具
+# ==============================================================================
 
 .PHONY: clean
 clean: ## 清理构建产物
-	@echo "$(BLUE)清理构建产物...$(RESET)"
+	@echo "清理构建产物..."
 	@rm -rf $(OUTPUT_DIR)
-	@rm -rf $(WEB_BLOG_DIR)/dist 2>/dev/null || true
-	@rm -rf $(WEB_ADMIN_DIR)/dist 2>/dev/null || true
-	@echo "$(GREEN)✅ 清理完成$(RESET)"
+	@if [ -d "$(BLOG_FRONTEND_DIR)/dist" ]; then rm -rf $(BLOG_FRONTEND_DIR)/dist; fi
+	@if [ -d "$(ADMIN_FRONTEND_DIR)/dist" ]; then rm -rf $(ADMIN_FRONTEND_DIR)/dist; fi
+	@echo "✅ 清理完成"
 
-# ==============================================================================
-# 开发运行目标
-# ==============================================================================
-.PHONY: dev
-dev: ## 启动开发环境
-	@echo "$(BLUE)启动开发环境...$(RESET)"
-	@docker compose -f $(DOCKER_COMPOSE_DEV) up -d
-	@echo "$(GREEN)✅ 开发环境启动完成$(RESET)"
-	@echo "$(YELLOW)💡 后端服务: http://localhost:8081$(RESET)"
-	@echo "$(YELLOW)💡 博客前端: http://localhost:5173$(RESET)"
-	@echo "$(YELLOW)💡 管理后台: http://localhost:8080$(RESET)"
-
-.PHONY: dev-backend
-dev-backend: build ## 启动后端开发服务
-	@echo "$(BLUE)启动后端服务...$(RESET)"
-	@$(OUTPUT_DIR)/$(BINARY_NAME) -c configs/miniblog.yaml
-
-.PHONY: dev-web
-dev-web: ## 启动前端开发服务
-	@echo "$(BLUE)启动博客前端开发服务...$(RESET)"
-	@cd $(WEB_BLOG_DIR) && npm run dev &
-	@echo "$(BLUE)启动管理后台开发服务...$(RESET)"
-	@cd $(WEB_ADMIN_DIR) && npm run dev &
-	@wait
-
-.PHONY: stop-dev
-stop-dev: ## 停止开发环境
-	@echo "$(BLUE)停止开发环境...$(RESET)"
-	@docker compose -f $(DOCKER_COMPOSE_DEV) down
-	@echo "$(GREEN)✅ 开发环境已停止$(RESET)"
-
-# ==============================================================================
-# 部署相关目标
-# ==============================================================================
-.PHONY: deploy-infra
-deploy-infra: ## 部署基础设施 (MySQL, Redis, Nginx)
-	@echo "$(BLUE)部署基础设施...$(RESET)"
-	@docker compose -f $(DOCKER_COMPOSE_PROD_INFRA) up -d
-	@echo "$(GREEN)✅ 基础设施部署完成$(RESET)"
-
-.PHONY: deploy-app
-deploy-app: build-linux ## 部署应用服务
-	@echo "$(BLUE)部署应用服务...$(RESET)"
-	@docker compose -f $(DOCKER_COMPOSE_PROD_APP) up -d --build
-	@echo "$(GREEN)✅ 应用服务部署完成$(RESET)"
-
-.PHONY: deploy-all
-deploy-all: deploy-infra deploy-app ## 部署完整应用
-	@echo "$(GREEN)✅ 完整应用部署完成$(RESET)"
-
-.PHONY: undeploy
-undeploy: ## 停止并清理所有部署
-	@echo "$(BLUE)停止并清理部署...$(RESET)"
-	@docker compose -f $(DOCKER_COMPOSE_PROD_APP) down --remove-orphans
-	@docker compose -f $(DOCKER_COMPOSE_PROD_INFRA) down --remove-orphans
-	@docker compose -f $(DOCKER_COMPOSE_DEV) down --remove-orphans
-	@echo "$(GREEN)✅ 部署清理完成$(RESET)"
-
-# ==============================================================================
-# 数据库管理
-# ==============================================================================
-.PHONY: db-migrate
-db-migrate: ## 运行数据库迁移
-	@echo "$(BLUE)运行数据库迁移...$(RESET)"
-	@mysql -h127.0.0.1 -P3306 -uroot -proot < configs/mysql/miniblog.sql 2>/dev/null || \
-		echo "$(YELLOW)⚠️  请确保 MySQL 服务已启动$(RESET)"
-	@echo "$(GREEN)✅ 数据库迁移完成$(RESET)"
-
-.PHONY: db-reset
-db-reset: ## 重置数据库
-	@echo "$(BLUE)重置数据库...$(RESET)"
-	@echo "$(RED)⚠️  这将删除所有数据，请确认！$(RESET)"
-	@read -p "输入 'yes' 继续: " confirm; [ "$$confirm" = "yes" ] || exit 1
-	@mysql -h127.0.0.1 -P3306 -uroot -proot -e "DROP DATABASE IF EXISTS miniblog; CREATE DATABASE miniblog;" 2>/dev/null || \
-		echo "$(YELLOW)⚠️  请确保 MySQL 服务已启动$(RESET)"
-	@$(MAKE) db-migrate
-	@echo "$(GREEN)✅ 数据库重置完成$(RESET)"
-
-# ==============================================================================
-# 监控和日志
-# ==============================================================================
-.PHONY: status
-status: ## 查看服务状态
-	@echo "$(BLUE)服务状态:$(RESET)"
-	@docker compose -f $(DOCKER_COMPOSE_DEV) ps 2>/dev/null || echo "开发环境未启动"
-	@docker compose -f $(DOCKER_COMPOSE_PROD_INFRA) ps 2>/dev/null || echo "生产基础设施未启动"
-	@docker compose -f $(DOCKER_COMPOSE_PROD_APP) ps 2>/dev/null || echo "生产应用未启动"
-
-.PHONY: logs
-logs: ## 查看所有服务日志
-	@echo "$(BLUE)查看服务日志...$(RESET)"
-	@docker compose -f $(DOCKER_COMPOSE_DEV) logs -f 2>/dev/null || \
-	docker compose -f $(DOCKER_COMPOSE_PROD_APP) logs -f 2>/dev/null || \
-		echo "$(YELLOW)没有运行中的服务$(RESET)"
-
-.PHONY: logs-backend
-logs-backend: ## 查看后端服务日志
-	@docker compose -f $(DOCKER_COMPOSE_DEV) logs -f miniblog 2>/dev/null || \
-	docker compose -f $(DOCKER_COMPOSE_PROD_APP) logs -f miniblog 2>/dev/null || \
-		echo "$(YELLOW)后端服务未运行$(RESET)"
-
-.PHONY: logs-db
-logs-db: ## 查看数据库日志
-	@docker compose -f $(DOCKER_COMPOSE_DEV) logs -f mysql 2>/dev/null || \
-	docker compose -f $(DOCKER_COMPOSE_PROD_INFRA) logs -f mysql 2>/dev/null || \
-		echo "$(YELLOW)数据库服务未运行$(RESET)"
-
-# ==============================================================================
-# 工具目标
-# ==============================================================================
-.PHONY: swagger
-swagger: ## 启动 Swagger 文档服务
-	@echo "$(BLUE)启动 Swagger 文档...$(RESET)"
-	@swagger serve -F=swagger --no-open --port 65534 $(ROOT_DIR)/api/openapi/openapi.yaml || \
-		echo "$(YELLOW)swagger 工具未安装，请安装: go install github.com/go-swagger/go-swagger/cmd/swagger@latest$(RESET)"
-	@echo "$(YELLOW)💡 Swagger 文档: http://localhost:65534$(RESET)"
+.PHONY: clean-deps
+clean-deps: ## 清理前端依赖
+	@echo "清理前端依赖..."
+	@if [ -d "$(BLOG_FRONTEND_DIR)/node_modules" ]; then rm -rf $(BLOG_FRONTEND_DIR)/node_modules; fi
+	@if [ -d "$(ADMIN_FRONTEND_DIR)/node_modules" ]; then rm -rf $(ADMIN_FRONTEND_DIR)/node_modules; fi
+	@echo "✅ 前端依赖清理完成"
 
 .PHONY: version
-version: ## 显示版本信息
-	@echo "$(BLUE)版本信息:$(RESET)"
-	@echo "  项目: $(PROJECT_NAME)"
-	@echo "  版本: $(VERSION)"
-	@echo "  构建时间: $(BUILD_TIME)"
-	@echo "  Git 提交: $(GIT_COMMIT)"
-	@echo "  Go 模块: $(GO_MODULE)"
+version: ## 显示版本
+	@echo "$(PROJECT_NAME) $(VERSION)"
 
-.PHONY: env-info
-env-info: ## 显示环境信息
-	@echo "$(BLUE)环境信息:$(RESET)"
-	@echo "  Go 版本: $$(go version)"
-	@echo "  Node 版本: $$(node --version 2>/dev/null || echo '未安装')"
-	@echo "  NPM 版本: $$(npm --version 2>/dev/null || echo '未安装')"
-	@echo "  Docker 版本: $$(docker --version 2>/dev/null || echo '未安装')"
-	@echo "  Docker Compose: $$(docker compose version 2>/dev/null || echo '未安装')"
+.PHONY: env-setup
+env-setup: ## 初始化环境配置
+	@if [ ! -f .env ]; then cp .env.example .env; echo "已创建 .env"; fi
 
-# ==============================================================================
-# CI/CD 相关
-# ==============================================================================
-.PHONY: ci-test
-ci-test: deps lint test ## CI 环境测试
-	@echo "$(GREEN)✅ CI 测试完成$(RESET)"
-
-.PHONY: ci-build
-ci-build: build-all ## CI 环境构建
-	@echo "$(GREEN)✅ CI 构建完成$(RESET)"
-
-.PHONY: release
-release: ci-test ci-build ## 准备发布
-	@echo "$(BLUE)准备发布 $(VERSION)...$(RESET)"
-	@git tag -a $(VERSION) -m "Release $(VERSION)" 2>/dev/null || echo "$(YELLOW)标签已存在或 git 未初始化$(RESET)"
-	@echo "$(GREEN)✅ 发布准备完成$(RESET)"
+.PHONY: info
+info: ## 显示项目信息
+	@echo "MiniBlog 项目信息:"
+	@echo "===================="
+	@echo "项目名称: $(PROJECT_NAME)"
+	@echo "版本: $(VERSION)"
+	@echo "后端服务: Go $(shell go version | awk '{print $$3}')"
+	@echo "博客前端: $(if $(shell test -d $(BLOG_FRONTEND_DIR) && echo 1),Vue.js,未安装)"
+	@echo "管理后台: $(if $(shell test -d $(ADMIN_FRONTEND_DIR) && echo 1),Vue.js + Element UI,未安装)"
+	@echo ""
+	@echo "服务地址:"
+	@echo "  后端API: http://localhost:8081"
+	@echo "  博客前端: http://localhost:3000"
+	@echo "  管理后台: http://localhost:3001"
 
 # ==============================================================================
-# 兼容性别名 (向后兼容)
+# 快速启动命令
 # ==============================================================================
+
+.PHONY: start-dev
+start-dev: check-deps deploy-dev ## 启动完整开发环境
+	@echo "🚀 开发环境启动完成"
+	@echo "后端API: http://localhost:8081"
+	@echo "博客前端: http://localhost:3000"  
+	@echo "管理后台: http://localhost:3001"
+	@echo ""
+	@echo "💡 提示: 使用 'make logs' 查看服务日志"

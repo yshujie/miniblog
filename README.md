@@ -1,8 +1,27 @@
 # MiniBlog
 
-<!-- 一个基于 Gin + Vue 的现代化全栈博客系统，提供完整的内容管理、用户认证和前台展示功能 -->
+<!-- 一个基于 Gin + Vue 的现代化全栈博客系统，采用外部基础设施架构，提供完整的内容管理、用户认证和前台展示功能 -->
 
-MiniBlog 是一个企业级的博客管理系统，采用 Go + Vue 技术栈构建，支持模块化内容组织、权限管理和多前端展示。系统设计遵循领域驱动设计（DDD）原则，具备良好的可扩展性和维护性。
+MiniBlog 是一个企业级的博客管理系统，采用 Go + Vue 技术栈构建，支持模块化内容组织、权限管理和多前端展示。系统采用外部基础设施架构，通过 Docker 网络连接共享的 Nginx、MySQL、Redis 服务，实现资源高效利用和服务解耦。
+
+## 🏗️ 架构说明
+
+**外部基础设施依赖**
+
+MiniBlog 采用微服务架构，依赖外部基础设施项目提供共享服务：
+
+- **数据库服务**：MySQL 8.0+ (服务名：`infra-mysql`)
+- **缓存服务**：Redis 6.0+ (服务名：`infra-redis`)
+- **代理服务**：Nginx (服务名：`infra-nginx`)
+- **管理面板**：Portainer (服务名：`infra-portainer`)
+
+**网络通信**
+
+应用通过 `infra_shared` Docker 网络与外部服务通信，实现：
+
+- 资源共享：多个应用项目共用基础设施
+- 服务解耦：应用专注业务逻辑，基础设施独立管理
+- 扩展性强：可独立扩容应用和基础设施
 
 ## 功能特性
 
@@ -79,9 +98,8 @@ MiniBlog 是一个企业级的博客管理系统，采用 Go + Vue 技术栈构�
 **系统要求：**
 
 - **Go 1.23+** - 后端服务开发运行环境
-- **MySQL 8.0+** - 主数据库（初始化脚本：`configs/mysql/miniblog.sql`）
-- **Redis 6.0+** - 缓存服务（可选）
-- **Docker & Docker Compose** - 容器化部署
+- **外部基础设施项目** - 提供 MySQL、Redis、Nginx 服务（需单独部署）
+- **Docker & Docker Compose** - 容器化部署和服务通信
 - **Node.js 18+** - 前端构建（可选）
 - **飞书开放平台凭证** - 外部文档同步（可选）
 
@@ -133,16 +151,22 @@ go mod tidy
 
 <!-- 描述如何运行该项目 -->
 
-**方式一：Docker Compose 一键部署（推荐）**
+**方式一：Docker Compose 部署（推荐）**
+
+> **重要提示**：MiniBlog 现在采用外部基础设施架构，需要先部署共享的基础设施项目。
 
 ```bash
-# 完整部署（基础设施 + 应用）
-make deploy-all
+# 1. 部署外部基础设施（需要先克隆 infra 项目）
+cd ../infra
+docker compose up -d
 
-# 分步部署
-make deploy-infra     # 部署 MySQL, Redis, Nginx
-make deploy-backend   # 部署后端服务  
-make deploy-frontend  # 部署前端服务
+# 2. 检查基础设施状态
+make check-infra
+
+# 3. 部署 MiniBlog 应用
+make deploy           # 部署所有应用组件
+make deploy-dev       # 开发环境部署
+make deploy-prod      # 生产环境部署
 ```
 
 **方式二：本地开发运行**

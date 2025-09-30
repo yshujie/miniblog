@@ -1,0 +1,49 @@
+version: '3.8'
+
+# 生产环境配置覆盖文件
+# 使用方法: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  miniblog-backend:
+    environment:
+      - GIN_MODE=release
+      - DEBUG=false
+      - LOG_LEVEL=info
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+      restart_policy:
+        condition: unless-stopped
+        delay: 5s
+        max_attempts: 3
+    # 生产环境不暴露端口，通过 nginx 代理访问
+    ports: []
+
+  miniblog-frontend-blog:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+      restart_policy:
+        condition: unless-stopped
+
+  miniblog-frontend-admin:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+      restart_policy:
+        condition: unless-stopped

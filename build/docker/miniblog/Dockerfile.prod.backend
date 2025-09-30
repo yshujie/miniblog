@@ -1,44 +1,11 @@
 # ---------- Builder ----------
 FROM golang:1.24-alpine AS builder
 
-# 设置构建参数
+
+# Go 构建相关参数（可选）
 ARG GOPROXY
-ARG HTTP_PROXY
-ARG HTTPS_PROXY
-ARG GO111MODULE
-ARG MYSQL_HOST
-ARG MYSQL_PORT
-ARG MYSQL_USERNAME
-ARG MYSQL_DBNAME
-ARG MYSQL_PASSWORD
-ARG REDIS_HOST
-ARG REDIS_PORT
-ARG REDIS_PASSWORD
-ARG REDIS_DB
-ARG JWT_SECRET
-ARG FEISHU_DOCREADER_APPID
-ARG FEISHU_DOCREADER_APPSECRET
-
-# 设置环境变量
 ENV GOPROXY=${GOPROXY}
-ENV HTTP_PROXY=${HTTP_PROXY}
-ENV HTTPS_PROXY=${HTTPS_PROXY}
-ENV GO111MODULE=${GO111MODULE}
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
-
-# 设置 miniblog 环境变量
-ENV MINIBLOG_DATABASE_HOST=${MYSQL_HOST}
-ENV MINIBLOG_DATABASE_PORT=${MYSQL_PORT}
-ENV MINIBLOG_DATABASE_USERNAME=${MYSQL_USERNAME}
-ENV MINIBLOG_DATABASE_DBNAME=${MYSQL_DBNAME}
-ENV MINIBLOG_DATABASE_PASSWORD=${MYSQL_PASSWORD}
-ENV MINIBLOG_REDIS_HOST=${REDIS_HOST}
-ENV MINIBLOG_REDIS_PORT=${REDIS_PORT}
-ENV MINIBLOG_REDIS_PASSWORD=${REDIS_PASSWORD}
-ENV MINIBLOG_REDIS_DB=${REDIS_DB}
-ENV MINIBLOG_JWT_SECRET=${JWT_SECRET}
-ENV MINIBLOG_FEISHU_DOCREADER_APPID=${FEISHU_DOCREADER_APPID}
-ENV MINIBLOG_FEISHU_DOCREADER_APPSECRET=${FEISHU_DOCREADER_APPSECRET}
 
 # 安装依赖
 RUN apk add --no-cache git ca-certificates
@@ -80,12 +47,15 @@ COPY --from=builder /app/cmd/miniblog/miniblog /usr/local/bin/miniblog
 # 复制配置文件
 COPY --from=builder /app/configs/miniblog.yaml /etc/miniblog/config.yaml
 
-# 复制 ssl 文件
-COPY --from=builder /app/configs/nginx/ssl/ /etc/miniblog/ssl/
+
+# 可选：复制 ssl 文件（如有）
+RUN mkdir -p /etc/miniblog/ssl
+# 证书通常由部署环境或 infra 项目挂载到 /etc/miniblog/ssl
+# 不在构建阶段复制仓库中的 files（configs/nginx/ssl 在 .gitignore 中）
 
 # 暴露端口
 EXPOSE 8081
 EXPOSE 8443
 
-# 启动命令
+# 启动命令，可通过 docker-compose.yml 覆盖
 ENTRYPOINT ["/usr/local/bin/miniblog", "--config", "/etc/miniblog/config.yaml"]

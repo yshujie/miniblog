@@ -1,37 +1,37 @@
 app:
   name: "miniblog"
   version: "1.0.0"
-  mode: "development"  # development, production
+  mode: "production"  # development, production
 
 # 服务器配置
 server:
   name: "miniblog"
   address: "0.0.0.0"
-  port: 8081
+  port: 8080  # 标准端口，方便代理
   port-ssl: 8443
   read-timeout: 60    # 秒
   write-timeout: 60   # 秒
-  run-mode: "debug"   # Gin 开发模式, 可选值有：debug, release, test
+  run-mode: "release"   # Gin 开发模式, 可选值有：debug, release, test
 
-# 数据库配置
+# 数据库配置 (连接到 infra 项目提供的 MySQL)
 database:
   driver: "mysql"
-  host: "mysql"  # 使用容器名称作为主机名
-  port: ""
-  username: ""
-  password: ""
-  dbname: ""
+  host: "${MYSQL_HOST:infra-mysql}"  # 连接到外部 MySQL 容器
+  port: "${MYSQL_PORT:3306}"
+  username: "${MYSQL_USERNAME:miniblog}"
+  password: "${MYSQL_PASSWORD:miniblog123}"
+  dbname: "${MYSQL_DATABASE:miniblog}"
   max-idle-conns: 10
   max-open-conns: 100
   conn-max-lifetime: 3600  # 秒
-  log-level: 4 # GORM log level, 1: silent, 2:error, 3:warn, 4:info
+  log-level: 1 # GORM log level, 1: silent, 2:error, 3:warn, 4:info (生产环境使用 silent)
 
-# redis 配置
+# Redis 配置 (连接到 infra 项目提供的 Redis)
 redis:
-  host: "redis"  # 使用容器名称作为主机名
-  port: ""
-  password: ""
-  db: ""
+  host: "${REDIS_HOST:infra-redis}"  # 连接到外部 Redis 容器
+  port: "${REDIS_PORT:6379}"
+  password: "${REDIS_PASSWORD:}"
+  db: "${REDIS_DB:1}"  # 使用专用的数据库索引
   pool-size: 100
   min-idle-conns: 10
 
@@ -66,6 +66,7 @@ cors:
 tls:
   cert: /etc/miniblog/ssl/api.yangshujie.com.crt # 服务端证书文件
   key: /etc/miniblog/ssl/api.yangshujie.com.key # 服务端私钥文件
+  strict: false # 当 true 时（或环境变量 TLS_STRICT=1），若证书/私钥不存在启动将失败（生产可启用）
 
 # feishu 配置
 feishu:
