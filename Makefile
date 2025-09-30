@@ -47,6 +47,14 @@ build-backend: ## 构建后端服务
 	@go build -ldflags "$(LDFLAGS)" -o $(OUTPUT_DIR)/$(PROJECT_NAME) ./cmd/$(PROJECT_NAME)
 	@echo "✅ 后端服务构建完成"
 
+.PHONY: docker-build-backend
+docker-build-backend: ## 构建后端 Docker 镜像，需要传入 IMAGE_NAME
+	@if [ -z "$(IMAGE_NAME)" ]; then echo "❌ 缺少 IMAGE_NAME 变量，例如 IMAGE_NAME=miniblog-backend:prod"; exit 1; fi
+	@echo "准备后端依赖..."
+	@go mod download
+	@echo "构建后端 Docker 镜像 $(IMAGE_NAME)..."
+	@docker build -f build/docker/miniblog/Dockerfile.prod.backend -t $(IMAGE_NAME) .
+
 .PHONY: run-backend
 run-backend: build-backend ## 运行后端服务
 	@echo "启动后端服务..."
@@ -115,6 +123,22 @@ build-admin: ## 构建管理后台
 		echo "❌ 管理后台目录不存在: $(ADMIN_FRONTEND_DIR)"; \
 	fi
 
+.PHONY: docker-build-frontend-blog
+docker-build-frontend-blog: ## 构建博客前端 Docker 镜像，需要传入 IMAGE_NAME
+	@if [ -z "$(IMAGE_NAME)" ]; then echo "❌ 缺少 IMAGE_NAME 变量，例如 IMAGE_NAME=miniblog-frontend-blog:prod"; exit 1; fi
+	@echo "构建博客前端产物..."
+	@cd $(BLOG_FRONTEND_DIR) && npm ci && npm run build
+	@echo "构建博客前端 Docker 镜像 $(IMAGE_NAME)..."
+	@docker build -f build/docker/miniblog/Dockerfile.prod.frontend.blog -t $(IMAGE_NAME) $(BLOG_FRONTEND_DIR)
+
+.PHONY: docker-build-frontend-admin
+docker-build-frontend-admin: ## 构建管理后台 Docker 镜像，需要传入 IMAGE_NAME
+	@if [ -z "$(IMAGE_NAME)" ]; then echo "❌ 缺少 IMAGE_NAME 变量，例如 IMAGE_NAME=miniblog-frontend-admin:prod"; exit 1; fi
+	@echo "构建管理后台产物..."
+	@cd $(ADMIN_FRONTEND_DIR) && npm ci && (npm run build:prod || npm run build)
+	@echo "构建管理后台 Docker 镜像 $(IMAGE_NAME)..."
+	@docker build -f build/docker/miniblog/Dockerfile.prod.frontend.admin -t $(IMAGE_NAME) $(ADMIN_FRONTEND_DIR)
+
 .PHONY: dev-admin
 dev-admin: ## 管理后台开发模式
 	@echo "启动管理后台开发服务器..."
@@ -180,10 +204,28 @@ run: run-backend ## 运行服务（默认后端）
 # Docker 部署管理
 # ==============================================================================
 
+.PHONY: compose-up
+compose-up: ## 使用 docker compose 启动服务，需要传入 FILES（空格分隔），可选 PULL=true
+	@set -e; \
+	FILES="$(strip $(FILES))"; \
+	if [ -z "$$FILES" ]; then FILES="docker-compose.yml"; fi; \
+	CMD="docker compose"; \
+	for file in $$FILES; do \
+		CMD="$$CMD -f $$file"; \
+	done; \
+	echo "使用 $$CMD"; \
+	if [ "$(PULL)" = "true" ]; then \
+		echo "拉取最新镜像..."; \
+		$$CMD pull --ignore-pull-failures; \
+	else \
+		echo "跳过 docker compose pull"; \
+	fi; \
+	$$CMD up -d
+
 .PHONY: deploy
 deploy: ## 部署所有服务
 	@echo "部署 MiniBlog 所有服务..."
-	@docker compose up -d --build
+	@$(MAKE) compose-up FILES="docker-compose.yml" PULL=true
 	@echo "✅ 部署完成"
 	@echo "服务地址："
 	@echo "  后端API: http://localhost:8081"
@@ -193,13 +235,13 @@ deploy: ## 部署所有服务
 .PHONY: deploy-dev
 deploy-dev: ## 部署开发环境
 	@echo "部署开发环境..."
-	@docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+	@$(MAKE) compose-up FILES="docker-compose.yml docker-compose.dev.yml" PULL=true
 	@echo "✅ 开发环境部署完成"
 
 .PHONY: deploy-prod
 deploy-prod: ## 部署生产环境  
 	@echo "部署生产环境..."
-	@docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+	@$(MAKE) compose-up FILES="docker-compose.yml docker-compose.prod.yml" PULL=true
 	@echo "✅ 生产环境部署完成"
 
 .PHONY: db-migrate
@@ -207,9 +249,9 @@ db-migrate: ## 运行数据库迁移（优先使用本地 migrate 二进制，�
 	@echo "Running DB migrations..."
 	@DB_HOST=${DB_HOST:-infra-mysql} \
 	DB_PORT=${DB_PORT:-3306} \
-	DB_USER=${DB_USER:-miniblog} \
-	DB_PASSWORD=${DB_PASSWORD:-miniblog_password} \
-	DB_NAME=${DB_NAME:-miniblog} ; \
+	DB_USER=${DB_USER:-${MYSQL_USERNAME:-miniblog}} \
+	DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD:-miniblog123}} \
+	DB_NAME=${DB_NAME:-${MYSQL_DATABASE:-miniblog}} ; \
 	DB_URL="mysql://$${DB_USER}:$${DB_PASSWORD}@tcp($${DB_HOST}:$${DB_PORT})/$${DB_NAME}?multiStatements=true" ; \
 	if command -v migrate >/dev/null 2>&1; then \
 		echo "-> Using local migrate binary"; \
@@ -225,14 +267,18 @@ db-init: ## 初始化数据库（执行初始 SQL 脚本，幂等）。需要有
 	@DB_HOST=${DB_HOST:-infra-mysql} \
 	DB_PORT=${DB_PORT:-3306} \
 	DB_ROOT_USER=${DB_ROOT_USER:-root} \
-	DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-} ; \
-	SCRIPT=./db/migrations/sql/000001_init.up.sql ; \
+	DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-} \
+	APP_DB_NAME=${DB_NAME:-${MYSQL_DATABASE:-miniblog}} \
+	APP_DB_USER=${DB_USER:-${MYSQL_USERNAME:-miniblog}} \
+	APP_DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD:-miniblog123}} \
+	SCRIPT=./db/migrations/mysql/init_db.sql ; \
+	export APP_DB_NAME APP_DB_USER APP_DB_PASSWORD; \
 	if command -v mysql >/dev/null 2>&1; then \
 		echo "-> Using local mysql client to execute init script $$SCRIPT"; \
-		mysql -h $$DB_HOST -P $$DB_PORT -u $$DB_ROOT_USER -p"$$DB_ROOT_PASSWORD" < $$SCRIPT; \
+		envsubst < $$SCRIPT | mysql -h $$DB_HOST -P $$DB_PORT -u $$DB_ROOT_USER -p"$$DB_ROOT_PASSWORD"; \
 	else \
 		echo "-> Local mysql client not found, using dockerized mysql client"; \
-		docker run --rm --network infra_shared -v "$(PWD)/db/migrations/sql:/work" mysql:8.0 sh -c 'exec mysql -h "'"$$DB_HOST"'" -P "'"$$DB_PORT"'" -u "'"$$DB_ROOT_USER"'" -p"'"$$DB_ROOT_PASSWORD"'"' < /work/000001_init.up.sql ; \
+		envsubst < $$SCRIPT | docker run --rm -i --network infra_shared mysql:8.0 mysql -h "$$DB_HOST" -P "$$DB_PORT" -u "$$DB_ROOT_USER" -p"$$DB_ROOT_PASSWORD"; \
 	fi
 
 .PHONY: down
@@ -265,6 +311,26 @@ clean: ## 清理构建产物
 	@if [ -d "$(BLOG_FRONTEND_DIR)/dist" ]; then rm -rf $(BLOG_FRONTEND_DIR)/dist; fi
 	@if [ -d "$(ADMIN_FRONTEND_DIR)/dist" ]; then rm -rf $(ADMIN_FRONTEND_DIR)/dist; fi
 	@echo "✅ 清理完成"
+
+.PHONY: docker-network-ensure
+docker-network-ensure: ## 确保 Docker 网络存在，需要传入 NETWORK
+	@if [ -z "$(NETWORK)" ]; then echo "❌ 缺少 NETWORK 变量，例如 NETWORK=infra_shared"; exit 1; fi
+	@if ! docker network ls --format '{{.Name}}' | grep -w "$(NETWORK)" >/dev/null 2>&1; then \
+		echo "创建 Docker 网络 $(NETWORK)..."; \
+		docker network create "$(NETWORK)"; \
+	else \
+		echo "Docker 网络 $(NETWORK) 已存在"; \
+	fi
+
+.PHONY: docker-push-image
+docker-push-image: ## 推送 Docker 镜像，需要传入 IMAGE_NAME
+	@if [ -z "$(IMAGE_NAME)" ]; then echo "❌ 缺少 IMAGE_NAME 变量，例如 IMAGE_NAME=miniblog-backend:prod"; exit 1; fi
+	@echo "推送 Docker 镜像 $(IMAGE_NAME)..."
+	@docker push $(IMAGE_NAME)
+
+.PHONY: docker-prune-images
+docker-prune-images: ## 清理悬空 Docker 镜像
+	@docker image prune -f
 
 .PHONY: clean-deps
 clean-deps: ## 清理前端依赖

@@ -2,15 +2,6 @@
 -- Create database, user and initial tables for miniblog
 -- This is a simplified, idempotent migration without stored procedures.
 
-CREATE DATABASE IF NOT EXISTS `miniblog` DEFAULT CHARACTER SET = 'utf8mb4' COLLATE = 'utf8mb4_general_ci';
-
--- Create application user if not exists (MySQL 5.7+ supports CREATE USER IF NOT EXISTS)
--- Adjust username/password as needed; this migration expects the runner has sufficient privileges.
-
-CREATE USER IF NOT EXISTS 'miniblog'@'%' IDENTIFIED BY 'miniblog_password';
-GRANT ALL PRIVILEGES ON `miniblog`.* TO 'miniblog'@'%';
-FLUSH PRIVILEGES;
-
 USE `miniblog`;
 
 CREATE TABLE IF NOT EXISTS `users` (
