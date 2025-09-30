@@ -26,6 +26,8 @@ services:
       - ./configs:/app/configs:ro
       - ./logs:/app/logs
       - miniblog-uploads:/app/uploads
+      - /data/ssl/certs/api.yangshujie.com.crt:/etc/miniblog/ssl/api.yangshujie.com.crt:ro
+      - /data/ssl/private/api.yangshujie.com.key:/etc/miniblog/ssl/api.yangshujie.com.key:ro
     networks:
       - infra_shared
     ports:
