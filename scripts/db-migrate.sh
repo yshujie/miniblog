@@ -2,6 +2,13 @@
 set -euo pipefail
 
 # Resolve DB connection parameters with sensible defaults.
+if [[ -n "${PIPELINE_ENV_FILE:-}" && -f "${PIPELINE_ENV_FILE}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${PIPELINE_ENV_FILE}"
+  set +a
+fi
+
 db_host="${DB_HOST:-${MYSQL_HOST:-infra-mysql}}"
 db_port="${DB_PORT:-${MYSQL_PORT:-3306}}"
 db_user="${DB_USER:-${MYSQL_USERNAME:-miniblog}}"

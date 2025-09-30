@@ -35,19 +35,19 @@ pipeline {
   }
 
   stages {
+    stage('Checkout') {
+      steps {
+        deleteDir()
+        checkout scm
+      }
+    }
+
     stage('Setup') {
       steps {
         script {
           // Merge parameter and credentials based configuration
           initializeEnvironment()
         }
-      }
-    }
-
-    stage('Checkout') {
-      steps {
-        deleteDir()
-        checkout scm
       }
     }
 
@@ -235,22 +235,22 @@ def initializeEnvironment() {
 
 def loadEnvFromCredentials(String credentialsId) {
   withCredentials([file(credentialsId: credentialsId, variable: 'ENV_FILE')]) {
-    readFile(ENV_FILE).split('\n').each { line ->
-      def trimmed = line.trim()
-      if (trimmed && !trimmed.startsWith('#')) {
-        def normalized = trimmed.replaceFirst(/^export\s+/, '')
-        if (normalized.contains('=')) {
-          def parts = normalized.split('=', 2)
-          def key = parts[0].trim()
-          def value = parts[1].trim().replaceAll(/^['"]|['"]$/, '')
-          if (key) {
-            env[key] = value
-          }
-        }
+    def content = readFile(ENV_FILE)
+    def target = "${env.WORKSPACE}/.pipeline.env"
+    writeFile file: target, text: content
+    env.PIPELINE_ENV_FILE = target
+
+    def exposedKeys = content.split('\n')
+      .findAll { line ->
+        def trimmed = line.trim()
+        trimmed && !trimmed.startsWith('#') && trimmed.contains('=')
       }
-    }
+      .collect { entry ->
+        entry.split('=', 2)[0].replaceFirst(/^export\s+/, '').trim()
+      }
+
+    echo "Loaded environment file from credentials '${credentialsId}' (keys: ${exposedKeys.join(', ')}; sensitive values hidden)."
   }
-  echo "Loaded environment variables from credentials '${credentialsId}' (sensitive values hidden)."
 }
 
 boolean flagEnabled(def value) {

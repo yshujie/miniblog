@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -n "${PIPELINE_ENV_FILE:-}" && -f "${PIPELINE_ENV_FILE}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${PIPELINE_ENV_FILE}"
+  set +a
+fi
+
 files=$(echo "${DEPLOY_COMPOSE_FILES:-docker-compose.yml}" | xargs)
 if [[ -z "$files" ]]; then
   files="docker-compose.yml"
