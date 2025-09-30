@@ -67,6 +67,19 @@ pipeline {
       }
     }
 
+    stage('Prepare Network') {
+      steps {
+        script {
+          echo 'Ensuring shared Docker network exists'
+          sh '''
+            if ! docker network ls --format '{{.Name}}' | grep -w infra_shared >/dev/null 2>&1; then
+              docker network create infra_shared
+            fi
+          '''
+        }
+      }
+    }
+
     stage('DB Init') {
       steps {
         script {
@@ -89,8 +102,21 @@ pipeline {
           if (env.SKIP_DB_MIGRATE == 'true') {
             echo 'Skipping DB migrations (SKIP_DB_MIGRATE=true)'
           } else {
-            echo 'Running DB migrations inside miniblog-backend container'
-            sh "docker compose run --rm miniblog-backend /usr/local/bin/miniblog migrate up -c /etc/miniblog/config.yaml"
+            echo 'Running DB migrations via Makefile target db-migrate'
+            def dbHost = env.MYSQL_HOST ?: 'infra-mysql'
+            def dbPort = env.MYSQL_PORT ?: '3306'
+            def dbUser = env.MYSQL_USERNAME ?: 'miniblog'
+            def dbPassword = env.MYSQL_PASSWORD ?: 'miniblog_password'
+            def dbName = env.MYSQL_DATABASE ?: 'miniblog'
+            withEnv([
+              "DB_HOST=${dbHost}",
+              "DB_PORT=${dbPort}",
+              "DB_USER=${dbUser}",
+              "DB_PASSWORD=${dbPassword}",
+              "DB_NAME=${dbName}"
+            ]) {
+              sh 'make db-migrate'
+            }
           }
         }
       }
@@ -114,8 +140,14 @@ pipeline {
       steps {
         dir('.') {
           echo 'Deploying application using root docker-compose.yml'
-          sh 'docker compose pull || true'
-          sh 'docker compose up -d --build'
+          script {
+            if (env.PUSH_IMAGES == 'true') {
+              sh 'docker compose pull --ignore-pull-failures'
+            } else {
+              echo 'Skipping docker compose pull (PUSH_IMAGES!=true)'
+            }
+          }
+          sh 'docker compose up -d'
         }
       }
     }
