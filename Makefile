@@ -262,21 +262,27 @@ db-migrate: ## 运行数据库迁移（优先使用本地 migrate 二进制，�
 .PHONY: db-init
 db-init: ## 初始化数据库（执行初始 SQL 脚本，幂等）。需要有数据库管理员权限来创建数据库/用户
 	@echo "Running DB initialization..."
-	@DB_HOST=${DB_HOST:-mysql} \
-	DB_PORT=${DB_PORT:-3306} \
-	DB_ROOT_USER=${DB_ROOT_USER:-root} \
-	DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-} \
-	APP_DB_NAME=${DB_NAME:-${MYSQL_DATABASE:-miniblog}} \
-	APP_DB_USER=${DB_USER:-${MYSQL_USERNAME:-miniblog}} \
-	APP_DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD:-miniblog123}} \
-	SCRIPT=./db/migrations/mysql/init_db.sql ; \
-	export APP_DB_NAME APP_DB_USER APP_DB_PASSWORD; \
+	@DB_HOST=${DB_HOST:-mysql}; \
+	DB_PORT=${DB_PORT:-3306}; \
+	DB_ROOT_USER=${DB_ROOT_USER:-root}; \
+	DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-}; \
+	APP_DB_NAME=${DB_NAME:-${MYSQL_DATABASE:-miniblog}}; \
+	APP_DB_USER=${DB_USER:-${MYSQL_USERNAME:-miniblog}}; \
+	APP_DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD:-miniblog123}}; \
+	SCRIPT=./db/migrations/mysql/init_db.sql; \
+	echo "-> Creating database: $$APP_DB_NAME, user: $$APP_DB_USER"; \
 	if command -v mysql >/dev/null 2>&1; then \
 		echo "-> Using local mysql client to execute init script $$SCRIPT"; \
-		envsubst < $$SCRIPT | mysql -h $$DB_HOST -P $$DB_PORT -u $$DB_ROOT_USER -p"$$DB_ROOT_PASSWORD"; \
+		sed -e "s/\$${APP_DB_NAME}/$$APP_DB_NAME/g" \
+		    -e "s/\$${APP_DB_USER}/$$APP_DB_USER/g" \
+		    -e "s/\$${APP_DB_PASSWORD}/$$APP_DB_PASSWORD/g" \
+		    $$SCRIPT | mysql -h $$DB_HOST -P $$DB_PORT -u $$DB_ROOT_USER -p"$$DB_ROOT_PASSWORD"; \
 	else \
-		echo "-> Local mysql client not found, using dockerized mysql client"; \
-		envsubst < $$SCRIPT | docker run --rm -i --network miniblog_net mysql:8.0 mysql -h "$$DB_HOST" -P "$$DB_PORT" -u "$$DB_ROOT_USER" -p"$$DB_ROOT_PASSWORD"; \
+		echo "-> Using dockerized mysql client"; \
+		sed -e "s/\$${APP_DB_NAME}/$$APP_DB_NAME/g" \
+		    -e "s/\$${APP_DB_USER}/$$APP_DB_USER/g" \
+		    -e "s/\$${APP_DB_PASSWORD}/$$APP_DB_PASSWORD/g" \
+		    $$SCRIPT | docker run --rm -i --network miniblog_net mysql:8.0 mysql -h "$$DB_HOST" -P "$$DB_PORT" -u "$$DB_ROOT_USER" -p"$$DB_ROOT_PASSWORD"; \
 	fi
 
 .PHONY: down
