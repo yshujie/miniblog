@@ -74,7 +74,12 @@ pipeline {
             dir('.') {
               sh """
                 set -eux
-                . /etc/profile.d/nvm.sh
+                export NVM_DIR=/usr/local/nvm
+                if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+                  echo 'NVM script not found at $NVM_DIR/nvm.sh' >&2
+                  exit 1
+                fi
+                . "$NVM_DIR/nvm.sh"
                 nvm use 20
                 node --version
                 npm --version
@@ -88,7 +93,12 @@ pipeline {
             dir('.') {
               sh """
                 set -eux
-                . /etc/profile.d/nvm.sh
+                export NVM_DIR=/usr/local/nvm
+                if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+                  echo 'NVM script not found at $NVM_DIR/nvm.sh' >&2
+                  exit 1
+                fi
+                . "$NVM_DIR/nvm.sh"
                 nvm use 14
                 node --version
                 npm --version
