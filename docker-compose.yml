@@ -12,23 +12,23 @@ services:
       - GIN_MODE=${GIN_MODE:-release}
       - MINIBLOG_CONFIG_PATH=/app/configs
       # 连接到外部基础设施服务
-      - MYSQL_HOST=infra-mysql
+      - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
       - MYSQL_DATABASE=${MYSQL_DATABASE:-miniblog}
       - MYSQL_USERNAME=${MYSQL_USERNAME:-miniblog}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-miniblog123}
-      - REDIS_HOST=infra-redis
+      - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - REDIS_DB=${REDIS_DB:-1}
       - JWT_SECRET=${JWT_SECRET:-miniblog_jwt_secret_key_change_in_production}
       # MINIBLOG_* 环境变量用于 viper 自动覆盖配置
-      - MINIBLOG_DATABASE_HOST=infra-mysql
+      - MINIBLOG_DATABASE_HOST=${MYSQL_HOST:-mysql}
       - MINIBLOG_DATABASE_PORT=3306
       - MINIBLOG_DATABASE_DBNAME=${MYSQL_DATABASE:-miniblog}
       - MINIBLOG_DATABASE_USERNAME=${MYSQL_USERNAME:-miniblog}
       - MINIBLOG_DATABASE_PASSWORD=${MYSQL_PASSWORD:-miniblog123}
-      - MINIBLOG_REDIS_HOST=infra-redis
+      - MINIBLOG_REDIS_HOST=${REDIS_HOST:-redis}
       - MINIBLOG_REDIS_PORT=6379
       - MINIBLOG_REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - MINIBLOG_REDIS_DB=${REDIS_DB:-1}
