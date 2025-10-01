@@ -20,7 +20,6 @@ services:
       restart_policy:
         condition: unless-stopped
         delay: 5s
-        max_attempts: 3
     # 生产环境不暴露端口，通过 nginx 代理访问
     ports: []
 
