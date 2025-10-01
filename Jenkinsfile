@@ -72,38 +72,36 @@ pipeline {
         stage('Blog Frontend') {
           steps {
             dir('.') {
-              sh(script: """#!/usr/bin/env bash
-set -xeo pipefail
+              sh(script: """bash -lc 'set -xeo pipefail
 export NVM_DIR=/usr/local/nvm
-if [[ ! -s "${NVM_DIR}/nvm.sh" ]]; then
-  echo 'NVM script not found at ${NVM_DIR}/nvm.sh' >&2
+if [ ! -s \\\"\\$NVM_DIR/nvm.sh\\\" ]; then
+  echo \\\"NVM script not found at \\$NVM_DIR/nvm.sh\\\" >&2
   exit 1
 fi
-source "${NVM_DIR}/nvm.sh"
+source \\\"\\$NVM_DIR/nvm.sh\\\"
 nvm use 20
 node --version
 npm --version
-IMAGE_NAME='${env.FRONTEND_BLOG_IMAGE_TAG}' make docker-build-frontend-blog
-""", shell: '/bin/bash')
+IMAGE_NAME=\\\"${env.FRONTEND_BLOG_IMAGE_TAG}\\\" make docker-build-frontend-blog
+'""")
             }
           }
         }
         stage('Admin Frontend') {
           steps {
             dir('.') {
-              sh(script: """#!/usr/bin/env bash
-set -xeo pipefail
+              sh(script: """bash -lc 'set -xeo pipefail
 export NVM_DIR=/usr/local/nvm
-if [[ ! -s "${NVM_DIR}/nvm.sh" ]]; then
-  echo 'NVM script not found at ${NVM_DIR}/nvm.sh' >&2
+if [ ! -s \\\"\\$NVM_DIR/nvm.sh\\\" ]; then
+  echo \\\"NVM script not found at \\$NVM_DIR/nvm.sh\\\" >&2
   exit 1
 fi
-source "${NVM_DIR}/nvm.sh"
+source \\\"\\$NVM_DIR/nvm.sh\\\"
 nvm use 14
 node --version
 npm --version
-IMAGE_NAME='${env.FRONTEND_ADMIN_IMAGE_TAG}' make docker-build-frontend-admin
-""", shell: '/bin/bash')
+IMAGE_NAME=\\\"${env.FRONTEND_ADMIN_IMAGE_TAG}\\\" make docker-build-frontend-admin
+'""")
             }
           }
         }
