@@ -39,8 +39,6 @@ pipeline {
     DEFAULT_IMAGE_NAMESPACE = 'miniblog'
     DEFAULT_IMAGE_TAG = 'prod'
     DOCKER_NETWORK = 'miniblog_net'
-    // 强制执行 DB Init（首次部署需要）- 已手动完成，暂时禁用
-    // FORCE_DB_INIT = 'true'
   }
 
   stages {
