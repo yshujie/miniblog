@@ -31,7 +31,7 @@ pipeline {
   environment {
     DEFAULT_IMAGE_NAMESPACE = 'miniblog'
     DEFAULT_IMAGE_TAG = 'prod'
-    DOCKER_NETWORK = 'infra_shared'
+    DOCKER_NETWORK = 'miniblog_net'
   }
 
   stages {
