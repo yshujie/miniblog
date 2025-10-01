@@ -32,13 +32,6 @@ pipeline {
     string(name: 'DB_ROOT_CREDENTIALS_ID', defaultValue: 'mysql-root-password', description: 'Credentials ID that stores the MySQL root password for the db-init stage.')
   }
 
-  // Shared defaults consumed during initialisation
-  environment {
-    DEFAULT_IMAGE_NAMESPACE = 'miniblog'
-    DEFAULT_IMAGE_TAG = 'prod'
-    DOCKER_NETWORK = 'miniblog_net'
-  }
-
   stages {
     stage('Checkout') {
       steps {
