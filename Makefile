@@ -264,6 +264,11 @@ db-migrate: ## 运行数据库迁移（优先使用本地 migrate 二进制，�
 		docker run --rm --network "$$DOCKER_NET" -v "$$MIGRATIONS_DIR:/migrations:ro" migrate/migrate -path /migrations -database "$$DB_URL" up; \
 	fi
 
+.PHONY: db-seed
+db-seed: ## 加载种子数据（初始化数据：用户、模块、文章等）
+	@echo "Loading seed data..."
+	@bash scripts/load-seed-data.sh
+
 .PHONY: db-init
 db-init: ## 初始化数据库（执行初始 SQL 脚本，幂等）。需要有数据库管理员权限来创建数据库/用户
 	@echo "Running DB initialization..."

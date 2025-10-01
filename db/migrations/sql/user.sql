@@ -1,0 +1,1 @@
+INSERT INTO miniblog.user (id, username, password, nickname, avatar, email, phone, introduction, status, created_at, updated_at) VALUES (1, 'clack', '$2a$10$FAQPC0W5l.UVnrrZnp0yEu0QxseILstQdzdUu9uj2TI7Ndl1tpK5C', 'clack', ' ', 'yangshujie@gmail.com', '15711236163', ' ', 0, '2025-06-18 11:34:07', '2025-06-18 11:34:07');

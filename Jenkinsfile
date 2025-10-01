@@ -25,6 +25,7 @@ pipeline {
     booleanParam(name: 'SKIP_BACKEND_BUILD', defaultValue: false, description: 'Skip building the backend Docker image.')
     booleanParam(name: 'SKIP_DB_INIT', defaultValue: false, description: 'Skip the database initialisation stage (recommended for established environments).')
     booleanParam(name: 'SKIP_DB_MIGRATE', defaultValue: false, description: 'Skip executing database migrations.')
+    booleanParam(name: 'SKIP_DB_SEED', defaultValue: true, description: 'Skip loading seed data (user, modules, articles). Only needed for first-time setup.')
     booleanParam(name: 'PUSH_IMAGES', defaultValue: false, description: 'Push built Docker images to the registry.')
     booleanParam(name: 'DEPLOY_AFTER_BUILD', defaultValue: true, description: 'Deploy the stack with docker compose after build.')
     string(name: 'DEPLOY_COMPOSE_FILES', defaultValue: 'docker-compose.yml docker-compose.prod.yml', description: 'Space separated list of docker compose files used for deployment.')
@@ -154,6 +155,17 @@ pipeline {
       }
     }
 
+    stage('DB Seed') {
+      when {
+        expression { env.RUN_DB_SEED == 'true' }
+      }
+      steps {
+        dir('.') {
+          sh 'make db-seed'
+        }
+      }
+    }
+
     stage('Cleanup') {
       when {
         expression { env.RUN_IMAGE_PRUNE == 'true' }
@@ -196,6 +208,7 @@ def initializeEnvironment() {
   // 检查是否有 FORCE_DB_INIT 环境变量强制执行
   env.RUN_DB_INIT = flagEnabled(env.FORCE_DB_INIT) ? 'true' : (shouldSkip(params.SKIP_DB_INIT, env.SKIP_DB_INIT) ? 'false' : 'true')
   env.RUN_DB_MIGRATE = shouldSkip(params.SKIP_DB_MIGRATE, env.SKIP_DB_MIGRATE) ? 'false' : 'true'
+  env.RUN_DB_SEED = shouldSkip(params.SKIP_DB_SEED, env.SKIP_DB_SEED) ? 'false' : 'true'
 
   def pushImages = flagEnabled(params.PUSH_IMAGES)
   if (!pushImages) {
