@@ -105,30 +105,6 @@ pipeline {
       }
     }
 
-    stage('DB Init') {
-      when {
-        expression { env.RUN_DB_INIT == 'true' }
-      }
-      steps {
-        withCredentials([string(credentialsId: params.DB_ROOT_CREDENTIALS_ID, variable: 'DB_ROOT_PASSWORD')]) {
-          dir('.') {
-            sh 'scripts/db-init.sh'
-          }
-        }
-      }
-    }
-
-    stage('DB Migrate') {
-      when {
-        expression { env.RUN_DB_MIGRATE == 'true' }
-      }
-      steps {
-        dir('.') {
-          sh 'scripts/db-migrate.sh'
-        }
-      }
-    }
-
     stage('Push Images') {
       when {
         expression { env.PUSH_IMAGES_FLAG == 'true' }
@@ -152,6 +128,30 @@ pipeline {
           ]) {
             sh 'scripts/deploy.sh'
           }
+        }
+      }
+    }
+
+    stage('DB Init') {
+      when {
+        expression { env.RUN_DB_INIT == 'true' }
+      }
+      steps {
+        withCredentials([string(credentialsId: params.DB_ROOT_CREDENTIALS_ID, variable: 'DB_ROOT_PASSWORD')]) {
+          dir('.') {
+            sh 'scripts/db-init.sh'
+          }
+        }
+      }
+    }
+
+    stage('DB Migrate') {
+      when {
+        expression { env.RUN_DB_MIGRATE == 'true' }
+      }
+      steps {
+        dir('.') {
+          sh 'scripts/db-migrate.sh'
         }
       }
     }
