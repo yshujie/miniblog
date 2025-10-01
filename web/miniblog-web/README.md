@@ -2,6 +2,25 @@
 
 This template should help get you started developing with Vue 3 in Vite.
 
+## Environment & Dependencies
+
+- **Node.js**: ≥ 18.0.0（推荐使用 Node 20 LTS 或 Node 22，便于兼容 Vite 6 与 TypeScript 5.8）。
+- **npm**: 随 Node 自带的 npm ≥ 9（仓库使用 `package-lock.json`，默认包管理器为 npm）。
+- **核心依赖**：
+ 	- `vue@^3.5.13`
+ 	- `vite@^6.2.4` 与 `@vitejs/plugin-vue`
+ 	- `pinia@^3.0.2`
+ 	- `element-plus@^2.9.10`
+ 	- `axios@^1.9.0`
+ 	- `md-editor-v3@^5.5.1`
+ 	- `vue3-markdown-it@^1.0.10`
+- **开发工具**：
+ 	- `typescript@~5.8.0` & `vue-tsc@^2.2.8`
+ 	- `@tsconfig/node22`（TypeScript 编译目标配置）
+ 	- `npm-run-all2@^7.0.2`（用于并行执行 `npm run build` 内部脚本）
+
+> 提示：如需在本地或 CI 中切换 Node 版本，建议使用 nvm/volta 等工具固定版本；请勿混用 yarn/pnpm 以免破坏锁文件。
+
 ## Recommended IDE Setup
 
 [VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).

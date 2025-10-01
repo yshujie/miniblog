@@ -1,3 +1,4 @@
+<!-- markdownlint-disable -->
 <p align="center">
   <img width="320" src="https://wpimg.wallstcn.com/ecc53a42-d79b-42e2-8852-5126b810a4c8.svg">
 </p>
@@ -48,6 +49,31 @@ English | [简体中文](./README.zh-CN.md) | [日本語](./README.ja.md) | [Spa
 [vue-element-admin](https://panjiachen.github.io/vue-element-admin) is a production-ready front-end solution for admin interfaces. It is based on [vue](https://github.com/vuejs/vue) and uses the UI Toolkit [element-ui](https://github.com/ElemeFE/element).
 
 [vue-element-admin](https://panjiachen.github.io/vue-element-admin) is based on the newest development stack of vue and it has a built-in i18n solution, typical templates for enterprise applications, and lots of awesome features. It helps you build large and complex Single-Page Applications. I believe whatever your needs are, this project will help you.
+
+## Miniblog Environment Notes
+
+> 以下内容结合本仓库的使用场景，对 node 版本与主要依赖作出补充说明，便于团队统一开发/构建环境。
+
+- **Node.js & npm**
+  - 上游模板的 `engines` 字段仅要求 Node ≥ 8.9，但考虑到依赖（Webpack 4、node-sass、vue-cli-service 4）的兼容性，推荐使用 **Node 12.x 或 Node 14.x LTS**，对应 npm 6/7。
+  - 更高版本的 Node 可能需要额外处理 `node-sass`/`chokidar` 的编译问题；如确需升级，请优先迁移到 dart-sass 或 `sass` 官方实现。
+- **核心依赖**
+  - `vue@2.6.10`
+  - `element-ui@2.13.2`
+  - `vue-router@3.0.2`
+  - `vuex@3.1.0`
+  - `axios@0.18.1`
+  - `mockjs@1.0.1-beta3`
+- **构建/开发工具**
+  - `@vue/cli-service@4.4.4`（Webpack 4）
+  - `babel-jest@23.6.0` + `@vue/cli-plugin-unit-jest`（单元测试，默认 watch 模式）
+  - `eslint@6.7.2`、`eslint-plugin-vue@6.2.2`
+  - `sass@1.26.2`、`sass-loader@8.0.2`
+- **包管理器**
+  - 仓库包含 `package-lock.json`，默认使用 **npm**。如需使用 pnpm/yarn，请先评估依赖兼容性并更新锁文件。
+- **CI 提示**
+  - 在 CI 中运行单测时建议显式设置 `CI=true npm run test:unit`，避免 Jest 在交互式 TTY 下进入 watch 模式挂起。
+
 
 - [Preview](https://panjiachen.github.io/vue-element-admin)
 
