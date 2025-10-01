@@ -24,7 +24,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:-miniblog_jwt_secret_key_change_in_production}
     volumes:
       - ./configs:/app/configs:ro
-      - ./logs:/app/logs
+      - /data/logs/miniblog/backend:/data/logs/miniblog
       - miniblog-uploads:/app/uploads
       - /data/ssl/certs/api.yangshujie.com.crt:/etc/miniblog/ssl/api.yangshujie.com.crt:ro
       - /data/ssl/private/api.yangshujie.com.key:/etc/miniblog/ssl/api.yangshujie.com.key:ro
@@ -52,6 +52,7 @@ services:
     networks:
       - miniblog_net
     volumes:
+      - /data/logs/miniblog/frontend-blog:/var/log/nginx
       - blog-dist:/app/dist
 
   miniblog-frontend-admin:
@@ -67,6 +68,7 @@ services:
     networks:
       - miniblog_net
     volumes:
+      - /data/logs/miniblog/frontend-admin:/var/log/nginx
       - admin-dist:/app/dist
 
 volumes:
