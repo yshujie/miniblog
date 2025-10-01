@@ -240,6 +240,7 @@ def initializeEnvironment() {
   echo "Run backend build: ${env.RUN_BACKEND_BUILD}"
   echo "Run db init: ${env.RUN_DB_INIT}"
   echo "Run db migrate: ${env.RUN_DB_MIGRATE}"
+  echo "Run db seed: ${env.RUN_DB_SEED} (SKIP_DB_SEED param: ${params.SKIP_DB_SEED})"
   echo "Push images: ${env.PUSH_IMAGES_FLAG}"
   echo "Deploy after build: ${env.RUN_DEPLOY}"
   echo "Deployment compose files: ${env.DEPLOY_COMPOSE_FILES}"
