@@ -280,11 +280,11 @@ db-init: ## 初始化数据库（执行初始 SQL 脚本，幂等）。需要有
 		    -e "s/\$${APP_DB_PASSWORD}/$$APP_DB_PASSWORD/g" \
 		    $$SCRIPT | mysql -h "$$DB_HOST" -P "$$DB_PORT" -u "$$DB_ROOT_USER" -p"$$DB_ROOT_PASSWORD"; \
 	else \
-		echo "-> Using dockerized mysql client"; \
+		echo "-> Using docker exec to run SQL inside MySQL container"; \
 		sed -e "s/\$${APP_DB_NAME}/$$APP_DB_NAME/g" \
 		    -e "s/\$${APP_DB_USER}/$$APP_DB_USER/g" \
 		    -e "s/\$${APP_DB_PASSWORD}/$$APP_DB_PASSWORD/g" \
-		    $$SCRIPT | docker run --rm -i --network miniblog_net mysql:8.0 mysql -h "$$DB_HOST" -P "$$DB_PORT" -u "$$DB_ROOT_USER" -p"$$DB_ROOT_PASSWORD"; \
+		    $$SCRIPT | docker exec -i "$$DB_HOST" mysql -u "$$DB_ROOT_USER" -p"$$DB_ROOT_PASSWORD"; \
 	fi
 
 .PHONY: down
