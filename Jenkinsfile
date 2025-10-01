@@ -71,14 +71,28 @@ pipeline {
         stage('Blog Frontend') {
           steps {
             dir('.') {
-              sh "IMAGE_NAME='${env.FRONTEND_BLOG_IMAGE_TAG}' make docker-build-frontend-blog"
+              sh """
+                set -eux
+                . /etc/profile.d/nvm.sh
+                nvm use 20
+                node --version
+                npm --version
+                IMAGE_NAME='${env.FRONTEND_BLOG_IMAGE_TAG}' make docker-build-frontend-blog
+              """
             }
           }
         }
         stage('Admin Frontend') {
           steps {
             dir('.') {
-              sh "IMAGE_NAME='${env.FRONTEND_ADMIN_IMAGE_TAG}' make docker-build-frontend-admin"
+              sh """
+                set -eux
+                . /etc/profile.d/nvm.sh
+                nvm use 14
+                node --version
+                npm --version
+                IMAGE_NAME='${env.FRONTEND_ADMIN_IMAGE_TAG}' make docker-build-frontend-admin
+              """
             }
           }
         }
