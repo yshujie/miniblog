@@ -18,7 +18,7 @@ pipeline {
     booleanParam(name: 'RUN_TESTS', defaultValue: true, description: 'Run backend unit tests before building images.')
     booleanParam(name: 'SKIP_FRONTEND_BUILD', defaultValue: false, description: 'Skip building frontend assets and Docker images.')
     booleanParam(name: 'SKIP_BACKEND_BUILD', defaultValue: false, description: 'Skip building the backend Docker image.')
-    booleanParam(name: 'SKIP_DB_INIT', defaultValue: true, description: 'Skip the database initialisation stage (recommended for established environments).')
+    booleanParam(name: 'SKIP_DB_INIT', defaultValue: false, description: 'Skip the database initialisation stage (recommended for established environments).')
     booleanParam(name: 'SKIP_DB_MIGRATE', defaultValue: false, description: 'Skip executing database migrations.')
     booleanParam(name: 'PUSH_IMAGES', defaultValue: false, description: 'Push built Docker images to the registry.')
     booleanParam(name: 'DEPLOY_AFTER_BUILD', defaultValue: true, description: 'Deploy the stack with docker compose after build.')
