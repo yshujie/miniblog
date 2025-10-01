@@ -32,6 +32,8 @@ pipeline {
     DEFAULT_IMAGE_NAMESPACE = 'miniblog'
     DEFAULT_IMAGE_TAG = 'prod'
     DOCKER_NETWORK = 'miniblog_net'
+    // 强制执行 DB Init（首次部署需要）- 设置完成后可以注释掉
+    FORCE_DB_INIT = 'true'
   }
 
   stages {
@@ -195,7 +197,8 @@ def initializeEnvironment() {
   env.RUN_TESTS = flagEnabled(params.RUN_TESTS) ? 'true' : 'false'
   env.RUN_FRONTEND_BUILD = shouldSkip(params.SKIP_FRONTEND_BUILD, env.SKIP_FRONTEND_BUILD) ? 'false' : 'true'
   env.RUN_BACKEND_BUILD = shouldSkip(params.SKIP_BACKEND_BUILD, env.SKIP_BACKEND_BUILD) ? 'false' : 'true'
-  env.RUN_DB_INIT = shouldSkip(params.SKIP_DB_INIT, env.SKIP_DB_INIT) ? 'false' : 'true'
+  // 检查是否有 FORCE_DB_INIT 环境变量强制执行
+  env.RUN_DB_INIT = flagEnabled(env.FORCE_DB_INIT) ? 'true' : (shouldSkip(params.SKIP_DB_INIT, env.SKIP_DB_INIT) ? 'false' : 'true')
   env.RUN_DB_MIGRATE = shouldSkip(params.SKIP_DB_MIGRATE, env.SKIP_DB_MIGRATE) ? 'false' : 'true'
 
   def pushImages = flagEnabled(params.PUSH_IMAGES)
