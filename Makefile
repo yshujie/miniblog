@@ -243,11 +243,11 @@ deploy-prod: ## 部署生产环境
 .PHONY: db-migrate
 db-migrate: ## 运行数据库迁移（优先使用本地 migrate 二进制，否则使用 dockerized migrate 镜像）
 	@echo "Running DB migrations..."
-	@DB_HOST=${DB_HOST:-infra-mysql} \
-	DB_PORT=${DB_PORT:-3306} \
-	DB_USER=${DB_USER:-${MYSQL_USERNAME:-miniblog}} \
-	DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD:-miniblog123}} \
-	DB_NAME=${DB_NAME:-${MYSQL_DATABASE:-miniblog}} ; \
+	DB_HOST=$${DB_HOST:-infra-mysql} \
+	DB_PORT=$${DB_PORT:-3306} \
+	DB_USER=$${DB_USER:-$${MYSQL_USERNAME:-miniblog}} \
+	DB_PASSWORD=$${DB_PASSWORD:-$${MYSQL_PASSWORD:-miniblog123}} \
+	DB_NAME=$${DB_NAME:-$${MYSQL_DATABASE:-miniblog}} ; \
 	DB_URL="mysql://$${DB_USER}:$${DB_PASSWORD}@tcp($${DB_HOST}:$${DB_PORT})/$${DB_NAME}?multiStatements=true" ; \
 	# Debug: print DB_URL with password redacted (do not expose secret)
 	DB_URL_REDACTED=$$(echo "$$DB_URL" | sed -E 's#(//[^:]+:)[^@]+@#\1****@#') ; \
