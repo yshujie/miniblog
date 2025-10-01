@@ -29,7 +29,7 @@ services:
       - /data/ssl/certs/api.yangshujie.com.crt:/etc/miniblog/ssl/api.yangshujie.com.crt:ro
       - /data/ssl/private/api.yangshujie.com.key:/etc/miniblog/ssl/api.yangshujie.com.key:ro
     networks:
-      - infra_shared
+      - miniblog_net
     ports:
       - "8090:8080"  # 映射到 8090,避免与 Jenkins 的 8080 冲突
     healthcheck:
@@ -50,7 +50,7 @@ services:
     container_name: miniblog-frontend-blog
     restart: unless-stopped
     networks:
-      - infra_shared
+      - miniblog_net
     volumes:
       - blog-dist:/app/dist
 
@@ -65,7 +65,7 @@ services:
     container_name: miniblog-frontend-admin
     restart: unless-stopped
     networks:
-      - infra_shared
+      - miniblog_net
     volumes:
       - admin-dist:/app/dist
 
@@ -78,6 +78,8 @@ volumes:
     name: miniblog-admin-dist
 
 networks:
-  infra_shared:
+  # MiniBlog 应用专用网络
+  # 包含：backend、frontend-blog、frontend-admin、mysql、redis
+  # 使用 external: true 表示网络需要提前创建：docker network create miniblog_net
+  miniblog_net:
     external: true
-    name: infra_shared

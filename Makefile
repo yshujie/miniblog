@@ -256,7 +256,7 @@ db-migrate: ## 运行数据库迁移（优先使用本地 migrate 二进制，�
 		migrate -path db/migrations/sql -database "$$DB_URL" up; \
 	else \
 		echo "-> Local migrate binary not found, using dockerized migrate image"; \
-		docker run --rm --network infra_shared -v "$(PWD)/db/migrations/sql:/migrations" migrate/migrate -path /migrations -database "$$DB_URL" up; \
+		docker run --rm --network miniblog_net -v "$(PWD)/db/migrations/sql:/migrations" migrate/migrate -path /migrations -database "$$DB_URL" up; \
 	fi
 
 .PHONY: db-init
@@ -276,7 +276,7 @@ db-init: ## 初始化数据库（执行初始 SQL 脚本，幂等）。需要有
 		envsubst < $$SCRIPT | mysql -h $$DB_HOST -P $$DB_PORT -u $$DB_ROOT_USER -p"$$DB_ROOT_PASSWORD"; \
 	else \
 		echo "-> Local mysql client not found, using dockerized mysql client"; \
-		envsubst < $$SCRIPT | docker run --rm -i --network infra_shared mysql:8.0 mysql -h "$$DB_HOST" -P "$$DB_PORT" -u "$$DB_ROOT_USER" -p"$$DB_ROOT_PASSWORD"; \
+		envsubst < $$SCRIPT | docker run --rm -i --network miniblog_net mysql:8.0 mysql -h "$$DB_HOST" -P "$$DB_PORT" -u "$$DB_ROOT_USER" -p"$$DB_ROOT_PASSWORD"; \
 	fi
 
 .PHONY: down
@@ -312,7 +312,7 @@ clean: ## 清理构建产物
 
 .PHONY: docker-network-ensure
 docker-network-ensure: ## 确保 Docker 网络存在，需要传入 NETWORK
-	@if [ -z "$(NETWORK)" ]; then echo "❌ 缺少 NETWORK 变量，例如 NETWORK=infra_shared"; exit 1; fi
+	@if [ -z "$(NETWORK)" ]; then echo "❌ 缺少 NETWORK 变量，例如 NETWORK=miniblog_net"; exit 1; fi
 	@if ! docker network ls --format '{{.Name}}' | grep -w "$(NETWORK)" >/dev/null 2>&1; then \
 		echo "创建 Docker 网络 $(NETWORK)..."; \
 		docker network create "$(NETWORK)"; \
