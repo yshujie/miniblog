@@ -15,6 +15,9 @@ db_user="${DB_USER:-${MYSQL_USERNAME:-miniblog}}"
 db_password="${DB_PASSWORD:-${MYSQL_PASSWORD:-miniblog123}}"
 db_name="${DB_NAME:-${MYSQL_DATABASE:-miniblog}}"
 
+# Debug: print resolved DB connection params (do not print password)
+echo "[db-migrate] Resolved DB_HOST=${db_host}, DB_PORT=${db_port}, DB_USER=${db_user}, DB_NAME=${db_name}" >&2
+
 DB_HOST="$db_host" \
 DB_PORT="$db_port" \
 DB_USER="$db_user" \
