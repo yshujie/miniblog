@@ -262,7 +262,7 @@ db-migrate: ## 运行数据库迁移（优先使用本地 migrate 二进制，�
 .PHONY: db-init
 db-init: ## 初始化数据库（执行初始 SQL 脚本，幂等）。需要有数据库管理员权限来创建数据库/用户
 	@echo "Running DB initialization..."
-	@DB_HOST=${DB_HOST:-infra-mysql} \
+	@DB_HOST=${DB_HOST:-mysql} \
 	DB_PORT=${DB_PORT:-3306} \
 	DB_ROOT_USER=${DB_ROOT_USER:-root} \
 	DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-} \
