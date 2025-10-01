@@ -20,8 +20,9 @@ services:
       restart_policy:
         condition: unless-stopped
         delay: 5s
-    # 生产环境不暴露端口，通过 nginx 代理访问
-    ports: []
+    # 映射到 8090,避免与 Jenkins 的 8080 冲突
+    ports:
+      - "8090:8080"
 
   miniblog-frontend-blog:
     deploy:

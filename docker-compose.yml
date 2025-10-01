@@ -31,7 +31,7 @@ services:
     networks:
       - infra_shared
     ports:
-      - "8080:8080"  # 用于直接访问，生产环境通过 nginx 代理
+      - "8090:8080"  # 映射到 8090,避免与 Jenkins 的 8080 冲突
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
