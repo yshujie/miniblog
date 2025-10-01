@@ -10,6 +10,14 @@ if [[ -n "${PIPELINE_ENV_FILE:-}" && -f "${PIPELINE_ENV_FILE}" ]]; then
   set +a
 fi
 
+# 导出所有 Makefile db-init 需要的环境变量
 export DB_ROOT_PASSWORD
+export MYSQL_HOST
+export MYSQL_PORT
+export MYSQL_USERNAME
+export MYSQL_PASSWORD
+export MYSQL_DBNAME
+
+echo "[db-init] Using MYSQL_HOST=${MYSQL_HOST:-mysql}, MYSQL_USERNAME=${MYSQL_USERNAME:-miniblog}, MYSQL_DBNAME=${MYSQL_DBNAME:-miniblog}"
 
 make db-init

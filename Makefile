@@ -243,11 +243,11 @@ deploy-prod: ## 部署生产环境
 .PHONY: db-migrate
 db-migrate: ## 运行数据库迁移（优先使用本地 migrate 二进制，否则使用 dockerized migrate 镜像）
 	@echo "Running DB migrations..."
-	@DB_HOST=$${DB_HOST:-infra-mysql}; \
-	DB_PORT=$${DB_PORT:-3306}; \
+	@DB_HOST=$${DB_HOST:-$${MYSQL_HOST:-mysql}}; \
+	DB_PORT=$${DB_PORT:-$${MYSQL_PORT:-3306}}; \
 	DB_USER=$${DB_USER:-$${MYSQL_USERNAME:-miniblog}}; \
 	DB_PASSWORD=$${DB_PASSWORD:-$${MYSQL_PASSWORD:-miniblog123}}; \
-	DB_NAME=$${DB_NAME:-$${MYSQL_DATABASE:-miniblog}}; \
+	DB_NAME=$${DB_NAME:-$${MYSQL_DBNAME:-$${MYSQL_DATABASE:-miniblog}}}; \
 	DB_URL="mysql://$${DB_USER}:$${DB_PASSWORD}@tcp($${DB_HOST}:$${DB_PORT})/$${DB_NAME}?multiStatements=true"; \
 	DB_URL_REDACTED=$$(echo "$$DB_URL" | sed -E 's#(//[^:]+:)[^@]+@#\1****@#'); \
 	echo "[db-migrate] DB_URL=$${DB_URL_REDACTED}"; \
@@ -262,11 +262,11 @@ db-migrate: ## 运行数据库迁移（优先使用本地 migrate 二进制，�
 .PHONY: db-init
 db-init: ## 初始化数据库（执行初始 SQL 脚本，幂等）。需要有数据库管理员权限来创建数据库/用户
 	@echo "Running DB initialization..."
-	@DB_HOST=${DB_HOST:-mysql}; \
-	DB_PORT=${DB_PORT:-3306}; \
+	@DB_HOST=${DB_HOST:-${MYSQL_HOST:-mysql}}; \
+	DB_PORT=${DB_PORT:-${MYSQL_PORT:-3306}}; \
 	DB_ROOT_USER=${DB_ROOT_USER:-root}; \
 	DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-}; \
-	APP_DB_NAME=${DB_NAME:-${MYSQL_DATABASE:-miniblog}}; \
+	APP_DB_NAME=${DB_NAME:-${MYSQL_DBNAME:-${MYSQL_DATABASE:-miniblog}}}; \
 	APP_DB_USER=${DB_USER:-${MYSQL_USERNAME:-miniblog}}; \
 	APP_DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD:-miniblog123}}; \
 	SCRIPT=./db/migrations/mysql/init_db.sql; \
