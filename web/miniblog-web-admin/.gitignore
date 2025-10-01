@@ -1,3 +1,9 @@
+# build 目录已废弃
+build/
+# plop-templates 目录已废弃
+plop-templates/
+# mock 目录已废弃
+mock/
 .DS_Store
 node_modules/
 dist/
