@@ -126,16 +126,12 @@ build-admin: ## 构建管理后台
 .PHONY: docker-build-frontend-blog
 docker-build-frontend-blog: ## 构建博客前端 Docker 镜像，需要传入 IMAGE_NAME
 	@if [ -z "$(IMAGE_NAME)" ]; then echo "❌ 缺少 IMAGE_NAME 变量，例如 IMAGE_NAME=miniblog-frontend-blog:prod"; exit 1; fi
-	@echo "构建博客前端产物..."
-	@cd $(BLOG_FRONTEND_DIR) && npm ci && npm run build
 	@echo "构建博客前端 Docker 镜像 $(IMAGE_NAME)..."
 	@docker build -f build/docker/miniblog/Dockerfile.prod.frontend.blog -t $(IMAGE_NAME) $(BLOG_FRONTEND_DIR)
 
 .PHONY: docker-build-frontend-admin
 docker-build-frontend-admin: ## 构建管理后台 Docker 镜像，需要传入 IMAGE_NAME
 	@if [ -z "$(IMAGE_NAME)" ]; then echo "❌ 缺少 IMAGE_NAME 变量，例如 IMAGE_NAME=miniblog-frontend-admin:prod"; exit 1; fi
-	@echo "构建管理后台产物..."
-	@cd $(ADMIN_FRONTEND_DIR) && (npm ci || npm install) && (npm run build:prod || npm run build)
 	@echo "构建管理后台 Docker 镜像 $(IMAGE_NAME)..."
 	@docker build -f build/docker/miniblog/Dockerfile.prod.frontend.admin -t $(IMAGE_NAME) $(ADMIN_FRONTEND_DIR)
 
