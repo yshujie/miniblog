@@ -249,6 +249,9 @@ db-migrate: ## 运行数据库迁移（优先使用本地 migrate 二进制，�
 	DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD:-miniblog123}} \
 	DB_NAME=${DB_NAME:-${MYSQL_DATABASE:-miniblog}} ; \
 	DB_URL="mysql://$${DB_USER}:$${DB_PASSWORD}@tcp($${DB_HOST}:$${DB_PORT})/$${DB_NAME}?multiStatements=true" ; \
+	# Debug: print DB_URL with password redacted (do not expose secret)
+	DB_URL_REDACTED=$$(echo "$$DB_URL" | sed -E 's#(//[^:]+:)[^@]+@#\1****@#') ; \
+	echo "[db-migrate] DB_URL=$${DB_URL_REDACTED}" ; \
 	if command -v migrate >/dev/null 2>&1; then \
 		echo "-> Using local migrate binary"; \
 		migrate -path db/migrations/sql -database "$$DB_URL" up ; \
