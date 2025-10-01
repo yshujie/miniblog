@@ -248,15 +248,20 @@ db-migrate: ## 运行数据库迁移（优先使用本地 migrate 二进制，�
 	DB_USER=$${DB_USER:-$${MYSQL_USERNAME:-miniblog}}; \
 	DB_PASSWORD=$${DB_PASSWORD:-$${MYSQL_PASSWORD:-miniblog123}}; \
 	DB_NAME=$${DB_NAME:-$${MYSQL_DBNAME:-$${MYSQL_DATABASE:-miniblog}}}; \
+	if ! MIGRATIONS_DIR="$$(cd db/migrations/sql 2>/dev/null && pwd)"; then \
+		echo "❌ Migrations directory not found: $$(pwd)/db/migrations/sql"; \
+		exit 1; \
+	fi; \
 	DB_URL="mysql://$${DB_USER}:$${DB_PASSWORD}@tcp($${DB_HOST}:$${DB_PORT})/$${DB_NAME}?multiStatements=true"; \
 	DB_URL_REDACTED=$$(echo "$$DB_URL" | sed -E 's#(//[^:]+:)[^@]+@#\1****@#'); \
 	echo "[db-migrate] DB_URL=$${DB_URL_REDACTED}"; \
 	if command -v migrate >/dev/null 2>&1; then \
 		echo "-> Using local migrate binary"; \
-		migrate -path db/migrations/sql -database "$$DB_URL" up; \
+		migrate -path "$$MIGRATIONS_DIR" -database "$$DB_URL" up; \
 	else \
 		echo "-> Local migrate binary not found, using dockerized migrate image"; \
-		docker run --rm --network miniblog_net -v "$(PWD)/db/migrations/sql:/migrations" migrate/migrate -path /migrations -database "$$DB_URL" up; \
+		DOCKER_NET=$${DOCKER_NETWORK:-miniblog_net}; \
+		docker run --rm --network "$$DOCKER_NET" -v "$$MIGRATIONS_DIR:/migrations:ro" migrate/migrate -path /migrations -database "$$DB_URL" up; \
 	fi
 
 .PHONY: db-init
