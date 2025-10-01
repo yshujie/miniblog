@@ -1,14 +1,12 @@
 pipeline {
   agent any
 
-  //   // Shared defaults consumed during initialisation
   environment {
     DEFAULT_IMAGE_NAMESPACE = 'miniblog'
     DEFAULT_IMAGE_TAG = 'prod'
     DOCKER_NETWORK = 'miniblog_net'
-    // 强制执行 DB Init（首次部署需要）- 数据库已手动创建，现在注释掉
-    // FORCE_DB_INIT = 'true'
-  } pipeline hygiene options
+  }
+
   options {
     skipDefaultCheckout(true)
     timestamps()
