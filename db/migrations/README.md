@@ -20,7 +20,9 @@ db/migrations/sql/
 ## 🔄 数据库初始化流程
 
 ### 1. DB Init（数据库初始化）
+
 创建数据库和用户：
+
 ```bash
 make db-init
 ```
@@ -28,7 +30,9 @@ make db-init
 对应 Jenkins 参数：`SKIP_DB_INIT`（默认 false，即执行）
 
 ### 2. DB Migrate（Schema 迁移）
+
 执行所有迁移文件，创建表结构：
+
 ```bash
 make db-migrate
 ```
@@ -36,7 +40,9 @@ make db-migrate
 对应 Jenkins 参数：`SKIP_DB_MIGRATE`（默认 false，即执行）
 
 ### 3. DB Seed（种子数据加载）
+
 加载初始数据（用户、模块、文章等）：
+
 ```bash
 make db-seed
 ```
@@ -56,6 +62,7 @@ touch db/migrations/sql/000003_add_comment_table.down.sql
 ```
 
 **000003_add_comment_table.up.sql**:
+
 ```sql
 USE `miniblog`;
 
@@ -71,6 +78,7 @@ CREATE TABLE IF NOT EXISTS `comment` (
 ```
 
 **000003_add_comment_table.down.sql**:
+
 ```sql
 USE `miniblog`;
 
@@ -87,6 +95,7 @@ touch db/migrations/sql/comment_seed.sql
 ```
 
 然后在 `scripts/load-seed-data.sh` 中添加：
+
 ```bash
 for sql_file in user.sql module.sql section.sql article.sql casbin_rule.sql comment_seed.sql; do
     # ...
@@ -96,16 +105,19 @@ done
 ## 🚀 Jenkins 构建配置
 
 ### 首次部署（全新环境）
+
 1. ✅ `SKIP_DB_INIT` = false（创建数据库）
 2. ✅ `SKIP_DB_MIGRATE` = false（创建表）
 3. ✅ `SKIP_DB_SEED` = **false**（加载初始数据）
 
 ### 日常更新（已有环境）
+
 1. ✅ `SKIP_DB_INIT` = true（数据库已存在）
 2. ✅ `SKIP_DB_MIGRATE` = false（执行新迁移）
 3. ✅ `SKIP_DB_SEED` = true（不重复加载数据）
 
 ### 仅部署代码（无数据库变更）
+
 1. ✅ `SKIP_DB_INIT` = true
 2. ✅ `SKIP_DB_MIGRATE` = true
 3. ✅ `SKIP_DB_SEED` = true

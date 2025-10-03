@@ -3,21 +3,25 @@
 ## ✅ 已完成的配置
 
 ### 1. 创建了种子数据加载脚本
+
 - 📄 `scripts/load-seed-data.sh`
   - 按顺序加载：user.sql → module.sql → section.sql → article.sql → casbin_rule.sql
   - 支持 Docker 和本地 MySQL 客户端
   - 自动检测运行环境
 
 ### 2. 更新了 Makefile
+
 - 新增 `db-seed` target：执行种子数据加载
 - 位置：在 `db-migrate` 之后
 
 ### 3. 更新了 Jenkinsfile
+
 - 新增 `DB Seed` 阶段：在 DB Migrate 之后执行
 - 新增参数 `SKIP_DB_SEED`（默认 true，避免重复加载）
 - 新增环境变量 `RUN_DB_SEED` 控制执行
 
 ### 4. 创建了示例迁移文件
+
 - `000002_seed_data.up.sql`：包含部分种子数据
 - `000002_seed_data.down.sql`：回滚种子数据
 
@@ -33,6 +37,7 @@ make db-seed
 ### 方法 2：通过 Jenkins
 
 在 Jenkins 构建时：
+
 1. 勾选 `SKIP_DB_SEED` = **false**（首次部署）
 2. 之后保持 `SKIP_DB_SEED` = **true**（避免重复加载）
 
@@ -60,6 +65,7 @@ make db-seed
 ### 如果是 Schema 变更（CREATE/ALTER TABLE）
 
 创建新的迁移文件：
+
 ```bash
 # 文件名格式：{版本号}_{描述}.up.sql
 db/migrations/sql/000003_add_new_feature.up.sql
@@ -91,6 +97,7 @@ db/migrations/sql/000003_add_new_feature.down.sql
 ## 🎯 下一步
 
 现在你可以：
+
 1. 提交这些更改到 Git
 2. 在 Jenkins 中触发构建
 3. 勾选 `SKIP_DB_SEED=false` 来加载种子数据

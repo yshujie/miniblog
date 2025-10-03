@@ -21,6 +21,7 @@
 **MySQL 错误码 1062**：Duplicate entry - 主键冲突
 
 **根本原因**：
+
 1. 种子数据 SQL 文件使用 `INSERT INTO` 语句
 2. `INSERT` 不具有**幂等性**（idempotent）
 3. 如果数据已存在，重复执行会违反主键约束
@@ -31,11 +32,13 @@
 ### 使用 REPLACE INTO 替代 INSERT INTO
 
 **修改前**：
+
 ```sql
 INSERT INTO miniblog.user (id, username, ...) VALUES (1, 'clack', ...);
 ```
 
 **修改后**：
+
 ```sql
 REPLACE INTO miniblog.user (id, username, ...) VALUES (1, 'clack', ...);
 ```
@@ -132,6 +135,7 @@ Loading casbin_rule.sql...
 ### 注意事项
 
 ⚠️ **REPLACE INTO 的行为**：
+
 - 会触发 `DELETE` + `INSERT`，不是 `UPDATE`
 - 如果有自增主键，可能会改变 `AUTO_INCREMENT` 值
 - 如果有触发器（TRIGGER），会触发 `DELETE` 和 `INSERT` 触发器
@@ -142,11 +146,13 @@ Loading casbin_rule.sql...
 ### 方案 1：REPLACE INTO（已采用）✅
 
 **优点**：
+
 - ✅ 简单，直接替换 `INSERT` → `REPLACE`
 - ✅ 完全幂等
 - ✅ 适合批量替换
 
 **缺点**：
+
 - ⚠️ 可能影响外键关系（但我们的数据没有这个问题）
 
 ### 方案 2：INSERT ... ON DUPLICATE KEY UPDATE
@@ -161,10 +167,12 @@ ON DUPLICATE KEY UPDATE
 ```
 
 **优点**：
+
 - ✅ 更新而非删除
 - ✅ 保持记录 ID 不变
 
 **缺点**：
+
 - ❌ 需要列出所有要更新的字段
 - ❌ SQL 语句变得很长
 - ❌ 不适合批量修改
@@ -184,9 +192,11 @@ docker exec mysql mysql -uminiblog -p"$DB_PASSWORD" -e "
 ```
 
 **优点**：
+
 - ✅ 保证干净的数据
 
 **缺点**：
+
 - ❌ 不可逆，删除所有数据
 - ❌ 不适合生产环境
 - ❌ 如果有外键约束，可能失败
@@ -194,6 +204,7 @@ docker exec mysql mysql -uminiblog -p"$DB_PASSWORD" -e "
 ## 🎉 修复完成
 
 现在种子数据加载脚本具有完全的幂等性：
+
 - ✅ 可以安全地多次执行
 - ✅ 不会因为数据已存在而失败
 - ✅ 确保数据与 SQL 文件保持一致
