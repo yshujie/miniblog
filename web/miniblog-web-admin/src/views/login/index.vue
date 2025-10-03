@@ -121,8 +121,9 @@ const handleLogin = async () => {
     await store.login(loginForm);
     const target = redirect.value || '/';
     await router.replace({ path: target, query: otherQuery.value });
-  } catch (error: any) {
-    ElMessage.error(error.message || '登录失败');
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '登录失败';
+    ElMessage.error(message);
   } finally {
     loading.value = false;
   }

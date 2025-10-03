@@ -130,7 +130,30 @@ interface ArticleFilters {
   limit: number;
 }
 
-const list = ref<Array<Record<string, any>>>([]);
+interface ArticleItem {
+  id: string | number;
+  module?: ModuleItem | { title?: string };
+  section?: SectionItem | { title?: string };
+  author?: string;
+  title?: string;
+  tags?: string[];
+  status?: string;
+}
+
+interface FetchModulesResponse {
+  modules?: ModuleItem[];
+}
+
+interface FetchSectionsResponse {
+  sections?: SectionItem[];
+}
+
+interface FetchArticlesResponse {
+  articles?: ArticleItem[];
+  total?: number;
+}
+
+const list = ref<ArticleItem[]>([]);
 const total = ref(0);
 const listLoading = ref(false);
 const modules = ref<ModuleItem[]>([]);
@@ -168,10 +191,11 @@ const statusText = (status?: string) => {
 
 const loadModules = async () => {
   try {
-  const response = await fetchModules() as any;
-    modules.value = response.modules || [];
-  } catch (error: any) {
-    ElMessage.error(error.message || '加载模块失败');
+    const response = await fetchModules() as FetchModulesResponse;
+    modules.value = response.modules ?? [];
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '加载模块失败';
+    ElMessage.error(message);
   }
 };
 
@@ -182,21 +206,23 @@ const loadSections = async () => {
     return;
   }
   try {
-  const response = await fetchSections(filters.module_code) as any;
-    sections.value = response.sections || [];
-  } catch (error: any) {
-    ElMessage.error(error.message || '加载章节失败');
+    const response = await fetchSections(filters.module_code) as FetchSectionsResponse;
+    sections.value = response.sections ?? [];
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '加载章节失败';
+    ElMessage.error(message);
   }
 };
 
 const search = async () => {
   listLoading.value = true;
   try {
-  const response = await fetchList({ ...filters }) as any;
-    list.value = response.articles || [];
-    total.value = response.total || 0;
-  } catch (error: any) {
-    ElMessage.error(error.message || '加载文章列表失败');
+    const response = await fetchList({ ...filters }) as FetchArticlesResponse;
+    list.value = response.articles ?? [];
+    total.value = response.total ?? 0;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '加载文章列表失败';
+    ElMessage.error(message);
   } finally {
     listLoading.value = false;
   }

@@ -4,8 +4,8 @@ import permissionStore from './store/modules/permission';
 import NProgress from 'nprogress'; // progress bar
 import 'nprogress/nprogress.css'; // progress bar style
 import { ElMessage } from 'element-plus';
-import { getToken } from '@/utils/auth'; // get token from cookie
-import getPageTitle from '@/utils/get-page-title';
+import { getToken } from './utils/auth'; // get token from cookie
+import getPageTitle from './utils/get-page-title';
 
 NProgress.configure({ showSpinner: false }); // NProgress Configuration
 

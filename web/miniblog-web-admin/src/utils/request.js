@@ -15,7 +15,7 @@ const service = axios.create({
     const processed = data.replace(/"id":(\d{15,})/g, '"id":"$1"');
     try {
       return JSON.parse(processed);
-    } catch (error) {
+    } catch {
       return processed;
     }
   }]

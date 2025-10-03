@@ -117,6 +117,27 @@ interface ArticleFormState {
   content: string;
 }
 
+interface FetchModulesResponse {
+  modules?: ModuleItem[];
+}
+
+interface FetchSectionsResponse {
+  sections?: SectionItem[];
+}
+
+interface ArticleDetails extends ArticleFormState {
+  module?: ModuleItem;
+  section?: SectionItem;
+}
+
+interface FetchArticleResponse {
+  article?: ArticleDetails;
+}
+
+interface CreateArticleResponse {
+  article?: { id?: string | number };
+}
+
 const props = defineProps<{ isEdit: boolean }>();
 
 const route = useRoute();
@@ -191,10 +212,11 @@ const resolveArticleId = () => {
 
 const loadModules = async () => {
   try {
-    const response = await fetchModules() as any;
-    modules.value = response.modules || [];
-  } catch (error: any) {
-    ElMessage.error(error.message || '加载模块失败');
+    const response = await fetchModules() as FetchModulesResponse;
+    modules.value = response.modules ?? [];
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '加载模块失败';
+    ElMessage.error(message);
   }
 };
 
@@ -205,10 +227,11 @@ const loadSections = async (moduleCode: string) => {
     return;
   }
   try {
-    const response = await fetchSections(moduleCode) as any;
-    sections.value = response.sections || [];
-  } catch (error: any) {
-    ElMessage.error(error.message || '加载章节失败');
+    const response = await fetchSections(moduleCode) as FetchSectionsResponse;
+    sections.value = response.sections ?? [];
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '加载章节失败';
+    ElMessage.error(message);
   }
 };
 
@@ -222,8 +245,12 @@ const loadArticle = async () => {
     return;
   }
   try {
-    const response = await fetchArticle(articleId) as any;
-    const article = response.article || {};
+    const response = await fetchArticle(articleId) as FetchArticleResponse;
+    const article = response.article;
+    if (!article) {
+      ElMessage.error('未获取到文章详情');
+      return;
+    }
     postForm.id = article.id;
     postForm.status = article.status || '';
     postForm.title = article.title || '';
@@ -237,8 +264,9 @@ const loadArticle = async () => {
     if (postForm.module_code) {
       await loadSections(postForm.module_code);
     }
-  } catch (error: any) {
-    ElMessage.error(error.message || '加载文章详情失败');
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '加载文章详情失败';
+    ElMessage.error(message);
   }
 };
 
@@ -267,15 +295,16 @@ const handleSave = async () => {
         ElMessage.success('文章更新成功');
         await loadArticle();
       } else {
-        const response = await createArticle({ ...postForm }) as any;
+        const response = await createArticle({ ...postForm }) as CreateArticleResponse;
         const newId = response.article?.id;
         ElMessage.success('文章创建成功');
         if (newId) {
           router.replace({ path: `/article/edit/${newId}` });
         }
       }
-    } catch (error: any) {
-      ElMessage.error(error.message || '保存失败');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '保存失败';
+      ElMessage.error(message);
       throw error;
     }
   });
@@ -287,8 +316,9 @@ const handlePublish = async () => {
       await publishArticle({ id: postForm.id });
       ElMessage.success('文章发布成功');
       await loadArticle();
-    } catch (error: any) {
-      ElMessage.error(error.message || '发布失败');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '发布失败';
+      ElMessage.error(message);
       throw error;
     }
   });
@@ -300,8 +330,9 @@ const handleUnpublish = async () => {
       await unpublishArticle({ id: postForm.id });
       ElMessage.success('文章下架成功');
       await loadArticle();
-    } catch (error: any) {
-      ElMessage.error(error.message || '下架失败');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '下架失败';
+      ElMessage.error(message);
       throw error;
     }
   });

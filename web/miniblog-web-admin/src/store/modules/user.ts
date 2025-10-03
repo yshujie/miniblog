@@ -15,6 +15,21 @@ export interface IUserState {
   roles: string[];
 }
 
+interface LoginResponse {
+  token: string;
+}
+
+interface UserProfile {
+  roles: string[];
+  nickname: string;
+  avatar: string;
+  introduction: string;
+}
+
+interface GetInfoResponse {
+  user?: UserProfile;
+}
+
 export default defineStore({
   id: 'user',
   state: (): IUserState => ({
@@ -31,8 +46,8 @@ export default defineStore({
     login(userInfo): Promise<void> {
       const { username, password } = userInfo;
       return new Promise((resolve, reject) => {
-        apiLogin({ username: username.trim(), password: password }).then(response => {
-          const { token } = response as any;
+        apiLogin({ username: username.trim(), password: password }).then((response: LoginResponse) => {
+          const { token } = response;
           this.token = token;
           setToken(token);
           resolve();
@@ -43,13 +58,14 @@ export default defineStore({
     },
 
     // get user info
-    getInfo() {
+    getInfo(): Promise<UserProfile> {
       return new Promise((resolve, reject) => {
-        apiGetInfo().then(response => {
-          const { user } = response as any;
+        apiGetInfo().then((response: GetInfoResponse) => {
+          const { user } = response;
 
           if (!user) {
             reject('Verification failed, please Login again.');
+            return;
           }
 
           const { roles, nickname, avatar, introduction } = user;
@@ -57,6 +73,7 @@ export default defineStore({
           // roles must be a non-empty array
           if (!roles || roles.length <= 0) {
             reject('getInfo: roles must be a non-null array!');
+            return;
           }
 
           this.roles = roles;
@@ -98,18 +115,14 @@ export default defineStore({
     },
 
     // dynamically modify permissions
-    async changeRoles(role) {
+    async changeRoles(role: string): Promise<void> {
       const token = role + '-token';
 
       this.token = token;
       setToken(token);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const infoRes = await this.getInfo() as any;
-      let roles = [];
-      if (infoRes.roles) {
-        roles = infoRes.roles;
-      }
+      const infoRes = await this.getInfo();
+      const roles = infoRes.roles || [];
 
       resetRouter();
 
