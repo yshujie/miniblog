@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # ---------- Builder ----------
-FROM cgr.dev/chainguard/node:20 AS builder
+FROM node:20-alpine AS builder
 
 # 设置构建参数
 ARG HTTP_PROXY
