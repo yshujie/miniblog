@@ -46,8 +46,14 @@ export default defineStore({
     login(userInfo): Promise<void> {
       const { username, password } = userInfo;
       return new Promise((resolve, reject) => {
-        apiLogin({ username: username.trim(), password: password }).then((response: LoginResponse) => {
-          const { token } = response;
+        apiLogin({ username: username.trim(), password: password }).then((response) => {
+          const loginResponse = response as Partial<LoginResponse>;
+          if (!loginResponse.token) {
+            reject(new Error('登录响应缺少 Token'));
+            return;
+          }
+
+          const { token } = loginResponse;
           this.token = token;
           setToken(token);
           resolve();
@@ -60,8 +66,9 @@ export default defineStore({
     // get user info
     getInfo(): Promise<UserProfile> {
       return new Promise((resolve, reject) => {
-        apiGetInfo().then((response: GetInfoResponse) => {
-          const { user } = response;
+        apiGetInfo().then((response) => {
+          const infoResponse = response as GetInfoResponse;
+          const { user } = infoResponse;
 
           if (!user) {
             reject('Verification failed, please Login again.');
