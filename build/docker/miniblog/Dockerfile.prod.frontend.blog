@@ -18,6 +18,12 @@ WORKDIR /app
 # 只复制依赖清单,先安装依赖(最大化缓存)
 COPY package*.json ./
 
+# 配置 Git 使用 HTTPS/镜像，避免 SSH 依赖及国内网络问题
+RUN git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" && \
+  git config --global url."https://github.com/".insteadOf "git@github.com:" && \
+  git config --global url."https://github.com/".insteadOf "git://github.com/" && \
+  git config --global url."https://mirror.ghproxy.com/https://github.com/".insteadOf "https://github.com/"
+
 # 配置 npm 使用淘宝镜像加速
 RUN npm config set registry https://registry.npmmirror.com
 
