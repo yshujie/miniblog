@@ -79,7 +79,11 @@ pipeline {
         stage('Admin Frontend') {
           steps {
             dir('.') {
-              sh "IMAGE_NAME='${env.FRONTEND_ADMIN_IMAGE_TAG}' NO_CACHE=${env.FRONTEND_NO_CACHE} make docker-build-frontend-admin"
+              sh """
+IMAGE_NAME='${env.FRONTEND_ADMIN_IMAGE_TAG}' \
+NO_CACHE=${env.FRONTEND_NO_CACHE} \
+make docker-build-frontend-admin
+"""
             }
           }
         }
@@ -190,6 +194,14 @@ pipeline {
 }
 
 def initializeEnvironment() {
+  def defaultIfBlank = { value, fallback ->
+    if (value == null) {
+      return fallback
+    }
+    def normalized = value.toString().trim()
+    return normalized ? normalized : fallback
+  }
+
   if (flagEnabled(params.LOAD_ENV_FROM_CREDENTIALS) && params.ENV_CREDENTIALS_ID?.trim()) {
     loadEnvFromCredentials(params.ENV_CREDENTIALS_ID.trim())
   } else {

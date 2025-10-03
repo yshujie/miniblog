@@ -143,15 +143,18 @@ docker-build-frontend-admin: ## 构建管理后台 Docker 镜像，需要传入 
 	@if [ -z "$(IMAGE_NAME)" ]; then echo "❌ 缺少 IMAGE_NAME 变量，例如 IMAGE_NAME=miniblog-frontend-admin:prod"; exit 1; fi
 	@echo "构建管理后台 Docker 镜像 $(IMAGE_NAME)..."
 	@FLAGS=""; \
+	BUILD_ARGS="$(DOCKER_BUILD_ARGS)"; \
 	if [ "$(NO_CACHE)" = "true" ]; then \
 	  echo "-> 禁用 Docker 构建缓存 (--no-cache --pull)"; \
 	  FLAGS="$$FLAGS --no-cache --pull"; \
 	fi; \
 	if [ -n "$(DOCKER_BUILD_ARGS)" ]; then \
 	  echo "-> 附加 Docker 构建参数: $(DOCKER_BUILD_ARGS)"; \
-	  FLAGS="$$FLAGS $(DOCKER_BUILD_ARGS)"; \
 	fi; \
-	docker build $$FLAGS -f build/docker/miniblog/Dockerfile.prod.frontend.admin -t $(IMAGE_NAME) $(ADMIN_FRONTEND_DIR)
+	if [ -n "$$BUILD_ARGS" ]; then \
+	  echo "-> 最终 Docker 构建参数: $$BUILD_ARGS"; \
+	fi; \
+	docker build $$FLAGS $$BUILD_ARGS -f build/docker/miniblog/Dockerfile.prod.frontend.admin -t $(IMAGE_NAME) $(ADMIN_FRONTEND_DIR)
 
 .PHONY: dev-admin
 dev-admin: ## 管理后台开发模式

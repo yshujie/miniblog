@@ -1,9 +1,6 @@
 # ---------- Builder ----------
 FROM node:20-alpine AS builder
 
-# 使用阿里云镜像源加速 apk 包下载 (必须在第一个 RUN 之前)
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
-
 # 设置构建参数
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
@@ -21,36 +18,21 @@ RUN apk add --no-cache git openssh-client
 # 只复制依赖清单,先安装依赖(最大化缓存)
 COPY package*.json ./
 
-# 配置 npm 使用淘宝镜像加速
-RUN npm config set registry https://registry.npmmirror.com
-
-# 配置 Git 强制使用 HTTPS 协议，将所有 SSH/Git 协议重写为 HTTPS（使用 ghproxy 加速）
-RUN git config --global url."https://mirror.ghproxy.com/https://github.com/".insteadOf "ssh://git@github.com/" && \
-  git config --global url."https://mirror.ghproxy.com/https://github.com/".insteadOf "git@github.com:" && \
-  git config --global url."https://mirror.ghproxy.com/https://github.com/".insteadOf "git://github.com/" && \
-  git config --global url."https://mirror.ghproxy.com/https://github.com/".insteadOf "https://github.com/"
-
-# 删除 package-lock.json 避免其中写死的 git SSH URL，让 npm 根据 git config 重新解析
-RUN rm -f package-lock.json
-
-# 安装依赖（会根据 package.json 和 git config 重新生成 lock 文件）
-RUN npm install
+# 使用 lock 文件安装依赖，保证可重复构建
+RUN npm ci
 
 # 再复制剩余代码
 COPY . .
 RUN npm run build
 
 # ---------- Runtime ----------
-FROM nginx:alpine
-
-# 设置工作目录
-WORKDIR /app
+FROM cgr.dev/chainguard/nginx:latest
 
 # 复制构建产物
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # 暴露端口  
-EXPOSE 3000
+EXPOSE 8080
 
 # 启动命令
 CMD ["nginx", "-g", "daemon off;"]

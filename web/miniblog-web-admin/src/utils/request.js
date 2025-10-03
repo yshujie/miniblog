@@ -3,8 +3,8 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import store from '@/store';
 import { getToken } from '@/utils/auth';
 
-const AUTH_BASE_URL = import.meta.env.VITE_AUTH_API || 'https://api.yangshujie.com/v1';
-const ADMIN_BASE_URL = import.meta.env.VITE_ADMIN_API || 'https://api.yangshujie.com/v1/admin';
+const AUTH_BASE_URL = 'https://api.yangshujie.com/v1';
+const ADMIN_BASE_URL = 'https://api.yangshujie.com/v1/admin';
 
 const service = axios.create({
   timeout: 5000,
