@@ -42,4 +42,4 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 8080
 
 # 启动命令
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["-g", "daemon off;"]
