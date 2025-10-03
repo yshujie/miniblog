@@ -1,104 +1,84 @@
-import axios from 'axios'
-import { MessageBox, Message } from 'element-ui'
-import store from '@/store'
-import { getToken } from '@/utils/auth'
+import axios from 'axios';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import store from '@/store';
+import { getToken } from '@/utils/auth';
 
-// 定义基础 URL
-const AUTH_BASE_URL = 'https://api.yangshujie.com/v1'
-const ADMIN_BASE_URL = 'https://api.yangshujie.com/v1/admin'
+const AUTH_BASE_URL = import.meta.env.VITE_AUTH_API || 'https://api.yangshujie.com/v1';
+const ADMIN_BASE_URL = import.meta.env.VITE_ADMIN_API || 'https://api.yangshujie.com/v1/admin';
 
-/**
- * 创建 axios 实例
- * @returns {Object} axios 实例
- */
 const service = axios.create({
-  timeout: 5000, // 请求超时时间
+  timeout: 5000,
   transformResponse: [(data) => {
-    // 在 JSON 解析之前，将大整数转换为字符串
-    const processedData = data.replace(/"id":(\d{15,})/g, '"id":"$1"')
-    return JSON.parse(processedData)
+    if (!data || typeof data !== 'string') {
+      return data;
+    }
+    const processed = data.replace(/"id":(\d{15,})/g, '"id":"$1"');
+    try {
+      return JSON.parse(processed);
+    } catch (error) {
+      return processed;
+    }
   }]
-})
+});
 
-/**
- * 请求拦截器
- * @param {Object} config 请求配置
- * @returns {Promise} 请求配置
- */
 service.interceptors.request.use(
   config => {
-    // 根据请求路径设置不同的 baseURL
-    if (config.url.startsWith('/auth/')) {
-      config.baseURL = AUTH_BASE_URL
+    if (config.url && config.url.startsWith('/auth/')) {
+      config.baseURL = AUTH_BASE_URL;
     } else {
-      config.baseURL = ADMIN_BASE_URL
+      config.baseURL = ADMIN_BASE_URL;
     }
 
-    // 如果存在 token，则添加到请求头
-    if (getToken()) {
-      // 添加 token 到请求头
-      config.headers['Authorization'] = `Bearer ${getToken()}`
+    const token = getToken();
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    return config
+
+    return config;
   },
   error => {
-    // 处理请求错误
-    console.log(error) // 调试
-    return Promise.reject(error)
+    console.error(error);
+    return Promise.reject(error);
   }
-)
+);
 
-/**
- * 响应拦截器
- * @param {Object} response 响应数据
- * @returns {Promise} 响应数据
- */
 service.interceptors.response.use(
-  /**
-   * Determine the request status by custom code
-   * Here is just an example
-   * You can also judge the status by HTTP Status Code
-   */
   response => {
-    const res = response.data
+    const res = response.data || {};
 
-    // 如果响应码不是 ok，则提示错误
     if (res.code !== 'ok') {
-      Message({
-        message: res.message || 'Error',
+      ElMessage({
+        message: res.message || '请求失败',
         type: 'error',
         duration: 5 * 1000
-      })
+      });
 
-      // 如果响应码是 unauthorized，则提示重新登录
       if (res.code === 'unauthorized') {
-        // to re-login
-        MessageBox.confirm('You have been logged out, you can cancel to stay on this page, or log in again', 'Confirm logout', {
-          confirmButtonText: 'Re-Login',
-          cancelButtonText: 'Cancel',
+        ElMessageBox.confirm('登录状态失效，请重新登录', '提示', {
+          confirmButtonText: '重新登录',
+          cancelButtonText: '取消',
           type: 'warning'
         }).then(() => {
-          store.dispatch('user/resetToken').then(() => {
-            location.reload()
-          })
-        })
+          store.user().resetToken();
+          window.location.reload();
+        });
       }
 
-      // 返回错误信息
-      return Promise.reject(new Error(res.message || 'Error'))
-    } else {
-      return res.payload
+      return Promise.reject(new Error(res.message || '请求失败'));
     }
+
+    return res.payload;
   },
   error => {
-    console.log('err' + error) // for debug
-    Message({
+    console.error('request error:', error);
+    ElMessage({
       message: error.message,
       type: 'error',
       duration: 5 * 1000
-    })
-    return Promise.reject(error)
+    });
+    return Promise.reject(error);
   }
-)
+);
 
-export default service
+export default service;

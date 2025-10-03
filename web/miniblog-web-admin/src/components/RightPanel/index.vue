@@ -1,9 +1,12 @@
 <template>
-  <div ref="rightPanel" :class="{show:show}" class="rightPanel-container">
+  <div ref="rightPanel" :class="{ show: show }" class="rightPanel-container">
     <div class="rightPanel-background" />
     <div class="rightPanel">
-      <div class="handle-button" :style="{'top':buttonTop+'px','background-color':theme}" @click="show=!show">
-        <i :class="show?'el-icon-close':'el-icon-setting'" />
+      <div class="handle-button" :style="{ 'top': buttonTop + 'px', 'background-color': theme }" @click="handleClick">
+        <el-icon>
+          <Close v-if="show" class="svg-icon disabled" />
+          <Setting v-else class="svg-icon disabled" />
+        </el-icon>
       </div>
       <div class="rightPanel-items">
         <slot />
@@ -13,10 +16,17 @@
 </template>
 
 <script>
-import { addClass, removeClass } from '@/utils'
+import { addClass, removeClass } from '@/utils';
+import { defineComponent } from 'vue';
+import store from '@/store';
+import { Close, Setting } from '@element-plus/icons-vue';
 
-export default {
+export default defineComponent({
   name: 'RightPanel',
+  components: {
+    Close,
+    Setting
+  },
   props: {
     clickNotClose: {
       default: false,
@@ -30,50 +40,53 @@ export default {
   data() {
     return {
       show: false
-    }
+    };
   },
   computed: {
     theme() {
-      return this.$store.state.settings.theme
+      return store.settings().theme;
     }
   },
   watch: {
     show(value) {
       if (value && !this.clickNotClose) {
-        this.addEventClick()
+        this.addEventClick();
       }
       if (value) {
-        addClass(document.body, 'showRightPanel')
+        addClass(document.body, 'showRightPanel');
       } else {
-        removeClass(document.body, 'showRightPanel')
+        removeClass(document.body, 'showRightPanel');
       }
     }
   },
   mounted() {
-    this.insertToBody()
+    this.insertToBody();
   },
-  beforeDestroy() {
-    const elx = this.$refs.rightPanel
-    elx.remove()
+  beforeUnmount() {
+    const elx = this.$refs.rightPanel;
+    elx.remove();
   },
   methods: {
+    handleClick() {
+      this.show = !this.show;
+    },
     addEventClick() {
-      window.addEventListener('click', this.closeSidebar)
+      window.addEventListener('click', this.closeSidebar);
     },
     closeSidebar(evt) {
-      const parent = evt.target.closest('.rightPanel')
+      const parent = evt.target.closest('.rightPanel');
       if (!parent) {
-        this.show = false
-        window.removeEventListener('click', this.closeSidebar)
+        this.show = false;
+        window.removeEventListener('click', this.closeSidebar);
       }
     },
     insertToBody() {
-      const elx = this.$refs.rightPanel
-      const body = document.querySelector('body')
-      body.insertBefore(elx, body.firstChild)
+      const elx = this.$refs.rightPanel;
+      const body = document.querySelector('body');
+      body.insertBefore(elx, body.firstChild);
     }
   }
-}
+});
 </script>
 
 <style>
@@ -137,9 +150,15 @@ export default {
   cursor: pointer;
   color: #fff;
   line-height: 48px;
+
   i {
     font-size: 24px;
     line-height: 48px;
+    height: 48px;
+  }
+
+  .disabled {
+    pointer-events: none;
   }
 }
 </style>

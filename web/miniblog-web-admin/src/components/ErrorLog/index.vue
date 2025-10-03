@@ -1,19 +1,21 @@
 <template>
   <div v-if="errorLogs.length>0">
-    <el-badge :is-dot="true" style="line-height: 25px;margin-top: -5px;" @click.native="dialogTableVisible=true">
+    <el-badge :is-dot="true" style="line-height: 25px;margin-top: -5px;" @click="dialogTableVisible=true">
       <el-button style="padding: 8px 10px;" size="small" type="danger">
         <svg-icon icon-class="bug" />
       </el-button>
     </el-badge>
 
-    <el-dialog :visible.sync="dialogTableVisible" width="80%" append-to-body>
-      <div slot="title">
-        <span style="padding-right: 10px;">Error Log</span>
-        <el-button size="mini" type="primary" icon="el-icon-delete" @click="clearAll">Clear All</el-button>
-      </div>
+    <el-dialog v-model="dialogTableVisible" width="80%" append-to-body>
+      <template v-slot:header>
+        <div class="text-title">
+          <span style="padding-right: 10px;">Error Log</span>
+          <el-button size="small" type="primary" :icon="IconDelete" @click="clearAll">Clear All</el-button>
+        </div>
+      </template>
       <el-table :data="errorLogs" border>
         <el-table-column label="Message">
-          <template slot-scope="{row}">
+          <template v-slot="{row}">
             <div>
               <span class="message-title">Msg:</span>
               <el-tag type="danger">
@@ -24,7 +26,7 @@
             <div>
               <span class="message-title" style="padding-right: 10px;">Info: </span>
               <el-tag type="warning">
-                {{ row.vm.$vnode.tag }} error in {{ row.info }}
+                error in {{ row.info }}
               </el-tag>
             </div>
             <br>
@@ -37,7 +39,7 @@
           </template>
         </el-table-column>
         <el-table-column label="Stack">
-          <template slot-scope="scope">
+          <template v-slot="scope">
             {{ scope.row.err.stack }}
           </template>
         </el-table-column>
@@ -47,25 +49,30 @@
 </template>
 
 <script>
-export default {
+import { defineComponent, markRaw } from 'vue';
+import store from '@/store';
+import { Delete as IconDelete } from '@element-plus/icons-vue';
+
+export default defineComponent({
   name: 'ErrorLog',
   data() {
     return {
+      IconDelete: markRaw(IconDelete),
       dialogTableVisible: false
-    }
+    };
   },
   computed: {
     errorLogs() {
-      return this.$store.getters.errorLogs
+      return store.errorLog().logs;
     }
   },
   methods: {
     clearAll() {
-      this.dialogTableVisible = false
-      this.$store.dispatch('errorLog/clearErrorLog')
+      this.dialogTableVisible = false;
+      store.errorLog().clearErrorLog();
     }
   }
-}
+});
 </script>
 
 <style scoped>

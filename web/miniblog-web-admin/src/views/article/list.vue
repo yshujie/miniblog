@@ -1,188 +1,247 @@
 <template>
   <div class="app-container">
-
-    <el-form :model="filters" label-width="120px">
-      <el-form-item label="Module Code">
-        <el-select v-model="filters.module_code" placeholder="Module Code" class="module-select" @change="initSections">
-          <el-option v-for="module in modules" :key="module.code" :label="module.title" :value="module.code" />
+    <el-form :model="filters" label-width="110px" class="filter-form">
+      <el-form-item label="模块">
+        <el-select
+          v-model="filters.module_code"
+          placeholder="选择模块"
+          class="module-select"
+          clearable
+          @change="handleModuleChange"
+        >
+          <el-option
+            v-for="moduleItem in modules"
+            :key="moduleItem.code"
+            :label="moduleItem.title"
+            :value="moduleItem.code"
+          />
         </el-select>
-
-        <el-select v-model="filters.section_code" placeholder="Section Code" class="section-select" @change="search">
-          <el-option v-for="section in sections" :key="section.code" :label="section.title" :value="section.code" />
+        <el-select
+          v-model="filters.section_code"
+          placeholder="选择章节"
+          class="section-select"
+          clearable
+          :disabled="!sections.length"
+          @change="search"
+        >
+          <el-option
+            v-for="section in sections"
+            :key="section.code"
+            :label="section.title"
+            :value="section.code"
+          />
         </el-select>
       </el-form-item>
 
       <el-form-item>
-        <el-button type="primary" @click="search">Search</el-button>
-        <el-button @click="resetSearch">Reset</el-button>
+        <el-button type="primary" @click="search">查询</el-button>
+        <el-button @click="resetFilters">重置</el-button>
       </el-form-item>
     </el-form>
 
-    <el-table v-loading="listLoading" :data="list" border fit highlight-current-row style="width: 100%">
-      <el-table-column align="center" label="ID" width="80">
-        <template slot-scope="scope">
-          <span>{{ scope.row.id }}</span>
+    <el-table
+      v-loading="listLoading"
+      :data="list"
+      border
+      fit
+      highlight-current-row
+      style="width: 100%"
+    >
+      <el-table-column label="ID" align="center" width="80">
+        <template #default="{ row }">
+          <span>{{ row.id }}</span>
         </template>
       </el-table-column>
-
-      <el-table-column width="180px" align="center" label="Module & Section">
-        <template slot-scope="scope">
-          <span>{{ scope.row.module.title }} - {{ scope.row.section.title }}</span>
+      <el-table-column label="模块/章节" min-width="180" align="center">
+        <template #default="{ row }">
+          <span>{{ row.module?.title }} - {{ row.section?.title }}</span>
         </template>
       </el-table-column>
-
-      <el-table-column width="120px" align="center" label="Author">
-        <template slot-scope="scope">
-          <span>{{ scope.row.author }}</span>
+      <el-table-column label="作者" width="140" align="center">
+        <template #default="{ row }">
+          <span>{{ row.author }}</span>
         </template>
       </el-table-column>
-
-      <el-table-column min-width="300px" label="Title">
-        <template slot-scope="{row}">
-          <router-link :to="'/article/edit/'+row.id" class="link-type">
-            <span>{{ row.title }}</span>
+      <el-table-column label="标题" min-width="260">
+        <template #default="{ row }">
+          <router-link :to="`/article/edit/${row.id}`" class="link-type">
+            {{ row.title }}
           </router-link>
         </template>
       </el-table-column>
-
-      <el-table-column min-width="300px" label="Tags">
-        <template slot-scope="{row}">
-          <el-tag v-for="tag in row.tags" :key="tag" type="primary" class="tag-item">{{ tag }}</el-tag>
+      <el-table-column label="标签" min-width="220">
+        <template #default="{ row }">
+          <el-tag
+            v-for="tag in row.tags || []"
+            :key="`${row.id}-${tag}`"
+            type="primary"
+            class="tag-item"
+          >
+            {{ tag }}
+          </el-tag>
         </template>
       </el-table-column>
-
-      <el-table-column min-width="100px" label="Status">
-        <template slot-scope="{row}">
-          <el-tag v-if="row.status === 'Published'" type="success" class="tag-item">Published</el-tag>
-          <el-tag v-else-if="row.status === 'Draft'" type="info" class="tag-item">Draft</el-tag>
-          <el-tag v-else-if="row.status === 'Unpublished'" type="danger" class="tag-item">Unpublished</el-tag>
-          <el-tag v-else type="warning" class="tag-item">Unknown</el-tag>
+      <el-table-column label="状态" width="140" align="center">
+        <template #default="{ row }">
+          <el-tag :type="statusType(row.status)">{{ statusText(row.status) }}</el-tag>
         </template>
       </el-table-column>
-
-      <el-table-column align="center" label="Actions" width="120">
-        <template slot-scope="scope">
-          <router-link :to="'/article/edit/'+scope.row.id">
-            <el-button type="primary" size="small" icon="el-icon-edit">
-              Edit
-            </el-button>
+      <el-table-column label="操作" width="140" align="center">
+        <template #default="{ row }">
+          <router-link :to="`/article/edit/${row.id}`">
+            <el-button size="small" type="primary" icon="Edit">编辑</el-button>
           </router-link>
         </template>
       </el-table-column>
     </el-table>
 
-    <pagination v-show="total>0" :total="total" :page.sync="filters.page" :limit.sync="filters.limit" @pagination="search" />
+    <pagination
+      v-show="total > 0"
+      :total="total"
+      v-model:page="filters.page"
+      v-model:limit="filters.limit"
+      @pagination="search"
+    />
   </div>
 </template>
 
-<script>
-import { fetchList } from '@/api/article'
-import { fetchModules } from '@/api/module'
-import { fetchSections } from '@/api/section'
-import Pagination from '@/components/Pagination' // Secondary package based on el-pagination
+<script setup lang="ts">
+import { onMounted, reactive, ref } from 'vue';
+import { ElMessage } from 'element-plus';
+import Pagination from '@/components/Pagination/index.vue';
+import { fetchList } from '@/api/article';
+import { fetchModules } from '@/api/module';
+import { fetchSections } from '@/api/section';
 
-export default {
-  name: 'ArticleList',
-  components: { Pagination },
-  filters: {
-    statusFilter(status) {
-      const statusMap = {
-        published: 'success',
-        draft: 'info',
-        deleted: 'danger'
-      }
-      return statusMap[status]
-    }
-  },
-  data() {
-    return {
-      list: null,
-      total: 0,
-      listLoading: true,
-      modules: [],
-      sections: [],
-      filters: {
-        module_code: '',
-        section_code: '',
-        page: 1,
-        limit: 20
-      }
-    }
-  },
-  created() {
-    this.init()
-  },
-
-  mounted() {
-    this.search()
-  },
-
-  methods: {
-    init() {
-      this.initModules()
-    },
-
-    async initModules() {
-      // 清空模块选择
-      this.filters.module_code = ''
-      this.modules = []
-
-      // 获取模块
-      const modulesResp = await fetchModules()
-      this.modules = modulesResp.modules
-
-      console.log('modules', this.modules)
-    },
-
-    async initSections() {
-      // 清空章节选择
-      this.filters.section_code = ''
-      this.sections = []
-
-      // 获取章节
-      const sectionsResp = await fetchSections(this.filters.module_code)
-      this.sections = sectionsResp.sections
-    },
-
-    async search() {
-      this.listLoading = true
-      const listResp = await fetchList(this.filters)
-
-      console.log('listResp', listResp)
-      this.list = listResp.articles
-      this.total = listResp.total
-      this.listLoading = false
-    },
-
-    resetSearch() {
-      this.filters = {
-        module_code: '',
-        section_code: '',
-        page: 1,
-        limit: 20
-      }
-    }
-  }
+interface ModuleItem {
+  code: string;
+  title: string;
 }
+
+interface SectionItem {
+  code: string;
+  title: string;
+}
+
+interface ArticleFilters {
+  module_code: string;
+  section_code: string;
+  page: number;
+  limit: number;
+}
+
+const list = ref<Array<Record<string, any>>>([]);
+const total = ref(0);
+const listLoading = ref(false);
+const modules = ref<ModuleItem[]>([]);
+const sections = ref<SectionItem[]>([]);
+
+const filters = reactive<ArticleFilters>({
+  module_code: '',
+  section_code: '',
+  page: 1,
+  limit: 20
+});
+
+const statusType = (status?: string) => {
+  switch (status) {
+    case 'Published':
+      return 'success';
+    case 'Draft':
+      return 'info';
+    case 'Unpublished':
+      return 'danger';
+    default:
+      return 'warning';
+  }
+};
+
+const statusText = (status?: string) => {
+  if (!status) return '未知';
+  const map: Record<string, string> = {
+    Published: '已发布',
+    Draft: '草稿',
+    Unpublished: '未发布'
+  };
+  return map[status] || status;
+};
+
+const loadModules = async () => {
+  try {
+  const response = await fetchModules() as any;
+    modules.value = response.modules || [];
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载模块失败');
+  }
+};
+
+const loadSections = async () => {
+  if (!filters.module_code) {
+    sections.value = [];
+    filters.section_code = '';
+    return;
+  }
+  try {
+  const response = await fetchSections(filters.module_code) as any;
+    sections.value = response.sections || [];
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载章节失败');
+  }
+};
+
+const search = async () => {
+  listLoading.value = true;
+  try {
+  const response = await fetchList({ ...filters }) as any;
+    list.value = response.articles || [];
+    total.value = response.total || 0;
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载文章列表失败');
+  } finally {
+    listLoading.value = false;
+  }
+};
+
+const resetFilters = () => {
+  filters.module_code = '';
+  filters.section_code = '';
+  filters.page = 1;
+  filters.limit = 20;
+  sections.value = [];
+  search();
+};
+
+const handleModuleChange = async () => {
+  filters.section_code = '';
+  await loadSections();
+  search();
+};
+
+onMounted(async () => {
+  await loadModules();
+  await search();
+});
 </script>
 
 <style scoped>
-.edit-input {
-  padding-right: 100px;
+.filter-form {
+  margin-bottom: 20px;
 }
-.cancel-btn {
-  position: absolute;
-  right: 15px;
-  top: 10px;
-}
+
 .module-select {
   width: 200px;
-  margin-right: 10px;
+  margin-right: 12px;
 }
+
 .section-select {
-  width: 200px;
+  width: 220px;
 }
+
 .tag-item {
-  margin-right: 5px;
+  margin-right: 6px;
+}
+
+.link-type {
+  color: var(--el-color-primary);
 }
 </style>

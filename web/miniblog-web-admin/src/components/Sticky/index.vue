@@ -12,7 +12,9 @@
 </template>
 
 <script>
-export default {
+import { defineComponent } from 'vue';
+
+export default defineComponent({
   name: 'Sticky',
   props: {
     stickyTop: {
@@ -35,57 +37,57 @@ export default {
       width: undefined,
       height: undefined,
       isSticky: false
-    }
+    };
   },
   mounted() {
-    this.height = this.$el.getBoundingClientRect().height
-    window.addEventListener('scroll', this.handleScroll)
-    window.addEventListener('resize', this.handleResize)
+    this.height = this.$el.getBoundingClientRect().height;
+    window.addEventListener('scroll', this.handleScroll);
+    window.addEventListener('resize', this.handleResize);
   },
   activated() {
-    this.handleScroll()
+    this.handleScroll();
   },
-  destroyed() {
-    window.removeEventListener('scroll', this.handleScroll)
-    window.removeEventListener('resize', this.handleResize)
+  unmounted() {
+    window.removeEventListener('scroll', this.handleScroll);
+    window.removeEventListener('resize', this.handleResize);
   },
   methods: {
     sticky() {
       if (this.active) {
-        return
+        return;
       }
-      this.position = 'fixed'
-      this.active = true
-      this.width = this.width + 'px'
-      this.isSticky = true
+      this.position = 'fixed';
+      this.active = true;
+      this.width = this.width + 'px';
+      this.isSticky = true;
     },
     handleReset() {
       if (!this.active) {
-        return
+        return;
       }
-      this.reset()
+      this.reset();
     },
     reset() {
-      this.position = ''
-      this.width = 'auto'
-      this.active = false
-      this.isSticky = false
+      this.position = '';
+      this.width = 'auto';
+      this.active = false;
+      this.isSticky = false;
     },
     handleScroll() {
-      const width = this.$el.getBoundingClientRect().width
-      this.width = width || 'auto'
-      const offsetTop = this.$el.getBoundingClientRect().top
+      const width = this.$el.getBoundingClientRect().width;
+      this.width = width || 'auto';
+      const offsetTop = this.$el.getBoundingClientRect().top;
       if (offsetTop < this.stickyTop) {
-        this.sticky()
-        return
+        this.sticky();
+        return;
       }
-      this.handleReset()
+      this.handleReset();
     },
     handleResize() {
       if (this.isSticky) {
-        this.width = this.$el.getBoundingClientRect().width + 'px'
+        this.width = this.$el.getBoundingClientRect().width + 'px';
       }
     }
   }
-}
+});
 </script>

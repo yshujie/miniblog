@@ -3,14 +3,14 @@
   .main-container {
     min-height: 100%;
     transition: margin-left .28s;
-    margin-left: $sideBarWidth;
+    margin-left: var(--side-bar-width);
     position: relative;
   }
 
   .sidebar-container {
     transition: width 0.28s;
-    width: $sideBarWidth !important;
-    background-color: $menuBg;
+    width: var(--side-bar-width) !important;
+    background-color: var(--menu-bg);
     height: 100%;
     position: fixed;
     font-size: 0px;
@@ -47,13 +47,19 @@
       display: none;
     }
 
-    a {
+    a.link {
       display: inline-block;
       width: 100%;
       overflow: hidden;
+      // display: flex;
+      // width: 100%;
+      // overflow: hidden;
+      // align-items: center;
+      // justify-content: left;
     }
 
     .svg-icon {
+      flex-shrink: 0;
       margin-right: 16px;
     }
 
@@ -70,23 +76,23 @@
 
     // menu hover
     .submenu-title-noDropdown,
-    .el-submenu__title {
+    .el-sub-menu__title {
       &:hover {
-        background-color: $menuHover !important;
+        background-color: var(--menu-hover) !important;
       }
     }
 
-    .is-active>.el-submenu__title {
-      color: $subMenuActiveText !important;
+    .is-active>.el-sub-menu__title {
+      color: var(--sub-menu-active-text) !important;
     }
 
-    & .nest-menu .el-submenu>.el-submenu__title,
-    & .el-submenu .el-menu-item {
-      min-width: $sideBarWidth !important;
-      background-color: $subMenuBg !important;
+    & .nest-menu .el-sub-menu>.el-sub-menu__title,
+    & .el-sub-menu .el-menu-item {
+      min-width: var(--side-bar-width) !important;
+      background-color: var(--sub-menu-bg) !important;
 
       &:hover {
-        background-color: $subMenuHover !important;
+        background-color: var(--sub-menu-hover) !important;
       }
     }
   }
@@ -103,24 +109,27 @@
     .submenu-title-noDropdown {
       padding: 0 !important;
       position: relative;
+      .text-one-added {
+        display: none;
+      }
 
       .el-tooltip {
         padding: 0 !important;
+      }
 
-        .svg-icon {
-          margin-left: 20px;
-        }
+      .svg-icon {
+        margin-left: 20px;
+      }
 
-        .sub-el-icon {
-          margin-left: 19px;
-        }
+      .sub-el-icon {
+        margin-left: 19px;
       }
     }
 
-    .el-submenu {
+    .el-sub-menu {
       overflow: hidden;
 
-      &>.el-submenu__title {
+      &>.el-sub-menu__title {
         padding: 0 !important;
 
         .svg-icon {
@@ -131,15 +140,15 @@
           margin-left: 19px;
         }
 
-        .el-submenu__icon-arrow {
+        .el-sub-menu__icon-arrow {
           display: none;
         }
       }
     }
 
     .el-menu--collapse {
-      .el-submenu {
-        &>.el-submenu__title {
+      .el-sub-menu {
+        &>.el-sub-menu__title {
           &>span {
             height: 0;
             width: 0;
@@ -152,8 +161,8 @@
     }
   }
 
-  .el-menu--collapse .el-menu .el-submenu {
-    min-width: $sideBarWidth !important;
+  .el-menu--collapse .el-menu .el-sub-menu {
+    min-width: var(--side-bar-width) !important;
   }
 
   // mobile responsive
@@ -164,14 +173,14 @@
 
     .sidebar-container {
       transition: transform .28s;
-      width: $sideBarWidth !important;
+      width: var(--side-bar-width) !important;
     }
 
     &.hideSidebar {
       .sidebar-container {
         pointer-events: none;
         transition-duration: 0.3s;
-        transform: translate3d(-$sideBarWidth, 0, 0);
+        transform: translate3d(calc(0% - var(--side-bar-width)), 0, 0);
       }
     }
   }
@@ -191,17 +200,22 @@
     .svg-icon {
       margin-right: 16px;
     }
+
     .sub-el-icon {
       margin-right: 12px;
       margin-left: -2px;
     }
   }
 
-  .nest-menu .el-submenu>.el-submenu__title,
+  .nest-menu .el-sub-menu>.el-sub-menu__title,
   .el-menu-item {
+    .text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     &:hover {
-      // you can use $subMenuHover
-      background-color: $menuHover !important;
+      // you can use var(--sub-menu-hover)
+      background-color: var(--menu-hover) !important;
     }
   }
 

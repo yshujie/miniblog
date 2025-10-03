@@ -1,16 +1,21 @@
-@import './variables.scss';
-@import './mixin.scss';
-@import './transition.scss';
-@import './element-ui.scss';
-@import './sidebar.scss';
-@import './btn.scss';
+// import dark theme
+@use "element-plus/theme-chalk/src/dark/css-vars.scss" as *;
+@use "./element-variables.scss";
+@use "./element-ui.scss";
+@use './sidebar.scss';
+
+// :root {
+//   --ep-color-primary: red;
+// }
 
 body {
   height: 100%;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-family: Helvetica Neue, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+  margin: 0;
 }
 
 label {
@@ -39,6 +44,19 @@ html {
 .padding-content {
   padding: 4px 0;
 }
+
+a {
+  color: var(--ep-color-primary);
+}
+
+code {
+  border-radius: 2px;
+  padding: 2px 4px;
+  background-color: var(--ep-color-primary-light-9);
+  color: var(--ep-color-primary);
+}
+
+
 
 a:focus,
 a:active {
@@ -152,19 +170,12 @@ aside {
     color: #fff;
   }
 
-  // 草稿
   &.draft {
-    background: #707070;
+    background: #d0d0d0;
   }
 
-  // 已发布
-  &.published {
-    background: #007bff;
-  }
-
-  // 已下架
-  &.unpublished {
-    background: #6c757d;
+  &.deleted {
+    background: #d0d0d0;
   }
 }
 

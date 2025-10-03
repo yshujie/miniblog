@@ -5,9 +5,10 @@
 </template>
 
 <script>
-import { isExternal } from '@/utils/validate'
+import { isExternal } from '@/utils/validate';
+import { defineComponent } from 'vue';
 
-export default {
+export default defineComponent({
   props: {
     to: {
       type: String,
@@ -16,13 +17,13 @@ export default {
   },
   computed: {
     isExternal() {
-      return isExternal(this.to)
+      return isExternal(this.to);
     },
     type() {
       if (this.isExternal) {
-        return 'a'
+        return 'a';
       }
-      return 'router-link'
+      return 'router-link';
     }
   },
   methods: {
@@ -32,12 +33,12 @@ export default {
           href: to,
           target: '_blank',
           rel: 'noopener'
-        }
+        };
       }
       return {
         to: to
-      }
+      };
     }
   }
-}
+});
 </script>

@@ -3,10 +3,11 @@
 </template>
 
 <script>
-import echarts from 'echarts'
-import resize from './mixins/resize'
+import { defineComponent } from 'vue';
+import * as echarts from 'echarts';
+import resize from './mixins/resize';
 
-export default {
+export default defineComponent({
   mixins: [resize],
   props: {
     className: {
@@ -29,29 +30,29 @@ export default {
   data() {
     return {
       chart: null
-    }
+    };
   },
   mounted() {
-    this.initChart()
+    this.initChart();
   },
-  beforeDestroy() {
+  beforeUnmount() {
     if (!this.chart) {
-      return
+      return;
     }
-    this.chart.dispose()
-    this.chart = null
+    this.chart.dispose();
+    this.chart = null;
   },
   methods: {
     initChart() {
-      this.chart = echarts.init(document.getElementById(this.id))
+      this.chart = echarts.init(document.getElementById(this.id));
 
-      const xAxisData = []
-      const data = []
-      const data2 = []
+      const xAxisData = [];
+      const data = [];
+      const data2 = [];
       for (let i = 0; i < 50; i++) {
-        xAxisData.push(i)
-        data.push((Math.sin(i / 5) * (i / 5 - 10) + i / 6) * 5)
-        data2.push((Math.sin(i / 5) * (i / 5 + 10) + i / 6) * 3)
+        xAxisData.push(i);
+        data.push((Math.sin(i / 5) * (i / 5 - 10) + i / 6) * 5);
+        data2.push((Math.sin(i / 5) * (i / 5 + 10) + i / 6) * 3);
       }
       this.chart.setOption({
         backgroundColor: '#08263a',
@@ -100,12 +101,10 @@ export default {
           data: data2,
           z: 1,
           itemStyle: {
-            normal: {
-              opacity: 0.4,
-              barBorderRadius: 5,
-              shadowBlur: 3,
-              shadowColor: '#111'
-            }
+            opacity: 0.4,
+            barBorderRadius: 5,
+            shadowBlur: 3,
+            shadowColor: '#111'
           }
         }, {
           name: 'Simulate Shadow',
@@ -117,16 +116,12 @@ export default {
           animationEasing: 'linear',
           animationDuration: 1200,
           lineStyle: {
-            normal: {
-              color: 'transparent'
-            }
+            color: 'transparent'
           },
           areaStyle: {
-            normal: {
-              color: '#08263a',
-              shadowBlur: 50,
-              shadowColor: '#000'
-            }
+            color: '#08263a',
+            shadowBlur: 50,
+            shadowColor: '#000'
           }
         }, {
           name: 'front',
@@ -135,21 +130,19 @@ export default {
           xAxisIndex: 1,
           z: 3,
           itemStyle: {
-            normal: {
-              barBorderRadius: 5
-            }
+            barBorderRadius: 5
           }
         }],
         animationEasing: 'elasticOut',
         animationEasingUpdate: 'elasticOut',
         animationDelay(idx) {
-          return idx * 20
+          return idx * 20;
         },
         animationDelayUpdate(idx) {
-          return idx * 20
+          return idx * 20;
         }
-      })
+      });
     }
   }
-}
+});
 </script>

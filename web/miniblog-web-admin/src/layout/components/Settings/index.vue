@@ -1,26 +1,31 @@
 <template>
   <div class="drawer-container">
     <div>
-      <h3 class="drawer-title">Page style setting</h3>
+      <h3 class="drawer-title">系统设置</h3>
 
-      <div class="drawer-item">
+      <!-- <div class="drawer-item">
         <span>Theme Color</span>
         <theme-picker style="float: right;height: 26px;margin: -3px 8px 0 0;" @change="themeChange" />
-      </div>
+      </div> -->
 
       <div class="drawer-item">
-        <span>Open Tags-View</span>
+        <span>开启 Tags-View</span>
         <el-switch v-model="tagsView" class="drawer-switch" />
       </div>
 
       <div class="drawer-item">
-        <span>Fixed Header</span>
+        <span>固定 Header</span>
         <el-switch v-model="fixedHeader" class="drawer-switch" />
       </div>
 
       <div class="drawer-item">
-        <span>Sidebar Logo</span>
+        <span>侧边栏 Logo</span>
         <el-switch v-model="sidebarLogo" class="drawer-switch" />
+      </div>
+
+      <div class="drawer-item">
+        <span>侧边栏子目录气泡显示</span>
+        <el-switch v-model="secondMenuPopup" class="drawer-switch" />
       </div>
 
     </div>
@@ -28,57 +33,72 @@
 </template>
 
 <script>
-import ThemePicker from '@/components/ThemePicker'
+// import ThemePicker from '@/components/ThemePicker';
+import { defineComponent } from 'vue';
+import store from '@/store';
 
-export default {
-  components: { ThemePicker },
+export default defineComponent({
+  components: {
+    // ThemePicker
+  },
   data() {
-    return {}
+    return {};
   },
   computed: {
     fixedHeader: {
       get() {
-        return this.$store.state.settings.fixedHeader
+        return store.settings().fixedHeader;
       },
       set(val) {
-        this.$store.dispatch('settings/changeSetting', {
+        store.settings().changeSetting({
           key: 'fixedHeader',
           value: val
-        })
+        });
       }
     },
     tagsView: {
       get() {
-        return this.$store.state.settings.tagsView
+        return store.settings().tagsView;
       },
       set(val) {
-        this.$store.dispatch('settings/changeSetting', {
+        store.settings().changeSetting({
           key: 'tagsView',
           value: val
-        })
+        });
       }
     },
     sidebarLogo: {
       get() {
-        return this.$store.state.settings.sidebarLogo
+        return store.settings().sidebarLogo;
       },
       set(val) {
-        this.$store.dispatch('settings/changeSetting', {
+        store.settings().changeSetting({
           key: 'sidebarLogo',
           value: val
-        })
+        });
+      }
+    },
+    secondMenuPopup: {
+      get() {
+        return store.settings().secondMenuPopup;
+      },
+      set(val) {
+        store.settings().changeSetting({
+          key: 'secondMenuPopup',
+          value: val
+        });
       }
     }
   },
   methods: {
     themeChange(val) {
-      this.$store.dispatch('settings/changeSetting', {
+      store.settings().changeSetting({
         key: 'theme',
         value: val
-      })
+      });
     }
   }
-}
+});
 </script>
 
 <style lang="scss" scoped>
@@ -96,6 +116,9 @@ export default {
   }
 
   .drawer-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     color: rgba(0, 0, 0, .65);
     font-size: 14px;
     padding: 12px 0;

@@ -1,5 +1,5 @@
 <template>
-  <div class="sidebar-logo-container" :class="{'collapse':collapse}">
+  <div class="sidebar-logo-container" :class="{ 'collapse': collapse }">
     <transition name="sidebarLogoFade">
       <router-link v-if="collapse" key="collapse" class="sidebar-logo-link" to="/">
         <img v-if="logo" :src="logo" class="sidebar-logo">
@@ -14,7 +14,9 @@
 </template>
 
 <script>
-export default {
+import { defineComponent } from 'vue';
+
+export default defineComponent({
   name: 'SidebarLogo',
   props: {
     collapse: {
@@ -24,11 +26,11 @@ export default {
   },
   data() {
     return {
-      title: 'Vue Element Admin',
+      title: 'Vue3 Element Admin',
       logo: 'https://wpimg.wallstcn.com/69a1c46c-eb1c-4b46-8bd4-e9e686ef5251.png'
-    }
+    };
   }
-}
+});
 </script>
 
 <style lang="scss" scoped>

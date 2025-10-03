@@ -110,9 +110,10 @@
 </template>
 
 <script>
+import { defineComponent } from 'vue';
 // source:https://github.com/wemake-services/vue-material-input/blob/master/src/components/MaterialInput.vue
 
-export default {
+export default defineComponent({
   name: 'MdInput',
   props: {
     /* eslint-disable */
@@ -122,7 +123,7 @@ export default {
       type: String,
       default: 'text'
     },
-    value: [String, Number],
+    modelValue: [String, Number],
     placeholder: String,
     readonly: Boolean,
     disabled: Boolean,
@@ -146,7 +147,7 @@ export default {
   },
   data() {
     return {
-      currentValue: this.value,
+      currentValue: this.modelValue,
       focus: false,
       fillPlaceHolder: null
     }
@@ -161,14 +162,14 @@ export default {
     }
   },
   watch: {
-    value(newValue) {
+    modelValue(newValue) {
       this.currentValue = newValue
     }
   },
   methods: {
     handleModelInput(event) {
       const value = event.target.value
-      this.$emit('input', value)
+      this.$emit('update:modelValue', value)
       if (this.$parent.$options.componentName === 'ElFormItem') {
         if (this.validateEvent) {
           this.$parent.$emit('el.form.change', [value])
@@ -194,7 +195,7 @@ export default {
       }
     }
   }
-}
+})
 </script>
 
 <style lang="scss" scoped>
@@ -264,7 +265,7 @@ export default {
     }
     .material-input {
       font-size: $font-size-base;
-      padding: $spacer $spacer $spacer - $apixel * 10 $spacer / 2;
+      padding: $spacer $spacer $spacer - $apixel * 10 $spacer * 0.5;
       display: block;
       width: 100%;
       border: none;
