@@ -12,9 +12,6 @@ ENV HTTPS_PROXY=${HTTPS_PROXY}
 # 设置工作目录
 WORKDIR /app
 
-# 安装 git 和 openssh（npm 某些依赖需要通过 git 安装）
-RUN apk add --no-cache git openssh-client
-
 # 只复制依赖清单,先安装依赖(最大化缓存)
 COPY package*.json ./
 
