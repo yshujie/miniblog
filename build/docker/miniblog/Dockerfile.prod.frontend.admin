@@ -30,10 +30,10 @@ RUN git config --global url."https://mirror.ghproxy.com/https://github.com/".ins
   git config --global url."https://mirror.ghproxy.com/https://github.com/".insteadOf "git://github.com/" && \
   git config --global url."https://mirror.ghproxy.com/https://github.com/".insteadOf "https://github.com/"
 
-# 设置环境变量，禁用 SSH 以强制使用 HTTPS
-ENV GIT_SSH_COMMAND="echo 'SSH is disabled, please use HTTPS' && exit 1"
+# 删除 package-lock.json 避免其中写死的 git SSH URL，让 npm 根据 git config 重新解析
+RUN rm -f package-lock.json
 
-# 安装依赖
+# 安装依赖（会根据 package.json 和 git config 重新生成 lock 文件）
 RUN npm install
 
 # 再复制剩余代码
