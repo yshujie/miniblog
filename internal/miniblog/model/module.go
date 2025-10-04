@@ -33,6 +33,9 @@ func (m *Module) BeforeCreate(tx *gorm.DB) (err error) {
 	m.ID = idutil.GetIntID()
 	m.CreatedAt = time.Now()
 	m.UpdatedAt = time.Now()
+	if m.Status == 0 {
+		m.Status = ModuleStatusNormal
+	}
 	return
 }
 

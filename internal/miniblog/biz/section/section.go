@@ -50,20 +50,20 @@ func (b *sectionBiz) Create(ctx context.Context, r *v1.CreateSectionRequest) (*v
 	}
 
 	// 创建 section 记录
-	err = b.ds.Sections().Create(&model.Section{
+	section := &model.Section{
 		Code:       r.Code,
 		Title:      r.Title,
 		ModuleCode: r.ModuleCode,
-	})
-	if err != nil {
+	}
+	if err = b.ds.Sections().Create(section); err != nil {
 		return nil, err
 	}
 
 	return &v1.CreateSectionResponse{
 		Section: &v1.SectionInfo{
-			Code:       r.Code,
-			Title:      r.Title,
-			ModuleCode: r.ModuleCode,
+			Code:       section.Code,
+			Title:      section.Title,
+			ModuleCode: section.ModuleCode,
 		},
 	}, nil
 }
@@ -76,7 +76,7 @@ func (b *sectionBiz) GetList(ctx context.Context, moduleCode string) (*v1.GetSec
 	}
 
 	response := &v1.GetSectionListResponse{
-		Sections: make([]*v1.SectionInfo, 0),
+		Sections: make([]*v1.SectionInfo, 0, len(sections)),
 	}
 	for _, section := range sections {
 		response.Sections = append(response.Sections, &v1.SectionInfo{
@@ -94,6 +94,9 @@ func (b *sectionBiz) GetOne(ctx context.Context, code string) (*v1.GetSectionRes
 	section, err := b.ds.Sections().GetByCode(code)
 	if err != nil {
 		return nil, err
+	}
+	if section == nil {
+		return nil, errno.ErrSectionNotFound
 	}
 
 	return &v1.GetSectionResponse{

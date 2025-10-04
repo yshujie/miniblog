@@ -41,19 +41,21 @@ func (b *moduleBiz) Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.
 	}
 
 	// 创建 module 记录
-	err = b.ds.Modules().Create(&model.Module{
+	module = &model.Module{
 		Code:  r.Code,
 		Title: r.Title,
-	})
-	if err != nil {
+	}
+	if err = b.ds.Modules().Create(module); err != nil {
 		return nil, err
 	}
 
 	// 返回响应 CreateModuleResponse
 	response := &v1.CreateModuleResponse{
 		Module: &v1.ModuleInfo{
-			Code:  r.Code,
-			Title: r.Title,
+			ID:     int(module.ID),
+			Code:   module.Code,
+			Title:  module.Title,
+			Status: module.Status,
 		},
 	}
 
@@ -69,12 +71,14 @@ func (b *moduleBiz) GetAll(ctx context.Context) (*v1.GetModuleListResponse, erro
 
 	// 将 modules 追加到 GetAllModulesResponse.Modules 中
 	response := &v1.GetModuleListResponse{
-		Modules: make([]*v1.ModuleInfo, 0),
+		Modules: make([]*v1.ModuleInfo, 0, len(modules)),
 	}
 	for _, module := range modules {
 		response.Modules = append(response.Modules, &v1.ModuleInfo{
-			Code:  module.Code,
-			Title: module.Title,
+			ID:     int(module.ID),
+			Code:   module.Code,
+			Title:  module.Title,
+			Status: module.Status,
 		})
 	}
 
@@ -87,11 +91,16 @@ func (b *moduleBiz) GetOne(ctx context.Context, code string) (*v1.GetOneModuleRe
 	if err != nil {
 		return nil, err
 	}
+	if module == nil {
+		return nil, errno.ErrModuleNotFound
+	}
 
 	return &v1.GetOneModuleResponse{
 		Module: &v1.ModuleInfo{
-			Code:  module.Code,
-			Title: module.Title,
+			ID:     int(module.ID),
+			Code:   module.Code,
+			Title:  module.Title,
+			Status: module.Status,
 		},
 	}, nil
 }

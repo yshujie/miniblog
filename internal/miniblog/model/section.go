@@ -35,6 +35,9 @@ func (s *Section) BeforeCreate(tx *gorm.DB) (err error) {
 	s.ID = idutil.GetIntID()
 	s.CreatedAt = time.Now()
 	s.UpdatedAt = time.Now()
+	if s.Status == 0 {
+		s.Status = SectionStatusNormal
+	}
 	return
 }
 
