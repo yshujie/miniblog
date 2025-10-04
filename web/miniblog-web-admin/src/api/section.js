@@ -13,3 +13,11 @@ export function fetchSections(moduleCode) {
     method: 'get'
   });
 }
+
+export function createSection(data) {
+  return request({
+    url: '/sections',
+    method: 'post',
+    data
+  });
+}
