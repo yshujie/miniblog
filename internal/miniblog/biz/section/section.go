@@ -60,6 +60,9 @@ func (b *sectionBiz) Create(ctx context.Context, r *v1.CreateSectionRequest) (*v
 		Title:      r.Title,
 		ModuleCode: r.ModuleCode,
 	}
+	if r.Sort != nil {
+		section.Sort = *r.Sort
+	}
 	if err = b.ds.Sections().Create(section); err != nil {
 		return nil, err
 	}

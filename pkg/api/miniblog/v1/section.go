@@ -5,6 +5,7 @@ type CreateSectionRequest struct {
 	Code       string `json:"code" valid:"required,stringlength(1|255)"`
 	Title      string `json:"title" valid:"required,stringlength(1|255)"`
 	ModuleCode string `json:"module_code" valid:"required,stringlength(1|255)"`
+	Sort       *int   `json:"sort,omitempty" valid:"optional,int"`
 }
 
 // CreateSectionResponse 创建 section 响应
