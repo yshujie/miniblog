@@ -224,14 +224,22 @@ const handleUnpublish = (moduleItem: ModuleItem) => changeModuleStatus(moduleIte
 const handleDelete = async (moduleItem: ModuleItem) => {
   if (!moduleItem?.code) return;
   try {
-    await ElMessageBox.confirm('确认删除该模块？该操作不可恢复', '确认删除', { type: 'warning' });
+    await ElMessageBox.confirm('确认删除该模块？该操作不可恢复', '确认删除', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      lockScroll: true,
+      center: true
+    });
     await moduleStore.deleteExistingModule(moduleItem.code);
     ElMessage.success('删除模块成功');
   } catch (error: any) {
-    // 用户取消或关闭弹窗时不提示错误
-    if (error === 'cancel' || error === 'close') return;
-    const message = error instanceof Error ? error.message : '删除模块失败';
-    ElMessage.error(message);
+    // 用户取消或关闭弹窗时不提示错误。Element Plus 在不同版本/环境中返回值形态可能不同，
+    // 这里兼容 string、Error、以及包含 code/message 的对象。
+    if (!error) return;
+    if (error === 'cancel' || error === 'close' || error?.code === 'cancel' || error?.code === 'close' || error?.message === 'cancel' || error?.message === 'close') return;
+    const message = error instanceof Error ? error.message : String(error);
+    ElMessage.error(message || '删除模块失败');
   }
 };
 

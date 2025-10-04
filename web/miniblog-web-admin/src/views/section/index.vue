@@ -305,14 +305,21 @@ onMounted(async () => {
 const handleDelete = async (section: SectionItem) => {
   if (!section?.code) return;
   try {
-    await ElMessageBox.confirm('确认删除该章节？该操作不可恢复', '确认删除', { type: 'warning' });
+    await ElMessageBox.confirm('确认删除该章节？该操作不可恢复', '确认删除', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      lockScroll: true,
+      center: true
+    });
     await sectionStore.deleteSection(section.code);
     ElMessage.success('删除章节成功');
     await loadSections(true);
   } catch (error: any) {
-    if (error === 'cancel' || error === 'close') return;
-    const message = error instanceof Error ? error.message : '删除章节失败';
-    ElMessage.error(message);
+    if (!error) return;
+    if (error === 'cancel' || error === 'close' || error?.code === 'cancel' || error?.code === 'close' || error?.message === 'cancel' || error?.message === 'close') return;
+    const message = error instanceof Error ? error.message : String(error);
+    ElMessage.error(message || '删除章节失败');
   }
 };
 </script>
