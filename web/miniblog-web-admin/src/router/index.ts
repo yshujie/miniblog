@@ -61,10 +61,40 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: { title: '编辑文章', hidden: true, activeMenu: '/article/list' }
       }
     ]
+  },
+  {
+    path: '/module',
+    component: Layout,
+    redirect: '/module/list',
+    name: 'Module',
+    meta: { title: '模块管理', icon: 'list', roles: ['admin'] },
+    children: [
+      {
+        path: 'list',
+        component: () => import('@/views/module/index.vue'),
+        name: 'ModuleList',
+        meta: { title: '模块列表', icon: 'list' }
+      }
+    ]
+  },
+  {
+    path: '/section',
+    component: Layout,
+    redirect: '/section/list',
+    name: 'Section',
+    meta: { title: '章节管理', icon: 'list', roles: ['admin'] },
+    children: [
+      {
+        path: 'list',
+        component: () => import('@/views/section/index.vue'),
+        name: 'SectionList',
+        meta: { title: '章节列表', icon: 'list' }
+      }
+    ]
   }
 ];
 
-const dynamicRouteNames = ['Article', 'ArticleList', 'CreateArticle', 'EditArticle'];
+const dynamicRouteNames = ['Article', 'ArticleList', 'CreateArticle', 'EditArticle', 'Module', 'ModuleList', 'Section', 'SectionList'];
 
 const createTheRouter = (): Router => createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
