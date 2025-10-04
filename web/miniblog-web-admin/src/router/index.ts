@@ -36,33 +36,6 @@ export const constantRoutes: RouteRecordRaw[] = [
 
 export const asyncRoutes: RouteRecordRaw[] = [
   {
-    path: '/article',
-    component: Layout,
-    redirect: '/article/list',
-    name: 'Article',
-    meta: { title: '文章管理', icon: 'list', roles: ['admin'] },
-    children: [
-      {
-        path: 'list',
-        component: () => import('@/views/article/list.vue'),
-        name: 'ArticleList',
-        meta: { title: '文章列表', icon: 'list' }
-      },
-      {
-        path: 'create',
-        component: () => import('@/views/article/create.vue'),
-        name: 'CreateArticle',
-        meta: { title: '新增文章', icon: 'edit' }
-      },
-      {
-        path: 'edit/:id(\\d+)',
-        component: () => import('@/views/article/edit.vue'),
-        name: 'EditArticle',
-        meta: { title: '编辑文章', hidden: true, activeMenu: '/article/list' }
-      }
-    ]
-  },
-  {
     path: '/module',
     component: Layout,
     redirect: '/module/list',
@@ -91,7 +64,34 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: { title: '章节列表', icon: 'list' }
       }
     ]
-  }
+  },
+  {
+    path: '/article',
+    component: Layout,
+    redirect: '/article/list',
+    name: 'Article',
+    meta: { title: '文章管理', icon: 'list', roles: ['admin'] },
+    children: [
+      {
+        path: 'list',
+        component: () => import('@/views/article/list.vue'),
+        name: 'ArticleList',
+        meta: { title: '文章列表', icon: 'list' }
+      },
+      {
+        path: 'create',
+        component: () => import('@/views/article/create.vue'),
+        name: 'CreateArticle',
+        meta: { title: '新增文章', icon: 'edit' }
+      },
+      {
+        path: 'edit/:id(\\d+)',
+        component: () => import('@/views/article/edit.vue'),
+        name: 'EditArticle',
+        meta: { title: '编辑文章', hidden: true, activeMenu: '/article/list' }
+      }
+    ]
+  },
 ];
 
 const dynamicRouteNames = ['Article', 'ArticleList', 'CreateArticle', 'EditArticle', 'Module', 'ModuleList', 'Section', 'SectionList'];
