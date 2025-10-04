@@ -66,6 +66,14 @@ func (f *fakeSectionStore) Update(section *model.Section) error {
 	return nil
 }
 
+func (f *fakeSectionStore) DeleteByCode(code string) error {
+	if _, ok := f.sections[code]; !ok {
+		return errors.New("section not found")
+	}
+	delete(f.sections, code)
+	return nil
+}
+
 type fakeModuleStore struct {
 	modules map[string]*model.Module
 }
@@ -89,6 +97,16 @@ func (f *fakeModuleStore) GetByCode(code string) (*model.Module, error) {
 func (f *fakeModuleStore) GetAll() ([]*model.Module, error)           { return nil, nil }
 func (f *fakeModuleStore) GetNormalModules() ([]*model.Module, error) { return nil, nil }
 func (f *fakeModuleStore) Update(_ *model.Module) error               { return nil }
+func (f *fakeModuleStore) DeleteByCode(code string) error {
+	if f.modules == nil {
+		return errors.New("modules map is nil")
+	}
+	if _, ok := f.modules[code]; !ok {
+		return errors.New("module not found")
+	}
+	delete(f.modules, code)
+	return nil
+}
 
 type fakeStore struct {
 	sections *fakeSectionStore
@@ -133,3 +151,67 @@ func TestSectionBizGetListReturnsAllStatuses(t *testing.T) {
 		t.Fatalf("expected 2 sections, got %d", len(resp.Sections))
 	}
 }
+
+// Tests for Delete behavior
+type fakeArticleStoreForSectionTest struct {
+	articles map[uint64]*model.Article
+}
+
+func (f *fakeArticleStoreForSectionTest) Create(article *model.Article) error      { return nil }
+func (f *fakeArticleStoreForSectionTest) GetOne(id uint64) (*model.Article, error) { return nil, nil }
+func (f *fakeArticleStoreForSectionTest) GetList(filter interface{}, page int, limit int) ([]*model.Article, error) {
+	m := filter.(map[string]interface{})
+	if code, ok := m["section_code"]; ok {
+		for _, a := range f.articles {
+			if a.SectionCode == code.(string) {
+				return []*model.Article{a}, nil
+			}
+		}
+	}
+	return []*model.Article{}, nil
+}
+func (f *fakeArticleStoreForSectionTest) Update(article *model.Article) error { return nil }
+
+// Test: delete fails when articles exist under section
+func TestSectionDelete_WhenHasArticles_ShouldFail(t *testing.T) {
+	sections := newFakeSectionStore()
+	sections.sections["s_del"] = &model.Section{Code: "s_del", ModuleCode: "m1", Status: model.SectionStatusNormal}
+
+	fakeArticles := &fakeArticleStoreForSectionTest{articles: map[uint64]*model.Article{1: {ID: 1, SectionCode: "s_del"}}}
+
+	// composed store defined at file scope (see composedSectionStore)
+	ms2 := &composedSectionStore{sec: sections, mod: &fakeModuleStore{modules: map[string]*model.Module{"m1": {Code: "m1"}}}, art: fakeArticles}
+	biz := sectionBiz{ds: ms2}
+
+	if err := biz.Delete(context.Background(), "s_del"); err == nil {
+		t.Fatalf("expected delete to fail due to articles, but it succeeded")
+	}
+}
+
+// Test: delete succeeds when no articles
+func TestSectionDelete_WhenNoArticles_ShouldSucceed(t *testing.T) {
+	sections := newFakeSectionStore()
+	sections.sections["s_ok"] = &model.Section{Code: "s_ok", ModuleCode: "m1", Status: model.SectionStatusNormal}
+
+	fakeArticles := &fakeArticleStoreForSectionTest{articles: map[uint64]*model.Article{}}
+
+	ms2 := &composedSectionStore{sec: sections, mod: &fakeModuleStore{modules: map[string]*model.Module{"m1": {Code: "m1"}}}, art: fakeArticles}
+	biz := sectionBiz{ds: ms2}
+
+	if err := biz.Delete(context.Background(), "s_ok"); err != nil {
+		t.Fatalf("expected delete to succeed, got error: %v", err)
+	}
+}
+
+// composedSectionStore implements IStore for section tests
+type composedSectionStore struct {
+	sec store.SectionStore
+	mod store.ModuleStore
+	art store.ArticleStore
+}
+
+func (c *composedSectionStore) DB() *gorm.DB                 { return nil }
+func (c *composedSectionStore) Users() store.UserStore       { return nil }
+func (c *composedSectionStore) Modules() store.ModuleStore   { return c.mod }
+func (c *composedSectionStore) Sections() store.SectionStore { return c.sec }
+func (c *composedSectionStore) Articles() store.ArticleStore { return c.art }

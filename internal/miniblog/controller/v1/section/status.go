@@ -33,3 +33,16 @@ func (c *SectionController) Unpublish(ctx *gin.Context) {
 
 	core.WriteResponse(ctx, nil, resp)
 }
+
+// Delete 物理删除 section
+func (c *SectionController) Delete(ctx *gin.Context) {
+	log.C(ctx).Infow("Delete section function called")
+
+	if err := c.biz.SectionBiz().Delete(ctx, ctx.Param("code")); err != nil {
+		log.C(ctx).Errorw("delete section failed", "error", err, "code", ctx.Param("code"))
+		core.WriteResponse(ctx, err, nil)
+		return
+	}
+
+	core.WriteResponse(ctx, nil, nil)
+}

@@ -11,6 +11,8 @@ type ModuleStore interface {
 	GetAll() ([]*model.Module, error)
 	GetNormalModules() ([]*model.Module, error)
 	Update(module *model.Module) error
+	// DeleteByCode physically deletes a module record by its code
+	DeleteByCode(code string) error
 }
 
 // ModuleStore 接口的实现
@@ -63,4 +65,9 @@ func (m *modules) GetNormalModules() ([]*model.Module, error) {
 // Update 更新模块
 func (m *modules) Update(module *model.Module) error {
 	return m.db.Save(module).Error
+}
+
+// DeleteByCode physically deletes a module by code
+func (m *modules) DeleteByCode(code string) error {
+	return m.db.Where("code = ?", code).Delete(&model.Module{}).Error
 }

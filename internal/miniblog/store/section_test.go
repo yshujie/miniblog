@@ -69,3 +69,25 @@ func TestSectionsStore_Getters(t *testing.T) {
 		t.Fatalf("unexpected section for moduleB: %+v", normalModuleB[0])
 	}
 }
+
+func TestSectionsStore_DeleteByCode(t *testing.T) {
+	db := setupSectionTestDB(t)
+	store := newSections(db)
+
+	s := &model.Section{Code: "dels", Title: "ToDelete", ModuleCode: "moduleX", Sort: 1, Status: model.SectionStatusNormal}
+	if err := store.Create(s); err != nil {
+		t.Fatalf("failed to create section: %v", err)
+	}
+
+	if err := store.DeleteByCode("dels"); err != nil {
+		t.Fatalf("DeleteByCode returned error: %v", err)
+	}
+
+	got, err := store.GetByCode("dels")
+	if err != nil {
+		t.Fatalf("GetByCode after delete returned error: %v", err)
+	}
+	if got != nil {
+		t.Fatalf("expected section to be deleted, but found: %+v", got)
+	}
+}

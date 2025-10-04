@@ -17,6 +17,8 @@ type ISectionBiz interface {
 	Unpublish(ctx context.Context, code string) (*v1.SectionStatusResponse, error)
 	GetList(ctx context.Context, moduleCode string) (*v1.GetSectionListResponse, error)
 	GetOne(ctx context.Context, code string) (*v1.GetSectionResponse, error)
+	// Delete physically deletes a section by code
+	Delete(ctx context.Context, code string) error
 }
 
 // sectionBiz 模块业务实现
@@ -157,6 +159,29 @@ func (b *sectionBiz) GetOne(ctx context.Context, code string) (*v1.GetSectionRes
 	return &v1.GetSectionResponse{
 		Section: toSectionInfo(section),
 	}, nil
+}
+
+// Delete 物理删除章节
+func (b *sectionBiz) Delete(ctx context.Context, code string) error {
+	section, err := b.ds.Sections().GetByCode(code)
+	if err != nil {
+		return err
+	}
+	if section == nil {
+		return errno.ErrSectionNotFound
+	}
+
+	// 检查是否存在关联的 articles
+	filter := map[string]interface{}{"section_code": code}
+	articles, err := b.ds.Articles().GetList(filter, 1, 1)
+	if err != nil {
+		return err
+	}
+	if len(articles) > 0 {
+		return errno.ErrSectionHasArticles
+	}
+
+	return b.ds.Sections().DeleteByCode(code)
 }
 
 func toSectionInfo(section *model.Section) *v1.SectionInfo {

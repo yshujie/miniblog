@@ -57,4 +57,10 @@ var (
 
 	// ErrUpdateArticleFailed 更新文章失败
 	ErrUpdateArticleFailed = &Errno{HTTP: 500, Code: "ErrUpdateArticleFailed", Message: "更新文章失败"}
+
+	// ErrModuleHasDependents 模块下存在关联的 section 或 article，不能删除
+	ErrModuleHasDependents = &Errno{HTTP: 400, Code: "ErrModuleHasDependents", Message: "模块下存在关联记录，不能删除"}
+
+	// ErrSectionHasArticles 章节下存在关联的 article，不能删除
+	ErrSectionHasArticles = &Errno{HTTP: 400, Code: "ErrSectionHasArticles", Message: "章节下存在文章，不能删除"}
 )

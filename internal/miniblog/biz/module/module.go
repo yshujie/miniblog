@@ -17,6 +17,8 @@ type IModuleBiz interface {
 	Unpublish(ctx context.Context, code string) (*v1.ModuleStatusResponse, error)
 	GetAll(ctx context.Context) (*v1.GetModuleListResponse, error)
 	GetOne(ctx context.Context, code string) (*v1.GetOneModuleResponse, error)
+	// Delete physically deletes a module by code
+	Delete(ctx context.Context, code string) error
 }
 
 // moduleBiz 模块业务实现
@@ -42,7 +44,6 @@ func (b *moduleBiz) Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.
 	if module != nil {
 		return nil, errno.ErrModuleAlreadyExists
 	}
-
 	// 创建 module 记录
 	module = &model.Module{
 		Code:  r.Code,
@@ -58,6 +59,38 @@ func (b *moduleBiz) Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.
 	}
 
 	return response, nil
+}
+
+// Delete 物理删除模块，删除前检查是否存在关联的 section 或 article
+func (b *moduleBiz) Delete(ctx context.Context, code string) error {
+	module, err := b.ds.Modules().GetByCode(code)
+	if err != nil {
+		return err
+	}
+	if module == nil {
+		return errno.ErrModuleNotFound
+	}
+
+	// 检查是否存在关联的 sections
+	sections, err := b.ds.Sections().GetSections(code)
+	if err != nil {
+		return err
+	}
+	if len(sections) > 0 {
+		return errno.ErrModuleHasDependents
+	}
+
+	// 检查是否存在关联的 articles（article 可能直接引用 module_code）
+	filter := map[string]interface{}{"module_code": code}
+	articles, err := b.ds.Articles().GetList(filter, 1, 1)
+	if err != nil {
+		return err
+	}
+	if len(articles) > 0 {
+		return errno.ErrModuleHasDependents
+	}
+
+	return b.ds.Modules().DeleteByCode(code)
 }
 
 // Update 更新模块

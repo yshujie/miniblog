@@ -11,6 +11,8 @@ type SectionStore interface {
 	GetSections(moduleCode string) ([]*model.Section, error)
 	GetNormalSections(moduleCode string) ([]*model.Section, error)
 	Update(section *model.Section) error
+	// DeleteByCode physically deletes a section record by its code
+	DeleteByCode(code string) error
 }
 
 // SectionStore 接口的实现
@@ -57,4 +59,9 @@ func (s *sections) GetNormalSections(moduleCode string) ([]*model.Section, error
 // Update 更新章节
 func (s *sections) Update(section *model.Section) error {
 	return s.db.Save(section).Error
+}
+
+// DeleteByCode physically deletes a section by code
+func (s *sections) DeleteByCode(code string) error {
+	return s.db.Where("code = ?", code).Delete(&model.Section{}).Error
 }

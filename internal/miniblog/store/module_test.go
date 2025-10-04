@@ -68,3 +68,25 @@ func TestModuleStore_GettersAndUpdate(t *testing.T) {
 		t.Fatalf("expected updated title, got %s", updated.Title)
 	}
 }
+
+func TestModuleStore_DeleteByCode(t *testing.T) {
+	db := setupModuleTestDB(t)
+	store := newModules(db)
+
+	m := &model.Module{Code: "delm", Title: "ToDelete", Status: model.ModuleStatusNormal}
+	if err := store.Create(m); err != nil {
+		t.Fatalf("failed to create module: %v", err)
+	}
+
+	if err := store.DeleteByCode("delm"); err != nil {
+		t.Fatalf("DeleteByCode returned error: %v", err)
+	}
+
+	got, err := store.GetByCode("delm")
+	if err != nil {
+		t.Fatalf("GetByCode after delete returned error: %v", err)
+	}
+	if got != nil {
+		t.Fatalf("expected module to be deleted, but found: %+v", got)
+	}
+}

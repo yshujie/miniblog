@@ -87,6 +87,7 @@ func installRouters(g *gin.Engine) error {
 				modulesv1.PUT(":code", mc.Update)              // 更新模块
 				modulesv1.PUT(":code/publish", mc.Publish)     // 上架模块
 				modulesv1.PUT(":code/unpublish", mc.Unpublish) // 下架模块
+				modulesv1.DELETE(":code", mc.Delete)           // 删除模块（物理删除）
 			}
 
 			// sections 路由分组
@@ -98,6 +99,7 @@ func installRouters(g *gin.Engine) error {
 				sectionsv1.PUT(":code", sc.Update)              // 更新章节
 				sectionsv1.PUT(":code/publish", sc.Publish)     // 上架章节
 				sectionsv1.PUT(":code/unpublish", sc.Unpublish) // 下架章节
+				sectionsv1.DELETE(":code", sc.Delete)           // 删除章节（物理删除）
 			}
 
 			// articles 路由分组

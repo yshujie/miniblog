@@ -33,3 +33,16 @@ func (c *ModuleController) Unpublish(ctx *gin.Context) {
 
 	core.WriteResponse(ctx, nil, resp)
 }
+
+// Delete 物理删除模块
+func (c *ModuleController) Delete(ctx *gin.Context) {
+	log.C(ctx).Infow("Delete module function called")
+
+	if err := c.biz.ModuleBiz().Delete(ctx, ctx.Param("code")); err != nil {
+		log.C(ctx).Errorw("delete module failed", "error", err, "code", ctx.Param("code"))
+		core.WriteResponse(ctx, err, nil)
+		return
+	}
+
+	core.WriteResponse(ctx, nil, nil)
+}
