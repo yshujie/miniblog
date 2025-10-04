@@ -110,14 +110,9 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import Pagination from '@/components/Pagination/index.vue';
 import { fetchList } from '@/api/article';
-import { fetchSections } from '@/api/section';
 import useModuleStore from '@/store/modules/module';
 import type { ModuleItem } from '@/store/modules/module';
-
-interface SectionItem {
-  code: string;
-  title: string;
-}
+import useSectionStore, { type SectionItem } from '@/store/modules/section';
 
 interface ArticleFilters {
   module_code: string;
@@ -136,22 +131,19 @@ interface ArticleItem {
   status?: string;
 }
 
-interface FetchSectionsResponse {
-  sections?: SectionItem[];
-}
-
 interface FetchArticlesResponse {
   articles?: ArticleItem[];
   total?: number;
 }
 
 const moduleStore = useModuleStore();
+const sectionStore = useSectionStore();
 
 const list = ref<ArticleItem[]>([]);
 const total = ref(0);
 const listLoading = ref(false);
 const modules = computed<ModuleItem[]>(() => moduleStore.modules);
-const sections = ref<SectionItem[]>([]);
+const sections = computed<SectionItem[]>(() => sectionStore.getSectionsByModule(filters.module_code));
 
 const filters = reactive<ArticleFilters>({
   module_code: '',
@@ -194,13 +186,11 @@ const loadModules = async () => {
 
 const loadSections = async () => {
   if (!filters.module_code) {
-    sections.value = [];
     filters.section_code = '';
     return;
   }
   try {
-    const response = await fetchSections(filters.module_code) as FetchSectionsResponse;
-    sections.value = response.sections ?? [];
+    await sectionStore.fetchSections(filters.module_code);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '加载章节失败';
     ElMessage.error(message);
@@ -226,7 +216,6 @@ const resetFilters = () => {
   filters.section_code = '';
   filters.page = 1;
   filters.limit = 20;
-  sections.value = [];
   search();
 };
 

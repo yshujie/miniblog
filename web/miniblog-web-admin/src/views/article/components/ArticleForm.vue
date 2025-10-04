@@ -92,14 +92,9 @@ import { useRoute, useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { fetchArticle, createArticle, updateArticle, publishArticle, unpublishArticle } from '@/api/article';
-import { fetchSections } from '@/api/section';
 import useModuleStore from '@/store/modules/module';
 import type { ModuleItem } from '@/store/modules/module';
-
-interface SectionItem {
-  code: string;
-  title: string;
-}
+import useSectionStore, { type SectionItem } from '@/store/modules/section';
 
 interface ArticleFormState {
   id: string | number;
@@ -111,10 +106,6 @@ interface ArticleFormState {
   tags: string[];
   external_link: string;
   content: string;
-}
-
-interface FetchSectionsResponse {
-  sections?: SectionItem[];
 }
 
 interface ArticleDetails extends ArticleFormState {
@@ -136,11 +127,12 @@ const route = useRoute();
 const router = useRouter();
 
 const moduleStore = useModuleStore();
+const sectionStore = useSectionStore();
 
 const formRef = ref<FormInstance>();
 const loading = ref(false);
 const modules = computed<ModuleItem[]>(() => moduleStore.modules);
-const sections = ref<SectionItem[]>([]);
+const sections = computed<SectionItem[]>(() => sectionStore.getSectionsByModule(postForm.module_code));
 
 const postForm = reactive<ArticleFormState>({
   id: '',
@@ -215,13 +207,11 @@ const loadModules = async () => {
 
 const loadSections = async (moduleCode: string) => {
   if (!moduleCode) {
-    sections.value = [];
     postForm.section_code = '';
     return;
   }
   try {
-    const response = await fetchSections(moduleCode) as FetchSectionsResponse;
-    sections.value = response.sections ?? [];
+    await sectionStore.fetchSections(moduleCode);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '加载章节失败';
     ElMessage.error(message);

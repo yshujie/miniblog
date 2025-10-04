@@ -8,7 +8,8 @@ import (
 type SectionStore interface {
 	Create(section *model.Section) error
 	GetByCode(code string) (*model.Section, error)
-	GetListByModuleCode(moduleCode string) ([]*model.Section, error)
+	GetSections(moduleCode string) ([]*model.Section, error)
+	GetNormalSections(moduleCode string) ([]*model.Section, error)
 	Update(section *model.Section) error
 }
 
@@ -42,8 +43,13 @@ func (s *sections) GetByCode(code string) (*model.Section, error) {
 	return &section, nil
 }
 
-// GetListByModuleCode 获取章节列表
-func (s *sections) GetListByModuleCode(moduleCode string) ([]*model.Section, error) {
+// GetSections 获取章节列表
+func (s *sections) GetSections(moduleCode string) ([]*model.Section, error) {
+	var sections []*model.Section
+	return sections, s.db.Where("module_code = ?", moduleCode).Order("sort asc").Find(&sections).Error
+}
+
+func (s *sections) GetNormalSections(moduleCode string) ([]*model.Section, error) {
 	var sections []*model.Section
 	return sections, s.db.Where("module_code = ?", moduleCode).Where("status = ?", model.SectionStatusNormal).Order("sort asc").Find(&sections).Error
 }

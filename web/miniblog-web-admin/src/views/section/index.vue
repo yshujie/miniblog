@@ -16,7 +16,7 @@
         />
       </el-select>
       <el-button type="primary" :disabled="!moduleOptions.length" @click="openCreateDialog">新增章节</el-button>
-      <el-button :loading="loading" @click="loadSections">刷新</el-button>
+      <el-button :loading="loading" @click="() => loadSections(true)">刷新</el-button>
     </div>
 
     <el-empty v-if="!sections.length && !loading" :description="emptyDescription" />
@@ -100,28 +100,16 @@ import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import useModuleStore from '@/store/modules/module';
 import type { ModuleItem } from '@/store/modules/module';
-import { fetchSections, createSection, updateSection, publishSection, unpublishSection } from '@/api/section';
-
-interface SectionItem {
-  code: string;
-  title: string;
-  sort?: number;
-  status?: number;
-  module_code?: string;
-  moduleCode?: string;
-}
-
-interface FetchSectionsResponse {
-  sections?: SectionItem[];
-}
+import useSectionStore, { SectionItem } from '@/store/modules/section';
 
 const moduleStore = useModuleStore();
+const sectionStore = useSectionStore();
 const moduleOptions = computed<ModuleItem[]>(() => moduleStore.modules);
 const selectedModuleCode = ref('');
 const NORMAL_STATUS = 1;
 
-const sections = ref<SectionItem[]>([]);
-const loading = ref(false);
+const sections = computed(() => sectionStore.getSectionsByModule(selectedModuleCode.value));
+const loading = computed(() => Boolean(selectedModuleCode.value && sectionStore.loadingModules[selectedModuleCode.value]));
 
 const formDialogVisible = ref(false);
 const formSubmitting = ref(false);
@@ -138,6 +126,8 @@ const formModel = reactive({
   title: '',
   sort: 0
 });
+
+const dialogTitle = computed(() => (dialogMode.value === 'create' ? '新增章节' : '编辑章节'));
 
 const formRules: FormRules = {
   module_code: [{ required: true, message: '请选择模块', trigger: 'change' }],
@@ -200,7 +190,7 @@ const openCreateDialog = () => {
 const openEditDialog = (section: SectionItem) => {
   dialogMode.value = 'edit';
   editingCode.value = section.code;
-  formModel.module_code = selectedModuleCode.value || section.module_code || section.moduleCode || '';
+  formModel.module_code = selectedModuleCode.value || section.module_code || '';
   formModel.code = section.code;
   formModel.title = section.title;
   formModel.sort = section.sort ?? 0;
@@ -230,21 +220,20 @@ const handleFormSubmit = async () => {
   formSubmitting.value = true;
   try {
     if (dialogMode.value === 'create') {
-      await createSection({
+      await sectionStore.createSection({
         module_code: formModel.module_code,
         code: formModel.code,
         title: formModel.title
       });
       ElMessage.success('新增章节成功');
     } else {
-      await updateSection(editingCode.value, {
+      await sectionStore.updateSection(editingCode.value, {
         title: formModel.title,
         sort: formModel.sort
       });
       ElMessage.success('更新章节成功');
     }
     formDialogVisible.value = false;
-    await loadSections();
   } catch (error: unknown) {
     const defaultMessage = dialogMode.value === 'create' ? '新增章节失败' : '更新章节失败';
     const message = error instanceof Error ? error.message : defaultMessage;
@@ -263,13 +252,12 @@ const changeSectionStatus = async (section: SectionItem, action: 'publish' | 'un
 
   try {
     if (action === 'publish') {
-      await publishSection(section.code);
+      await sectionStore.publishSection(section.code);
       ElMessage.success('章节已上架');
     } else {
-      await unpublishSection(section.code);
+      await sectionStore.unpublishSection(section.code);
       ElMessage.success('章节已下架');
     }
-    await loadSections();
   } catch (error: unknown) {
     const defaultMessage = action === 'publish' ? '上架章节失败' : '下架章节失败';
     const message = error instanceof Error ? error.message : defaultMessage;
@@ -295,24 +283,15 @@ const loadModules = async () => {
   }
 };
 
-const loadSections = async () => {
+const loadSections = async (force = false) => {
   if (!selectedModuleCode.value) {
-    sections.value = [];
     return;
   }
-  loading.value = true;
   try {
-    const res = await fetchSections(selectedModuleCode.value) as FetchSectionsResponse;
-    sections.value = (res.sections ?? []).map((item) => ({
-      ...item,
-      sort: item.sort ?? 0,
-      status: item.status ?? 0
-    }));
+    await sectionStore.fetchSections(selectedModuleCode.value, force);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '加载章节失败';
     ElMessage.error(message);
-  } finally {
-    loading.value = false;
   }
 };
 

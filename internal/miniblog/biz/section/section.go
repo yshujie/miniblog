@@ -129,7 +129,7 @@ func (b *sectionBiz) Unpublish(ctx context.Context, code string) (*v1.SectionSta
 
 // GetList 获取所有模块
 func (b *sectionBiz) GetList(ctx context.Context, moduleCode string) (*v1.GetSectionListResponse, error) {
-	sections, err := b.ds.Sections().GetListByModuleCode(moduleCode)
+	sections, err := b.ds.Sections().GetSections(moduleCode)
 	if err != nil {
 		return nil, err
 	}

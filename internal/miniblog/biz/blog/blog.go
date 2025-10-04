@@ -59,7 +59,7 @@ func (b *blogBiz) GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModule
 	}
 
 	// 获取章节列表
-	sections, _ := b.ds.Sections().GetListByModuleCode(req.ModuleCode)
+	sections, _ := b.ds.Sections().GetNormalSections(req.ModuleCode)
 	for _, section := range sections {
 		sectionDetail := &v1.SectionDetail{
 			ID:         section.ID,
