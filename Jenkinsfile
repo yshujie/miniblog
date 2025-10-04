@@ -22,7 +22,7 @@ pipeline {
     string(name: 'ENV_CREDENTIALS_ID', defaultValue: 'miniblog-dev-env', description: 'Credentials ID containing the .env file used to populate environment variables.')
     booleanParam(name: 'RUN_TESTS', defaultValue: true, description: 'Run backend unit tests before building images.')
     booleanParam(name: 'SKIP_FRONTEND_BUILD', defaultValue: false, description: 'Skip building frontend assets and Docker images.')
-  booleanParam(name: 'FRONTEND_NO_CACHE', defaultValue: true, description: 'Disable Docker build cache when building frontend images.')
+  booleanParam(name: 'FRONTEND_NO_CACHE', defaultValue: false, description: 'Disable Docker build cache when building frontend images.')
     booleanParam(name: 'SKIP_BACKEND_BUILD', defaultValue: false, description: 'Skip building the backend Docker image.')
     booleanParam(name: 'SKIP_DB_INIT', defaultValue: false, description: 'Skip the database initialisation stage (recommended for established environments).')
     booleanParam(name: 'SKIP_DB_MIGRATE', defaultValue: false, description: 'Skip executing database migrations.')
