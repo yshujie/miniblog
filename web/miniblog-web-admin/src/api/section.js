@@ -43,3 +43,10 @@ export function createSection(data) {
     data
   });
 }
+
+export function deleteSection(code) {
+  return request({
+    url: `/sections/${code}`,
+    method: 'delete'
+  });
+}

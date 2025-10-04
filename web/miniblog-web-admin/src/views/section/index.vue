@@ -39,6 +39,7 @@
       <el-table-column label="操作" width="260" align="center">
         <template #default="{ row }">
           <el-button size="small" type="primary" @click="openEditDialog(row)">编辑</el-button>
+          <el-button size="small" type="danger" @click="handleDelete(row)" style="margin-left:8px">删除</el-button>
           <el-button
             v-if="row.status !== NORMAL_STATUS"
             size="small"
@@ -96,7 +97,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import useModuleStore from '@/store/modules/module';
 import type { ModuleItem } from '@/store/modules/module';
@@ -300,6 +301,20 @@ onMounted(async () => {
   await loadModules();
   await loadSections();
 });
+
+const handleDelete = async (section: SectionItem) => {
+  if (!section?.code) return;
+  try {
+    await ElMessageBox.confirm('确认删除该章节？该操作不可恢复', '确认删除', { type: 'warning' });
+    await sectionStore.deleteSection(section.code);
+    ElMessage.success('删除章节成功');
+    await loadSections(true);
+  } catch (error: any) {
+    if (error === 'cancel' || error === 'close') return;
+    const message = error instanceof Error ? error.message : '删除章节失败';
+    ElMessage.error(message);
+  }
+};
 </script>
 
 <style scoped>

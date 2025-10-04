@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { fetchSections, createSection, updateSection, publishSection, unpublishSection } from '@/api/section';
+import { fetchSections, createSection, updateSection, publishSection, unpublishSection, deleteSection } from '@/api/section';
 
 export interface SectionItem {
   code: string;
@@ -104,6 +104,18 @@ export default defineStore({
     async unpublishSection(code: string) {
       const response = await unpublishSection(code) as SectionResponse;
       this.upsertSection(response.section);
+    }
+    ,
+    async deleteSection(code: string) {
+      await deleteSection(code);
+      // remove from local cache
+      const moduleCode = Object.keys(this.sectionsByModule).find((k) => (this.sectionsByModule[k] || []).some((s) => s.code === code));
+      if (moduleCode) {
+        this.sectionsByModule = {
+          ...this.sectionsByModule,
+          [moduleCode]: (this.sectionsByModule[moduleCode] || []).filter((s) => s.code !== code)
+        };
+      }
     }
   }
 });

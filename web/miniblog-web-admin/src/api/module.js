@@ -36,3 +36,10 @@ export function unpublishModule(code) {
     method: 'put'
   });
 }
+
+export function deleteModule(code) {
+  return request({
+    url: `/modules/${code}`,
+    method: 'delete'
+  });
+}

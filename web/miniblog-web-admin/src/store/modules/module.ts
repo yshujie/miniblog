@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { fetchModules, createModule, updateModule, publishModule, unpublishModule } from '@/api/module';
+import { fetchModules, createModule, updateModule, publishModule, unpublishModule, deleteModule } from '@/api/module';
 
 export interface ModuleItem {
   id?: number | string;
@@ -92,6 +92,13 @@ export default defineStore({
       await this.ensureLoaded();
       const response = await unpublishModule(code) as ModuleResponse;
       this.upsertModule(response.module);
+    }
+    ,
+    async deleteExistingModule(code: string) {
+      await this.ensureLoaded();
+      await deleteModule(code);
+      // remove from local list
+      this.modules = this.modules.filter((item) => item.code !== code);
     }
   }
 });
