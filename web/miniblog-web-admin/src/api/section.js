@@ -14,6 +14,28 @@ export function fetchSections(moduleCode) {
   });
 }
 
+export function updateSection(code, data) {
+  return request({
+    url: `/sections/${code}`,
+    method: 'put',
+    data
+  });
+}
+
+export function publishSection(code) {
+  return request({
+    url: `/sections/${code}/publish`,
+    method: 'put'
+  });
+}
+
+export function unpublishSection(code) {
+  return request({
+    url: `/sections/${code}/unpublish`,
+    method: 'put'
+  });
+}
+
 export function createSection(data) {
   return request({
     url: '/sections',
