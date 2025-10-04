@@ -18,35 +18,61 @@
           <el-tag :type="statusType(row.status)">{{ statusText(row.status) }}</el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="操作" width="260" align="center">
+        <template #default="{ row }">
+          <el-button size="small" type="primary" @click="openEditDialog(row)">编辑</el-button>
+          <el-button
+            v-if="row.status !== NORMAL_STATUS"
+            size="small"
+            type="success"
+            :loading="statusChangingCode === row.code && statusChangingType === 'publish'"
+            :disabled="statusChangingCode === row.code"
+            @click="handlePublish(row)"
+          >上架</el-button>
+          <el-button
+            v-else
+            size="small"
+            type="warning"
+            :loading="statusChangingCode === row.code && statusChangingType === 'unpublish'"
+            :disabled="statusChangingCode === row.code"
+            @click="handleUnpublish(row)"
+          >下架</el-button>
+        </template>
+      </el-table-column>
     </el-table>
 
     <el-dialog
-      v-model="createDialogVisible"
-      title="新增模块"
+      v-model="formDialogVisible"
+      :title="dialogTitle"
       width="480px"
       :close-on-click-modal="false"
     >
       <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="100px">
         <el-form-item label="编码" prop="code">
-          <el-input v-model="createForm.code" placeholder="请输入模块编码" maxlength="128" />
+          <el-input
+            v-model="createForm.code"
+            placeholder="请输入模块编码"
+            maxlength="128"
+            :disabled="dialogMode === 'edit'"
+          />
         </el-form-item>
         <el-form-item label="标题" prop="title">
           <el-input v-model="createForm.title" placeholder="请输入模块标题" maxlength="255" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="handleCreateCancel">取消</el-button>
-        <el-button type="primary" :loading="createSubmitting" @click="handleCreateSubmit">确定</el-button>
+        <el-button @click="handleFormCancel">取消</el-button>
+        <el-button type="primary" :loading="formSubmitting" @click="handleFormSubmit">确定</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
-import { fetchModules, createModule } from '@/api/module';
+import { fetchModules, createModule, updateModule, publishModule, unpublishModule } from '@/api/module';
 
 interface ModuleItem {
   id?: number | string;
@@ -59,17 +85,26 @@ interface FetchModulesResponse {
   modules?: ModuleItem[];
 }
 
+const NORMAL_STATUS = 1;
+
 const moduleList = ref<ModuleItem[]>([]);
 const loading = ref(false);
 
-const createDialogVisible = ref(false);
-const createSubmitting = ref(false);
+const formDialogVisible = ref(false);
+const formSubmitting = ref(false);
 const createFormRef = ref<FormInstance>();
+const dialogMode = ref<'create' | 'edit'>('create');
+const editingCode = ref('');
+
+const statusChangingCode = ref('');
+const statusChangingType = ref<'publish' | 'unpublish' | ''>('');
 
 const createForm = reactive({
   code: '',
   title: ''
 });
+
+const dialogTitle = computed(() => (dialogMode.value === 'create' ? '新增模块' : '编辑模块'));
 
 const createRules: FormRules = {
   code: [
@@ -84,10 +119,10 @@ const createRules: FormRules = {
 
 const statusText = (status?: number) => {
   switch (status) {
-    case 1:
+    case NORMAL_STATUS:
       return '正常';
     case 2:
-      return '已下架';
+      return '未上架';
     default:
       return '未知';
   }
@@ -95,7 +130,7 @@ const statusText = (status?: number) => {
 
 const statusType = (status?: number) => {
   switch (status) {
-    case 1:
+    case NORMAL_STATUS:
       return 'success';
     case 2:
       return 'info';
@@ -104,44 +139,96 @@ const statusType = (status?: number) => {
   }
 };
 
-const resetCreateForm = () => {
+const openCreateDialog = () => {
+  dialogMode.value = 'create';
+  editingCode.value = '';
   createForm.code = '';
   createForm.title = '';
-  createFormRef.value?.clearValidate();
+  formDialogVisible.value = true;
+  nextTick(() => {
+    createFormRef.value?.clearValidate();
+  });
 };
 
-const openCreateDialog = () => {
-  resetCreateForm();
-  createDialogVisible.value = true;
+const openEditDialog = (moduleItem: ModuleItem) => {
+  dialogMode.value = 'edit';
+  editingCode.value = moduleItem.code;
+  createForm.code = moduleItem.code;
+  createForm.title = moduleItem.title;
+  formDialogVisible.value = true;
+  nextTick(() => {
+    createFormRef.value?.clearValidate();
+  });
 };
 
-const handleCreateCancel = () => {
-  createDialogVisible.value = false;
+const handleFormCancel = () => {
+  formDialogVisible.value = false;
+  nextTick(() => {
+    createFormRef.value?.clearValidate();
+  });
 };
 
-const handleCreateSubmit = async () => {
+const handleFormSubmit = async () => {
   if (!createFormRef.value) return;
-  await createFormRef.value.validate(async (valid) => {
-    if (!valid) {
-      return;
-    }
-    try {
-      createSubmitting.value = true;
+  try {
+    await createFormRef.value.validate();
+  } catch {
+    return;
+  }
+
+  formSubmitting.value = true;
+  try {
+    if (dialogMode.value === 'create') {
       await createModule({
         code: createForm.code,
         title: createForm.title
       });
       ElMessage.success('新增模块成功');
-      createDialogVisible.value = false;
-      await loadModules();
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '新增模块失败';
-      ElMessage.error(message);
-    } finally {
-      createSubmitting.value = false;
+    } else {
+      await updateModule(editingCode.value, {
+        title: createForm.title
+      });
+      ElMessage.success('更新模块成功');
     }
-  });
+    formDialogVisible.value = false;
+    await loadModules();
+  } catch (error: unknown) {
+    const defaultMessage = dialogMode.value === 'create' ? '新增模块失败' : '更新模块失败';
+    const message = error instanceof Error ? error.message : defaultMessage;
+    ElMessage.error(message);
+  } finally {
+    formSubmitting.value = false;
+  }
 };
+
+const changeModuleStatus = async (moduleItem: ModuleItem, action: 'publish' | 'unpublish') => {
+  if (!moduleItem?.code) {
+    return;
+  }
+  statusChangingCode.value = moduleItem.code;
+  statusChangingType.value = action;
+
+  try {
+    if (action === 'publish') {
+      await publishModule(moduleItem.code);
+      ElMessage.success('模块已上架');
+    } else {
+      await unpublishModule(moduleItem.code);
+      ElMessage.success('模块已下架');
+    }
+    await loadModules();
+  } catch (error: unknown) {
+    const defaultMessage = action === 'publish' ? '上架模块失败' : '下架模块失败';
+    const message = error instanceof Error ? error.message : defaultMessage;
+    ElMessage.error(message);
+  } finally {
+    statusChangingCode.value = '';
+    statusChangingType.value = '';
+  }
+};
+
+const handlePublish = (moduleItem: ModuleItem) => changeModuleStatus(moduleItem, 'publish');
+const handleUnpublish = (moduleItem: ModuleItem) => changeModuleStatus(moduleItem, 'unpublish');
 
 const loadModules = async () => {
   loading.value = true;

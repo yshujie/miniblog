@@ -14,3 +14,25 @@ export function createModule(data) {
     data
   });
 }
+
+export function updateModule(code, data) {
+  return request({
+    url: `/modules/${code}`,
+    method: 'put',
+    data
+  });
+}
+
+export function publishModule(code) {
+  return request({
+    url: `/modules/${code}/publish`,
+    method: 'put'
+  });
+}
+
+export function unpublishModule(code) {
+  return request({
+    url: `/modules/${code}/unpublish`,
+    method: 'put'
+  });
+}
