@@ -95,6 +95,9 @@ func installRouters(g *gin.Engine) error {
 				sectionsv1.POST("", sc.Create)                  // 创建章节
 				sectionsv1.GET(":module_code", sc.GetList)      // 获取章节列表
 				sectionsv1.GET(":module_code/:code", sc.GetOne) // 获取章节信息
+				sectionsv1.PUT(":code", sc.Update)              // 更新章节
+				sectionsv1.PUT(":code/publish", sc.Publish)     // 上架章节
+				sectionsv1.PUT(":code/unpublish", sc.Unpublish) // 下架章节
 			}
 
 			// articles 路由分组

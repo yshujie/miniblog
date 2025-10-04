@@ -12,6 +12,9 @@ import (
 // ISectionBiz 模块业务接口
 type ISectionBiz interface {
 	Create(ctx context.Context, r *v1.CreateSectionRequest) (*v1.CreateSectionResponse, error)
+	Update(ctx context.Context, code string, r *v1.UpdateSectionRequest) (*v1.UpdateSectionResponse, error)
+	Publish(ctx context.Context, code string) (*v1.SectionStatusResponse, error)
+	Unpublish(ctx context.Context, code string) (*v1.SectionStatusResponse, error)
 	GetList(ctx context.Context, moduleCode string) (*v1.GetSectionListResponse, error)
 	GetOne(ctx context.Context, code string) (*v1.GetSectionResponse, error)
 }
@@ -60,12 +63,68 @@ func (b *sectionBiz) Create(ctx context.Context, r *v1.CreateSectionRequest) (*v
 	}
 
 	return &v1.CreateSectionResponse{
-		Section: &v1.SectionInfo{
-			Code:       section.Code,
-			Title:      section.Title,
-			ModuleCode: section.ModuleCode,
-		},
+		Section: toSectionInfo(section),
 	}, nil
+}
+
+// Update 更新 section 记录
+func (b *sectionBiz) Update(ctx context.Context, code string, r *v1.UpdateSectionRequest) (*v1.UpdateSectionResponse, error) {
+	section, err := b.ds.Sections().GetByCode(code)
+	if err != nil {
+		return nil, err
+	}
+	if section == nil {
+		return nil, errno.ErrSectionNotFound
+	}
+
+	section.Title = r.Title
+	if r.Sort != nil {
+		section.Sort = *r.Sort
+	}
+
+	if err = b.ds.Sections().Update(section); err != nil {
+		return nil, err
+	}
+
+	return &v1.UpdateSectionResponse{Section: toSectionInfo(section)}, nil
+}
+
+// Publish 上架 section
+func (b *sectionBiz) Publish(ctx context.Context, code string) (*v1.SectionStatusResponse, error) {
+	section, err := b.ds.Sections().GetByCode(code)
+	if err != nil {
+		return nil, err
+	}
+	if section == nil {
+		return nil, errno.ErrSectionNotFound
+	}
+
+	section.Publish()
+
+	if err = b.ds.Sections().Update(section); err != nil {
+		return nil, err
+	}
+
+	return &v1.SectionStatusResponse{Section: toSectionInfo(section)}, nil
+}
+
+// Unpublish 下架 section
+func (b *sectionBiz) Unpublish(ctx context.Context, code string) (*v1.SectionStatusResponse, error) {
+	section, err := b.ds.Sections().GetByCode(code)
+	if err != nil {
+		return nil, err
+	}
+	if section == nil {
+		return nil, errno.ErrSectionNotFound
+	}
+
+	section.Unpublish()
+
+	if err = b.ds.Sections().Update(section); err != nil {
+		return nil, err
+	}
+
+	return &v1.SectionStatusResponse{Section: toSectionInfo(section)}, nil
 }
 
 // GetList 获取所有模块
@@ -79,11 +138,7 @@ func (b *sectionBiz) GetList(ctx context.Context, moduleCode string) (*v1.GetSec
 		Sections: make([]*v1.SectionInfo, 0, len(sections)),
 	}
 	for _, section := range sections {
-		response.Sections = append(response.Sections, &v1.SectionInfo{
-			Code:       section.Code,
-			Title:      section.Title,
-			ModuleCode: section.ModuleCode,
-		})
+		response.Sections = append(response.Sections, toSectionInfo(section))
 	}
 
 	return response, nil
@@ -100,10 +155,20 @@ func (b *sectionBiz) GetOne(ctx context.Context, code string) (*v1.GetSectionRes
 	}
 
 	return &v1.GetSectionResponse{
-		Section: &v1.SectionInfo{
-			Code:       section.Code,
-			Title:      section.Title,
-			ModuleCode: section.ModuleCode,
-		},
+		Section: toSectionInfo(section),
 	}, nil
+}
+
+func toSectionInfo(section *model.Section) *v1.SectionInfo {
+	if section == nil {
+		return nil
+	}
+
+	return &v1.SectionInfo{
+		Code:       section.Code,
+		Title:      section.Title,
+		ModuleCode: section.ModuleCode,
+		Sort:       section.Sort,
+		Status:     section.Status,
+	}
 }

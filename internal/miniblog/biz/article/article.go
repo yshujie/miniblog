@@ -251,8 +251,11 @@ func (b *articleBiz) transformArticleInfo(article *model.Article, isSimple bool)
 			Title: module.Title,
 		},
 		Section: v1.SectionInfo{
-			Code:  section.Code,
-			Title: section.Title,
+			Code:       section.Code,
+			Title:      section.Title,
+			ModuleCode: section.ModuleCode,
+			Sort:       section.Sort,
+			Status:     section.Status,
 		},
 		Author:       article.Author,
 		Tags:         strings.Split(article.Tags, ","),
