@@ -3,6 +3,13 @@ set -euo pipefail
 
 : "${DB_ROOT_PASSWORD:=}"
 
+# Safety guard: only run DB init when explicitly enabled. This prevents accidental
+# database creation during CI/builds. To force, set ENABLE_DB_INIT=true in environment.
+if [ "${ENABLE_DB_INIT:-false}" != "true" ]; then
+  echo "[db-init] Skipping DB init because ENABLE_DB_INIT != true"
+  exit 0
+fi
+
 if [[ -n "${PIPELINE_ENV_FILE:-}" && -f "${PIPELINE_ENV_FILE}" ]]; then
   set -a
   # shellcheck disable=SC1090

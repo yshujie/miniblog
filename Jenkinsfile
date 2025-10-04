@@ -24,9 +24,9 @@ pipeline {
     booleanParam(name: 'SKIP_FRONTEND_BUILD', defaultValue: false, description: 'Skip building frontend assets and Docker images.')
     booleanParam(name: 'FRONTEND_USE_CACHE', defaultValue: true, description: 'Use Docker build cache when building frontend images.')
     booleanParam(name: 'SKIP_BACKEND_BUILD', defaultValue: false, description: 'Skip building the backend Docker image.')
-    booleanParam(name: 'SKIP_DB_INIT', defaultValue: false, description: 'Skip the database initialisation stage (recommended for established environments).')
-    booleanParam(name: 'SKIP_DB_MIGRATE', defaultValue: false, description: 'Skip executing database migrations.')
-    booleanParam(name: 'SKIP_DB_SEED', defaultValue: false, description: 'Skip loading seed data (user, modules, articles). Only needed for first-time setup.')
+  booleanParam(name: 'SKIP_DB_INIT', defaultValue: true, description: 'Skip the database initialisation stage (recommended for established environments).')
+  booleanParam(name: 'SKIP_DB_MIGRATE', defaultValue: true, description: 'Skip executing database migrations.')
+  booleanParam(name: 'SKIP_DB_SEED', defaultValue: true, description: 'Skip loading seed data (user, modules, articles). Only needed for first-time setup.')
     booleanParam(name: 'PUSH_IMAGES', defaultValue: false, description: 'Push built Docker images to the registry.')
     booleanParam(name: 'DEPLOY_AFTER_BUILD', defaultValue: true, description: 'Deploy the stack with docker compose after build.')
     string(name: 'DEPLOY_COMPOSE_FILES', defaultValue: 'docker-compose.yml docker-compose.prod.yml', description: 'Space separated list of docker compose files used for deployment.')
@@ -151,7 +151,9 @@ pipeline {
       steps {
         withCredentials([string(credentialsId: params.DB_ROOT_CREDENTIALS_ID, variable: 'DB_ROOT_PASSWORD')]) {
           dir('.') {
-            sh 'scripts/db-init.sh'
+            withEnv(['ENABLE_DB_INIT=true']) {
+              sh 'scripts/db-init.sh'
+            }
           }
         }
       }
@@ -174,7 +176,9 @@ pipeline {
       }
       steps {
         dir('.') {
-          sh 'make db-seed'
+          withEnv(['ENABLE_DB_SEED=true']) {
+            sh 'make db-seed'
+          }
         }
       }
     }

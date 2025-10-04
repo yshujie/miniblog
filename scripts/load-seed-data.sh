@@ -9,6 +9,12 @@ if [ -f "${PIPELINE_ENV_FILE}" ]; then
   source "${PIPELINE_ENV_FILE}"
 fi
 
+# Safety guard: only load seed data when explicitly enabled. Set ENABLE_DB_SEED=true to run.
+if [ "${ENABLE_DB_SEED:-false}" != "true" ]; then
+    echo "[load-seed-data] Skipping seed load because ENABLE_DB_SEED != true"
+    exit 0
+fi
+
 # Database connection parameters
 DB_HOST="${DB_HOST:-${MYSQL_HOST:-mysql}}"
 DB_PORT="${DB_PORT:-${MYSQL_PORT:-3306}}"
