@@ -98,6 +98,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import 'element-plus/es/components/message-box/style/css';
 import type { FormInstance, FormRules } from 'element-plus';
 import useModuleStore from '@/store/modules/module';
 import type { ModuleItem } from '@/store/modules/module';
