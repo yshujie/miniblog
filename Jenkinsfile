@@ -22,7 +22,7 @@ pipeline {
     string(name: 'ENV_CREDENTIALS_ID', defaultValue: 'miniblog-dev-env', description: 'Credentials ID containing the .env file used to populate environment variables.')
     booleanParam(name: 'RUN_TESTS', defaultValue: true, description: 'Run backend unit tests before building images.')
     booleanParam(name: 'SKIP_FRONTEND_BUILD', defaultValue: false, description: 'Skip building frontend assets and Docker images.')
-  booleanParam(name: 'FRONTEND_NO_CACHE', defaultValue: false, description: 'Disable Docker build cache when building frontend images.')
+    booleanParam(name: 'FRONTEND_USE_CACHE', defaultValue: true, description: 'Use Docker build cache when building frontend images.')
     booleanParam(name: 'SKIP_BACKEND_BUILD', defaultValue: false, description: 'Skip building the backend Docker image.')
     booleanParam(name: 'SKIP_DB_INIT', defaultValue: false, description: 'Skip the database initialisation stage (recommended for established environments).')
     booleanParam(name: 'SKIP_DB_MIGRATE', defaultValue: false, description: 'Skip executing database migrations.')
@@ -72,18 +72,26 @@ pipeline {
         stage('Blog Frontend') {
           steps {
             dir('.') {
-              sh "IMAGE_NAME='${env.FRONTEND_BLOG_IMAGE_TAG}' NO_CACHE=${env.FRONTEND_NO_CACHE} make docker-build-frontend-blog"
+              script {
+                def args = ["IMAGE_NAME='${env.FRONTEND_BLOG_IMAGE_TAG}'"]
+                if (env.FRONTEND_NO_CACHE == 'true') {
+                  args << 'NO_CACHE=true'
+                }
+                sh "${args.join(' ')} make docker-build-frontend-blog"
+              }
             }
           }
         }
         stage('Admin Frontend') {
           steps {
             dir('.') {
-              sh """
-IMAGE_NAME='${env.FRONTEND_ADMIN_IMAGE_TAG}' \
-NO_CACHE=${env.FRONTEND_NO_CACHE} \
-make docker-build-frontend-admin
-"""
+              script {
+                def args = ["IMAGE_NAME='${env.FRONTEND_ADMIN_IMAGE_TAG}'"]
+                if (env.FRONTEND_NO_CACHE == 'true') {
+                  args << 'NO_CACHE=true'
+                }
+                sh "${args.join(' ')} make docker-build-frontend-admin"
+              }
             }
           }
         }
@@ -217,7 +225,9 @@ def initializeEnvironment() {
 
   env.RUN_TESTS = flagEnabled(params.RUN_TESTS) ? 'true' : 'false'
   env.RUN_FRONTEND_BUILD = shouldSkip(params.SKIP_FRONTEND_BUILD, env.SKIP_FRONTEND_BUILD) ? 'false' : 'true'
-  env.FRONTEND_NO_CACHE = flagEnabled(params.FRONTEND_NO_CACHE) ? 'true' : 'false'
+  def useCache = flagEnabled(params.FRONTEND_USE_CACHE) ? 'true' : 'false'
+  env.FRONTEND_USE_CACHE = useCache
+  env.FRONTEND_NO_CACHE = (useCache == 'true') ? 'false' : 'true'
   env.RUN_BACKEND_BUILD = shouldSkip(params.SKIP_BACKEND_BUILD, env.SKIP_BACKEND_BUILD) ? 'false' : 'true'
   // 检查是否有 FORCE_DB_INIT 环境变量强制执行
   env.RUN_DB_INIT = flagEnabled(env.FORCE_DB_INIT) ? 'true' : (shouldSkip(params.SKIP_DB_INIT, env.SKIP_DB_INIT) ? 'false' : 'true')
@@ -251,7 +261,7 @@ def initializeEnvironment() {
   echo "Admin frontend image tag: ${env.FRONTEND_ADMIN_IMAGE_TAG}"
   echo "Run unit tests: ${env.RUN_TESTS}"
   echo "Run frontend build: ${env.RUN_FRONTEND_BUILD}"
-  echo "Frontend docker build without cache: ${env.FRONTEND_NO_CACHE}"
+  echo "Frontend docker build without cache: ${env.FRONTEND_NO_CACHE} (use cache: ${env.FRONTEND_USE_CACHE})"
   echo "Run backend build: ${env.RUN_BACKEND_BUILD}"
   echo "Run db init: ${env.RUN_DB_INIT}"
   echo "Run db migrate: ${env.RUN_DB_MIGRATE}"
