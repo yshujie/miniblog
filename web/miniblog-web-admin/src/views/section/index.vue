@@ -100,7 +100,8 @@ import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import useModuleStore from '@/store/modules/module';
 import type { ModuleItem } from '@/store/modules/module';
-import useSectionStore, { SectionItem } from '@/store/modules/section';
+import useSectionStore from '@/store/modules/section';
+import type { SectionItem } from '@/store/modules/section';
 
 const moduleStore = useModuleStore();
 const sectionStore = useSectionStore();
