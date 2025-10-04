@@ -92,13 +92,9 @@ import { useRoute, useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { fetchArticle, createArticle, updateArticle, publishArticle, unpublishArticle } from '@/api/article';
-import { fetchModules } from '@/api/module';
 import { fetchSections } from '@/api/section';
-
-interface ModuleItem {
-  code: string;
-  title: string;
-}
+import useModuleStore from '@/store/modules/module';
+import type { ModuleItem } from '@/store/modules/module';
 
 interface SectionItem {
   code: string;
@@ -115,10 +111,6 @@ interface ArticleFormState {
   tags: string[];
   external_link: string;
   content: string;
-}
-
-interface FetchModulesResponse {
-  modules?: ModuleItem[];
 }
 
 interface FetchSectionsResponse {
@@ -143,9 +135,11 @@ const props = defineProps<{ isEdit: boolean }>();
 const route = useRoute();
 const router = useRouter();
 
+const moduleStore = useModuleStore();
+
 const formRef = ref<FormInstance>();
 const loading = ref(false);
-const modules = ref<ModuleItem[]>([]);
+const modules = computed<ModuleItem[]>(() => moduleStore.modules);
 const sections = ref<SectionItem[]>([]);
 
 const postForm = reactive<ArticleFormState>({
@@ -212,8 +206,7 @@ const resolveArticleId = () => {
 
 const loadModules = async () => {
   try {
-    const response = await fetchModules() as FetchModulesResponse;
-    modules.value = response.modules ?? [];
+    await moduleStore.ensureLoaded();
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '加载模块失败';
     ElMessage.error(message);

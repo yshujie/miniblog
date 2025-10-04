@@ -98,30 +98,25 @@
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
-import { fetchModules } from '@/api/module';
+import useModuleStore from '@/store/modules/module';
+import type { ModuleItem } from '@/store/modules/module';
 import { fetchSections, createSection, updateSection, publishSection, unpublishSection } from '@/api/section';
-
-interface ModuleItem {
-  code: string;
-  title: string;
-}
 
 interface SectionItem {
   code: string;
   title: string;
   sort?: number;
   status?: number;
-}
-
-interface FetchModulesResponse {
-  modules?: ModuleItem[];
+  module_code?: string;
+  moduleCode?: string;
 }
 
 interface FetchSectionsResponse {
   sections?: SectionItem[];
 }
 
-const moduleOptions = ref<ModuleItem[]>([]);
+const moduleStore = useModuleStore();
+const moduleOptions = computed<ModuleItem[]>(() => moduleStore.modules);
 const selectedModuleCode = ref('');
 const NORMAL_STATUS = 1;
 
@@ -205,7 +200,7 @@ const openCreateDialog = () => {
 const openEditDialog = (section: SectionItem) => {
   dialogMode.value = 'edit';
   editingCode.value = section.code;
-  formModel.module_code = selectedModuleCode.value || section.module_code;
+  formModel.module_code = selectedModuleCode.value || section.module_code || section.moduleCode || '';
   formModel.code = section.code;
   formModel.title = section.title;
   formModel.sort = section.sort ?? 0;
@@ -290,8 +285,7 @@ const handleUnpublish = (section: SectionItem) => changeSectionStatus(section, '
 
 const loadModules = async () => {
   try {
-    const res = await fetchModules() as FetchModulesResponse;
-    moduleOptions.value = res.modules ?? [];
+    await moduleStore.ensureLoaded();
     if (!selectedModuleCode.value && moduleOptions.value.length) {
       selectedModuleCode.value = moduleOptions.value[0].code;
     }

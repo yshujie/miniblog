@@ -2,11 +2,11 @@
   <div class="app-container">
     <div class="toolbar">
       <el-button type="primary" @click="openCreateDialog">新增模块</el-button>
-      <el-button :loading="loading" @click="loadModules">刷新</el-button>
+      <el-button :loading="moduleLoading" @click="loadModules(true)">刷新</el-button>
     </div>
 
     <el-table
-      v-loading="loading"
+      v-loading="moduleLoading"
       :data="moduleList"
       border
       style="width: 100%"
@@ -72,23 +72,15 @@
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
-import { fetchModules, createModule, updateModule, publishModule, unpublishModule } from '@/api/module';
-
-interface ModuleItem {
-  id?: number | string;
-  code: string;
-  title: string;
-  status?: number;
-}
-
-interface FetchModulesResponse {
-  modules?: ModuleItem[];
-}
+import useModuleStore from '@/store/modules/module';
+import type { ModuleItem } from '@/store/modules/module';
 
 const NORMAL_STATUS = 1;
 
-const moduleList = ref<ModuleItem[]>([]);
-const loading = ref(false);
+const moduleStore = useModuleStore();
+
+const moduleList = computed<ModuleItem[]>(() => moduleStore.modules);
+const moduleLoading = computed(() => moduleStore.loading);
 
 const formDialogVisible = ref(false);
 const formSubmitting = ref(false);
@@ -179,19 +171,18 @@ const handleFormSubmit = async () => {
   formSubmitting.value = true;
   try {
     if (dialogMode.value === 'create') {
-      await createModule({
+      await moduleStore.createNewModule({
         code: createForm.code,
         title: createForm.title
       });
       ElMessage.success('新增模块成功');
     } else {
-      await updateModule(editingCode.value, {
+      await moduleStore.updateExistingModule(editingCode.value, {
         title: createForm.title
       });
       ElMessage.success('更新模块成功');
     }
     formDialogVisible.value = false;
-    await loadModules();
   } catch (error: unknown) {
     const defaultMessage = dialogMode.value === 'create' ? '新增模块失败' : '更新模块失败';
     const message = error instanceof Error ? error.message : defaultMessage;
@@ -210,13 +201,12 @@ const changeModuleStatus = async (moduleItem: ModuleItem, action: 'publish' | 'u
 
   try {
     if (action === 'publish') {
-      await publishModule(moduleItem.code);
+      await moduleStore.publishExistingModule(moduleItem.code);
       ElMessage.success('模块已上架');
     } else {
-      await unpublishModule(moduleItem.code);
+      await moduleStore.unpublishExistingModule(moduleItem.code);
       ElMessage.success('模块已下架');
     }
-    await loadModules();
   } catch (error: unknown) {
     const defaultMessage = action === 'publish' ? '上架模块失败' : '下架模块失败';
     const message = error instanceof Error ? error.message : defaultMessage;
@@ -230,16 +220,12 @@ const changeModuleStatus = async (moduleItem: ModuleItem, action: 'publish' | 'u
 const handlePublish = (moduleItem: ModuleItem) => changeModuleStatus(moduleItem, 'publish');
 const handleUnpublish = (moduleItem: ModuleItem) => changeModuleStatus(moduleItem, 'unpublish');
 
-const loadModules = async () => {
-  loading.value = true;
+const loadModules = async (force = false) => {
   try {
-    const res = await fetchModules() as FetchModulesResponse;
-    moduleList.value = res.modules ?? [];
+    await moduleStore.ensureLoaded(force);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '加载模块列表失败';
     ElMessage.error(message);
-  } finally {
-    loading.value = false;
   }
 };
 

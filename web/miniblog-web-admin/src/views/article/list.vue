@@ -106,17 +106,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import Pagination from '@/components/Pagination/index.vue';
 import { fetchList } from '@/api/article';
-import { fetchModules } from '@/api/module';
 import { fetchSections } from '@/api/section';
-
-interface ModuleItem {
-  code: string;
-  title: string;
-}
+import useModuleStore from '@/store/modules/module';
+import type { ModuleItem } from '@/store/modules/module';
 
 interface SectionItem {
   code: string;
@@ -140,10 +136,6 @@ interface ArticleItem {
   status?: string;
 }
 
-interface FetchModulesResponse {
-  modules?: ModuleItem[];
-}
-
 interface FetchSectionsResponse {
   sections?: SectionItem[];
 }
@@ -153,10 +145,12 @@ interface FetchArticlesResponse {
   total?: number;
 }
 
+const moduleStore = useModuleStore();
+
 const list = ref<ArticleItem[]>([]);
 const total = ref(0);
 const listLoading = ref(false);
-const modules = ref<ModuleItem[]>([]);
+const modules = computed<ModuleItem[]>(() => moduleStore.modules);
 const sections = ref<SectionItem[]>([]);
 
 const filters = reactive<ArticleFilters>({
@@ -191,8 +185,7 @@ const statusText = (status?: string) => {
 
 const loadModules = async () => {
   try {
-    const response = await fetchModules() as FetchModulesResponse;
-    modules.value = response.modules ?? [];
+    await moduleStore.ensureLoaded();
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '加载模块失败';
     ElMessage.error(message);
