@@ -233,10 +233,11 @@ def initializeEnvironment() {
   env.FRONTEND_USE_CACHE = useCache
   env.FRONTEND_NO_CACHE = (useCache == 'true') ? 'false' : 'true'
   env.RUN_BACKEND_BUILD = shouldSkip(params.SKIP_BACKEND_BUILD, env.SKIP_BACKEND_BUILD) ? 'false' : 'true'
-  // 检查是否有 FORCE_DB_INIT 环境变量强制执行
-  env.RUN_DB_INIT = flagEnabled(env.FORCE_DB_INIT) ? 'true' : (shouldSkip(params.SKIP_DB_INIT, env.SKIP_DB_INIT) ? 'false' : 'true')
-  env.RUN_DB_MIGRATE = shouldSkip(params.SKIP_DB_MIGRATE, env.SKIP_DB_MIGRATE) ? 'false' : 'true'
-  env.RUN_DB_SEED = shouldSkip(params.SKIP_DB_SEED, env.SKIP_DB_SEED) ? 'false' : 'true'
+  // DB operations: only run if explicitly enabled (params override env vars from credentials)
+  // Default is to SKIP (params default to true), unless user explicitly sets param to false
+  env.RUN_DB_INIT = params.SKIP_DB_INIT ? 'false' : 'true'
+  env.RUN_DB_MIGRATE = params.SKIP_DB_MIGRATE ? 'false' : 'true'
+  env.RUN_DB_SEED = params.SKIP_DB_SEED ? 'false' : 'true'
 
   def pushImages = flagEnabled(params.PUSH_IMAGES)
   if (!pushImages) {
