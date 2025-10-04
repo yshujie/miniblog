@@ -80,16 +80,9 @@ func (b *moduleBiz) Delete(ctx context.Context, code string) error {
 		return errno.ErrModuleHasDependents
 	}
 
-	// 检查是否存在关联的 articles（article 可能直接引用 module_code）
-	filter := map[string]interface{}{"module_code": code}
-	articles, err := b.ds.Articles().GetList(filter, 1, 1)
-	if err != nil {
-		return err
-	}
-	if len(articles) > 0 {
-		return errno.ErrModuleHasDependents
-	}
-
+	// 如果没有关联的 sections，则可以安全删除模块。
+	// 历史上可能存在 article.module_code 的设计，但当前数据库中 article 表没有 module_code 字段，
+	// 因此我们通过 sections 检查依赖：只要没有 sections，文章不应属于该模块。
 	return b.ds.Modules().DeleteByCode(code)
 }
 
