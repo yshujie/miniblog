@@ -11,6 +11,16 @@ type CreateModuleResponse struct {
 	Module *ModuleInfo `json:"module"`
 }
 
+// UpdateModuleRequest 更新模块请求
+type UpdateModuleRequest struct {
+	Title string `json:"title" valid:"required,stringlength(1|255)"`
+}
+
+// UpdateModuleResponse 更新模块响应
+type UpdateModuleResponse struct {
+	Module *ModuleInfo `json:"module"`
+}
+
 // GetModuleListResponse 获取模块列表响应
 type GetModuleListResponse struct {
 	Modules []*ModuleInfo `json:"modules"`
@@ -18,6 +28,11 @@ type GetModuleListResponse struct {
 
 // GetOneModuleResponse 获取模块详情响应
 type GetOneModuleResponse struct {
+	Module *ModuleInfo `json:"module"`
+}
+
+// ModuleStatusResponse 模块状态变更响应
+type ModuleStatusResponse struct {
 	Module *ModuleInfo `json:"module"`
 }
 

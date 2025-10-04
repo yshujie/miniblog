@@ -81,9 +81,12 @@ func installRouters(g *gin.Engine) error {
 			// modules 路由分组
 			modulesv1 := adminv1.Group("/modules")
 			{
-				modulesv1.GET("", mc.GetAll)      // 获取所有模块
-				modulesv1.POST("", mc.Create)     // 创建模块
-				modulesv1.GET(":code", mc.GetOne) // 获取模块信息
+				modulesv1.GET("", mc.GetAll)                   // 获取所有模块
+				modulesv1.POST("", mc.Create)                  // 创建模块
+				modulesv1.GET(":code", mc.GetOne)              // 获取模块信息
+				modulesv1.PUT(":code", mc.Update)              // 更新模块
+				modulesv1.PUT(":code/publish", mc.Publish)     // 上架模块
+				modulesv1.PUT(":code/unpublish", mc.Unpublish) // 下架模块
 			}
 
 			// sections 路由分组

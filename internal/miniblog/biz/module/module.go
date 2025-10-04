@@ -12,6 +12,9 @@ import (
 // ModuleBiz 模块业务接口
 type IModuleBiz interface {
 	Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.CreateModuleResponse, error)
+	Update(ctx context.Context, code string, r *v1.UpdateModuleRequest) (*v1.UpdateModuleResponse, error)
+	Publish(ctx context.Context, code string) (*v1.ModuleStatusResponse, error)
+	Unpublish(ctx context.Context, code string) (*v1.ModuleStatusResponse, error)
 	GetAll(ctx context.Context) (*v1.GetModuleListResponse, error)
 	GetOne(ctx context.Context, code string) (*v1.GetOneModuleResponse, error)
 }
@@ -51,15 +54,67 @@ func (b *moduleBiz) Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.
 
 	// 返回响应 CreateModuleResponse
 	response := &v1.CreateModuleResponse{
-		Module: &v1.ModuleInfo{
-			ID:     int(module.ID),
-			Code:   module.Code,
-			Title:  module.Title,
-			Status: module.Status,
-		},
+		Module: toModuleInfo(module),
 	}
 
 	return response, nil
+}
+
+// Update 更新模块
+func (b *moduleBiz) Update(ctx context.Context, code string, r *v1.UpdateModuleRequest) (*v1.UpdateModuleResponse, error) {
+	module, err := b.ds.Modules().GetByCode(code)
+	if err != nil {
+		return nil, err
+	}
+	if module == nil {
+		return nil, errno.ErrModuleNotFound
+	}
+
+	module.Title = r.Title
+
+	if err = b.ds.Modules().Update(module); err != nil {
+		return nil, err
+	}
+
+	return &v1.UpdateModuleResponse{Module: toModuleInfo(module)}, nil
+}
+
+// Publish 上架模块
+func (b *moduleBiz) Publish(ctx context.Context, code string) (*v1.ModuleStatusResponse, error) {
+	module, err := b.ds.Modules().GetByCode(code)
+	if err != nil {
+		return nil, err
+	}
+	if module == nil {
+		return nil, errno.ErrModuleNotFound
+	}
+
+	module.Publish()
+
+	if err = b.ds.Modules().Update(module); err != nil {
+		return nil, err
+	}
+
+	return &v1.ModuleStatusResponse{Module: toModuleInfo(module)}, nil
+}
+
+// Unpublish 下架模块
+func (b *moduleBiz) Unpublish(ctx context.Context, code string) (*v1.ModuleStatusResponse, error) {
+	module, err := b.ds.Modules().GetByCode(code)
+	if err != nil {
+		return nil, err
+	}
+	if module == nil {
+		return nil, errno.ErrModuleNotFound
+	}
+
+	module.Unpublish()
+
+	if err = b.ds.Modules().Update(module); err != nil {
+		return nil, err
+	}
+
+	return &v1.ModuleStatusResponse{Module: toModuleInfo(module)}, nil
 }
 
 // GetAll 获取所有模块
@@ -74,12 +129,7 @@ func (b *moduleBiz) GetAll(ctx context.Context) (*v1.GetModuleListResponse, erro
 		Modules: make([]*v1.ModuleInfo, 0, len(modules)),
 	}
 	for _, module := range modules {
-		response.Modules = append(response.Modules, &v1.ModuleInfo{
-			ID:     int(module.ID),
-			Code:   module.Code,
-			Title:  module.Title,
-			Status: module.Status,
-		})
+		response.Modules = append(response.Modules, toModuleInfo(module))
 	}
 
 	return response, nil
@@ -96,11 +146,19 @@ func (b *moduleBiz) GetOne(ctx context.Context, code string) (*v1.GetOneModuleRe
 	}
 
 	return &v1.GetOneModuleResponse{
-		Module: &v1.ModuleInfo{
-			ID:     int(module.ID),
-			Code:   module.Code,
-			Title:  module.Title,
-			Status: module.Status,
-		},
+		Module: toModuleInfo(module),
 	}, nil
+}
+
+func toModuleInfo(module *model.Module) *v1.ModuleInfo {
+	if module == nil {
+		return nil
+	}
+
+	return &v1.ModuleInfo{
+		ID:     int(module.ID),
+		Code:   module.Code,
+		Title:  module.Title,
+		Status: module.Status,
+	}
 }
