@@ -92,8 +92,7 @@ export default defineStore({
       await this.ensureLoaded();
       const response = await unpublishModule(code) as ModuleResponse;
       this.upsertModule(response.module);
-    }
-    ,
+    },
     async deleteExistingModule(code: string) {
       await this.ensureLoaded();
       await deleteModule(code);

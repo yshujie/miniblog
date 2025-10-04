@@ -91,7 +91,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
         meta: { title: '编辑文章', hidden: true, activeMenu: '/article/list' }
       }
     ]
-  },
+  }
 ];
 
 const dynamicRouteNames = ['Article', 'ArticleList', 'CreateArticle', 'EditArticle', 'Module', 'ModuleList', 'Section', 'SectionList'];

@@ -104,8 +104,7 @@ export default defineStore({
     async unpublishSection(code: string) {
       const response = await unpublishSection(code) as SectionResponse;
       this.upsertSection(response.section);
-    }
-    ,
+    },
     async deleteSection(code: string) {
       await deleteSection(code);
       // remove from local cache
