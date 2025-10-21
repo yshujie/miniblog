@@ -1,0 +1,10 @@
+name: ping-runner
+on: workflow_dispatch
+
+jobs:
+  ping:
+    runs-on: [self-hosted, macmini, prod]  # 如果没加标签，就改成 [self-hosted, macOS, ARM64]
+    steps:
+      - run: uname -a
+      - run: sw_vers
+      - run: whoami
