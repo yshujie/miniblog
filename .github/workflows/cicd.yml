@@ -4,6 +4,23 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip unit tests'
+        type: boolean
+        default: false
+      skip_db_init:
+        description: 'Skip database initialization'
+        type: boolean
+        default: true
+      skip_db_migrate:
+        description: 'Skip database migration'
+        type: boolean
+        default: true
+      skip_db_seed:
+        description: 'Skip database seed data'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -20,7 +37,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 单元测试阶段
+  test:
+    if: ${{ !inputs.skip_tests }}
+    runs-on: [self-hosted, macmini, prod]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run unit tests
+        run: make test-backend
+
   build-and-push:
+    needs: [test]
+    if: ${{ !cancelled() && (success() || inputs.skip_tests) }}
     runs-on: [self-hosted, macmini, prod]
 
     steps:
@@ -48,7 +77,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.prod.backend
+          file: build/docker/miniblog/Dockerfile.prod.backend
           platforms: linux/amd64
           push: true
           cache-from: type=gha
@@ -183,3 +212,60 @@ jobs:
             sleep 2
             (curl -fsS http://127.0.0.1:8090/health && echo " HEALTH=OK") || (echo "HEALTH=FAIL"; exit 1)
             docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+
+      # 数据库初始化（仅首次部署时需要）
+      - name: DB Init
+        if: ${{ !inputs.skip_db_init }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USER }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/miniblog
+            
+            # 从 .env 加载环境变量
+            export $(cat .env | grep -v '^#' | xargs)
+            export DB_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}"
+            export ENABLE_DB_INIT=true
+            
+            ./scripts/db-init.sh
+
+      # 数据库迁移
+      - name: DB Migrate
+        if: ${{ !inputs.skip_db_migrate }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USER }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/miniblog
+            
+            # 从 .env 加载环境变量
+            export $(cat .env | grep -v '^#' | xargs)
+            
+            ./scripts/db-migrate.sh
+
+      # 数据库种子数据
+      - name: DB Seed
+        if: ${{ !inputs.skip_db_seed }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USER }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/miniblog
+            
+            # 从 .env 加载环境变量
+            export $(cat .env | grep -v '^#' | xargs)
+            export ENABLE_DB_SEED=true
+            
+            make db-seed
