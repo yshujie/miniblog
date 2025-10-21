@@ -1,4 +1,4 @@
-name: CI/CD (miniblog-prod)
+name: CI/CD (miniblog)
 
 on:
   push:
@@ -21,12 +21,18 @@ concurrency:
 
 jobs:
   build-and-push:
-    # 如果你已经给 Runner 加了 macmini/prod 标签，改成：
-    # runs-on: [self-hosted, macmini, prod]
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: [self-hosted, macmini, prod]
+    env:
+      # 关键：用临时 docker 配置，避免访问 macOS Keychain
+      DOCKER_CONFIG: ${{ runner.temp }}/.docker
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Init docker config (no keychain)
+        run: |
+          mkdir -p "$DOCKER_CONFIG"
+          echo '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -38,9 +44,8 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      # === 后端镜像（确认 Dockerfile 路径）===
-      # 常见1：项目根有 Dockerfile.prod.backend（你本机列表里就是这个）
-      - name: Build & Push backend
+      # === Backend ===
+      - name: Build & Push backend (linux/amd64)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -53,9 +58,9 @@ jobs:
             ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
             ${{ env.BACKEND_IMAGE }}:latest
 
-      # === 博客前端镜像（把 context/file 对上你的仓库结构）===
-      # 方案A（常见）：web/miniblog-web 目录下有 Dockerfile.prod.frontend.blog
-      - name: Build & Push frontend-blog
+      # === Frontend Blog（两种路径，命中其一即可） ===
+      - name: Build & Push frontend-blog (web path)
+        if: ${{ hashFiles('web/miniblog-web/Dockerfile.prod.frontend.blog') != '' }}
         uses: docker/build-push-action@v6
         with:
           context: ./web/miniblog-web
@@ -67,10 +72,24 @@ jobs:
           tags: |
             ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_BLOG_IMAGE }}:latest
-      # 如果你的前端 Dockerfile 在别处，改 context/file 即可；实在不确定，先把这整个 step 注释掉，后端先跑通。
 
-      # === Admin 前端镜像（同理改路径）===
-      - name: Build & Push frontend-admin
+      - name: Build & Push frontend-blog (build/docker path)
+        if: ${{ hashFiles('build/docker/miniblog/Dockerfile.prod.frontend.blog') != '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: build/docker/miniblog/Dockerfile.prod.frontend.blog
+          platforms: linux/amd64
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
+            ${{ env.FE_BLOG_IMAGE }}:latest
+
+      # === Frontend Admin（同理两种路径） ===
+      - name: Build & Push frontend-admin (web path)
+        if: ${{ hashFiles('web/miniblog-web-admin/Dockerfile.prod.frontend.admin') != '' }}
         uses: docker/build-push-action@v6
         with:
           context: ./web/miniblog-web-admin
@@ -83,13 +102,27 @@ jobs:
             ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_ADMIN_IMAGE }}:latest
 
+      - name: Build & Push frontend-admin (build/docker path)
+        if: ${{ hashFiles('build/docker/miniblog/Dockerfile.prod.frontend.admin') != '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: build/docker/miniblog/Dockerfile.prod.frontend.admin
+          platforms: linux/amd64
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
+            ${{ env.FE_ADMIN_IMAGE }}:latest
+
   deploy:
-    # 同上，若已加自定义标签，改成 [self-hosted, macmini, prod]
+    # 同上：若有 macmini/prod 标签，改成 [self-hosted, macmini, prod]
     runs-on: [self-hosted, macOS, ARM64]
     needs: build-and-push
     environment: production
     timeout-minutes: 30
-
+    # DOCKER_CONFIG 这步对 deploy job 不是必须（docker 命令在远端服务器上执行），留空也行
     steps:
       - uses: actions/checkout@v4
 
@@ -106,34 +139,42 @@ jobs:
             # 1) 预置网络/目录（幂等）
             docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
             sudo mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin}
-
-            # 2) 拉代码（要求服务器已配置 Deploy Key: Host github-miniblog）
             cd /opt/miniblog
+
+            # 2) 拉代码（要求服务器已配置 Deploy Key：Host github-miniblog）
             if [ -d .git ]; then
               git fetch --all -p && git reset --hard origin/main
             else
               git clone github-miniblog:${{ github.repository }} .
             fi
 
-            # 3) 登录 GHCR（拉镜像用）
+            # 3) 登录 GHCR（拉镜像）
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
 
-            # 4) 写入 .env 注入镜像与业务配置
-            cat > .env <<EOF
-BACKEND_IMAGE_TAG=${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
-FRONTEND_BLOG_IMAGE_TAG=${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
-FRONTEND_ADMIN_IMAGE_TAG=${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
+            # 4) 写入 .env（用带引号的 heredoc 防止远端 shell 展开）
+            cat > .env <<'EOF'
+            BACKEND_IMAGE_TAG=${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
+            FRONTEND_BLOG_IMAGE_TAG=${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
+            FRONTEND_ADMIN_IMAGE_TAG=${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
 
-GIN_MODE=release
-MYSQL_HOST=${{ secrets.MYSQL_HOST }}
-MYSQL_PORT=3306
-MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
-MYSQL_USERNAME=${{ secrets.MYSQL_USERNAME }}
-MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
-REDIS_HOST=${{ secrets.REDIS_HOST }}
-REDIS_DB=${{ secrets.REDIS_DB }}
-JWT_SECRET=${{ secrets.JWT_SECRET }}
-EOF
+            GIN_MODE=release
+
+            MYSQL_HOST=${{ secrets.MYSQL_HOST }}
+            MYSQL_PORT=${{ secrets.MYSQL_PORT }}
+            MYSQL_DATABASE=${{ secrets.MYSQL_DBNAME }}
+            MYSQL_USERNAME=${{ secrets.MYSQL_USERNAME }}
+            MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+
+            REDIS_HOST=${{ secrets.REDIS_HOST }}
+            REDIS_PORT=${{ secrets.REDIS_PORT }}
+            REDIS_DB=${{ secrets.REDIS_DB }}
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+
+            FEISHU_DOCREADER_APPID=${{ secrets.FEISHU_DOCREADER_APPID }}
+            FEISHU_DOCREADER_APPSECRET=${{ secrets.FEISHU_DOCREADER_APPSECRET }}
+            EOF
 
             # 5) 拉取并无停机更新（生产覆盖文件固定 8090 端口）
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
