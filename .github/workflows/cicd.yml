@@ -250,6 +250,11 @@ jobs:
           docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
           docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
+          # Ensure nginx is connected to the application network and reload config to pick up new upstreams
+          docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
+          docker network connect miniblog_net nginx || true
+          docker exec nginx nginx -t && docker exec nginx nginx -s reload || true
+
           # 6) 健康检查 + 简要状态
           sleep 2
           (curl -fsS http://127.0.0.1:8090/health && echo " HEALTH=OK") || (echo "HEALTH=FAIL"; exit 1)
