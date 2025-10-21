@@ -9,18 +9,6 @@ on:
         description: 'Skip unit tests'
         type: boolean
         default: false
-      skip_db_init:
-        description: 'Skip database initialization'
-        type: boolean
-        default: true
-      skip_db_migrate:
-        description: 'Skip database migration'
-        type: boolean
-        default: true
-      skip_db_seed:
-        description: 'Skip database seed data'
-        type: boolean
-        default: true
 
 permissions:
   contents: read
