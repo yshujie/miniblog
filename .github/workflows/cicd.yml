@@ -53,15 +53,15 @@ jobs:
             go.sum
             go.work.sum
       
-      - name: Cache Go build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum', '**/go.work.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+      - name: Fix Go module cache permissions
+        run: |
+          # 修复 Go 模块缓存的权限问题
+          if [ -d ~/go/pkg/mod ]; then
+            chmod -R u+w ~/go/pkg/mod || true
+            echo "✅ Go 模块缓存权限已修复"
+          else
+            echo "✅ Go 模块缓存目录不存在，跳过"
+          fi
       
       - name: Download dependencies
         run: go mod download
