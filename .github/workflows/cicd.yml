@@ -1,4 +1,4 @@
-name: CI/CD (miniblog)
+name: CI/CD (miniblog-prod)
 
 on:
   push:
