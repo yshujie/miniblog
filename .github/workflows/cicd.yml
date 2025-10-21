@@ -49,6 +49,19 @@ jobs:
         with:
           go-version: '1.24'
           cache: true
+          cache-dependency-path: |
+            go.sum
+            go.work.sum
+      
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum', '**/go.work.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       
       - name: Download dependencies
         run: go mod download
@@ -93,8 +106,13 @@ jobs:
           file: build/docker/miniblog/Dockerfile.prod.backend
           platforms: linux/amd64
           push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # 使用 GitHub Actions 缓存和 Registry 缓存双重策略
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache,mode=max
           tags: |
             ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
             ${{ env.BACKEND_IMAGE }}:latest
@@ -108,8 +126,12 @@ jobs:
           file: ./web/miniblog-web/Dockerfile.prod.frontend.blog
           platforms: linux/amd64
           push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ env.FE_BLOG_IMAGE }}:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=${{ env.FE_BLOG_IMAGE }}:buildcache,mode=max
           tags: |
             ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_BLOG_IMAGE }}:latest
@@ -122,8 +144,12 @@ jobs:
           file: build/docker/miniblog/Dockerfile.prod.frontend.blog
           platforms: linux/amd64
           push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ env.FE_BLOG_IMAGE }}:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=${{ env.FE_BLOG_IMAGE }}:buildcache,mode=max
           tags: |
             ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_BLOG_IMAGE }}:latest
@@ -137,8 +163,12 @@ jobs:
           file: ./web/miniblog-web-admin/Dockerfile.prod.frontend.admin
           platforms: linux/amd64
           push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ env.FE_ADMIN_IMAGE }}:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=${{ env.FE_ADMIN_IMAGE }}:buildcache,mode=max
           tags: |
             ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_ADMIN_IMAGE }}:latest
@@ -151,8 +181,12 @@ jobs:
           file: build/docker/miniblog/Dockerfile.prod.frontend.admin
           platforms: linux/amd64
           push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ env.FE_ADMIN_IMAGE }}:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=${{ env.FE_ADMIN_IMAGE }}:buildcache,mode=max
           tags: |
             ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_ADMIN_IMAGE }}:latest
