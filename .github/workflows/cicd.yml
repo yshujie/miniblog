@@ -95,7 +95,18 @@ jobs:
 
       - name: Login to GHCR
         run: |
-          echo "${{ secrets.GHCR_TOKEN }}" | docker --config="${{ runner.temp }}/.docker" login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+          # 直接写入 auth 到配置文件，完全绕过凭证存储
+          AUTH=$(echo -n "${{ github.repository_owner }}:${{ secrets.GHCR_TOKEN }}" | base64)
+          cat > "${{ runner.temp }}/.docker/config.json" <<EOF
+          {
+            "auths": {
+              "ghcr.io": {
+                "auth": "$AUTH"
+              }
+            }
+          }
+          EOF
+          echo "✅ GHCR 认证配置完成"
 
       # === Backend ===
       - name: Build & Push backend (linux/amd64)
