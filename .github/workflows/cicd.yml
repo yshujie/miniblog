@@ -81,7 +81,8 @@ jobs:
         run: |
           DOCKER_CONFIG_DIR="${{ runner.temp }}/.docker"
           mkdir -p "$DOCKER_CONFIG_DIR"
-          echo '{"auths":{}}' > "$DOCKER_CONFIG_DIR/config.json"
+          # 禁用 credsStore，避免使用 macOS Keychain
+          echo '{"auths":{},"credsStore":""}' > "$DOCKER_CONFIG_DIR/config.json"
           echo "DOCKER_CONFIG=$DOCKER_CONFIG_DIR" >> $GITHUB_ENV
           echo "Docker config directory: $DOCKER_CONFIG_DIR"
 
