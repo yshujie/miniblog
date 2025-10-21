@@ -185,127 +185,140 @@ jobs:
             ${{ env.FE_ADMIN_IMAGE }}:latest
 
   deploy:
-    # 改为使用 Linux runner (GitHub-hosted) 以支持 container action
-    runs-on: ubuntu-latest
+    # 使用 macOS 自托管 runner，避免容器 action 限制
+    runs-on: [self-hosted, macOS, ARM64]
     needs: build-and-push
     environment: production
     timeout-minutes: 30
-    # DOCKER_CONFIG 这步对 deploy job 不是必须（docker 命令在远端服务器上执行），留空也行
     steps:
       - uses: actions/checkout@v4
 
+      # 准备 SSH 密钥（一次性设置）
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SVRA_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SVRA_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
       - name: Deploy to Server A via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USER }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          script_stop: true
-          script: |
-            set -euo pipefail
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
+            'bash -s' <<'ENDSSH'
+          set -euo pipefail
 
-            # 1) 预置网络/目录（幂等）
-            docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
-            sudo mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin}
-            cd /opt/miniblog
+          # 1) 预置网络/目录（幂等）
+          docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
+          sudo mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin}
+          cd /opt/miniblog
 
-            # 2) 拉代码（要求服务器已配置 Deploy Key：Host github-miniblog）
-            if [ -d .git ]; then
-              git fetch --all -p && git reset --hard origin/main
-            else
-              git clone github-miniblog:${{ github.repository }} .
-            fi
+          # 2) 拉代码（要求服务器已配置 Deploy Key：Host github-miniblog）
+          if [ -d .git ]; then
+            git fetch --all -p && git reset --hard origin/main
+          else
+            git clone github-miniblog:${{ github.repository }} .
+          fi
 
-            # 3) 登录 GHCR（拉镜像）
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+          # 3) 登录 GHCR（拉镜像）
+          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
 
-            # 4) 写入 .env（用带引号的 heredoc 防止远端 shell 展开）
-            cat > .env <<'EOF'
-            BACKEND_IMAGE_TAG=${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
-            FRONTEND_BLOG_IMAGE_TAG=${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
-            FRONTEND_ADMIN_IMAGE_TAG=${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
+          # 4) 写入 .env（用带引号的 heredoc 防止远端 shell 展开）
+          cat > .env <<'EOF'
+          BACKEND_IMAGE_TAG=${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
+          FRONTEND_BLOG_IMAGE_TAG=${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
+          FRONTEND_ADMIN_IMAGE_TAG=${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
 
-            GIN_MODE=release
+          GIN_MODE=release
 
-            MYSQL_HOST=${{ secrets.MYSQL_HOST }}
-            MYSQL_PORT=${{ secrets.MYSQL_PORT }}
-            MYSQL_DATABASE=${{ secrets.MYSQL_DBNAME }}
-            MYSQL_USERNAME=${{ secrets.MYSQL_USERNAME }}
-            MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_HOST=${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT=${{ secrets.MYSQL_PORT }}
+          MYSQL_DATABASE=${{ secrets.MYSQL_DBNAME }}
+          MYSQL_USERNAME=${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
 
-            REDIS_HOST=${{ secrets.REDIS_HOST }}
-            REDIS_PORT=${{ secrets.REDIS_PORT }}
-            REDIS_DB=${{ secrets.REDIS_DB }}
-            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          REDIS_HOST=${{ secrets.REDIS_HOST }}
+          REDIS_PORT=${{ secrets.REDIS_PORT }}
+          REDIS_DB=${{ secrets.REDIS_DB }}
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
 
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
 
-            FEISHU_DOCREADER_APPID=${{ secrets.FEISHU_DOCREADER_APPID }}
-            FEISHU_DOCREADER_APPSECRET=${{ secrets.FEISHU_DOCREADER_APPSECRET }}
-            EOF
+          FEISHU_DOCREADER_APPID=${{ secrets.FEISHU_DOCREADER_APPID }}
+          FEISHU_DOCREADER_APPSECRET=${{ secrets.FEISHU_DOCREADER_APPSECRET }}
+          EOF
 
-            # 5) 拉取并无停机更新（生产覆盖文件固定 8090 端口）
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+          # 5) 拉取并无停机更新（生产覆盖文件固定 8090 端口）
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
-            # 6) 健康检查 + 简要状态
-            sleep 2
-            (curl -fsS http://127.0.0.1:8090/health && echo " HEALTH=OK") || (echo "HEALTH=FAIL"; exit 1)
-            docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+          # 6) 健康检查 + 简要状态
+          sleep 2
+          (curl -fsS http://127.0.0.1:8090/health && echo " HEALTH=OK") || (echo "HEALTH=FAIL"; exit 1)
+          docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+          ENDSSH
 
       # 数据库初始化（仅首次部署时需要）
       - name: DB Init
         if: ${{ !inputs.skip_db_init }}
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USER }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          script_stop: true
-          script: |
-            set -euo pipefail
-            cd /opt/miniblog
-            
-            # 从 .env 加载环境变量
-            export $(cat .env | grep -v '^#' | xargs)
-            export DB_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}"
-            export ENABLE_DB_INIT=true
-            
-            ./scripts/db-init.sh
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
+            'bash -s' <<'ENDSSH'
+          set -euo pipefail
+          cd /opt/miniblog
+          
+          # 从 .env 加载环境变量
+          export $(cat .env | grep -v '^#' | xargs)
+          export DB_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}"
+          export ENABLE_DB_INIT=true
+          
+          ./scripts/db-init.sh
+          ENDSSH
 
       # 数据库迁移
       - name: DB Migrate
         if: ${{ !inputs.skip_db_migrate }}
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USER }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          script_stop: true
-          script: |
-            set -euo pipefail
-            cd /opt/miniblog
-            
-            # 从 .env 加载环境变量
-            export $(cat .env | grep -v '^#' | xargs)
-            
-            ./scripts/db-migrate.sh
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
+            'bash -s' <<'ENDSSH'
+          set -euo pipefail
+          cd /opt/miniblog
+          
+          # 从 .env 加载环境变量
+          export $(cat .env | grep -v '^#' | xargs)
+          
+          ./scripts/db-migrate.sh
+          ENDSSH
 
       # 数据库种子数据
       - name: DB Seed
         if: ${{ !inputs.skip_db_seed }}
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USER }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          script_stop: true
-          script: |
-            set -euo pipefail
-            cd /opt/miniblog
-            
-            # 从 .env 加载环境变量
-            export $(cat .env | grep -v '^#' | xargs)
-            export ENABLE_DB_SEED=true
-            
-            make db-seed
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
+            'bash -s' <<'ENDSSH'
+          set -euo pipefail
+          cd /opt/miniblog
+          
+          # 从 .env 加载环境变量
+          export $(cat .env | grep -v '^#' | xargs)
+          export ENABLE_DB_SEED=true
+          
+          make db-seed
+          ENDSSH
+
+      # 清理 SSH 密钥
+      - name: Cleanup SSH Key
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
