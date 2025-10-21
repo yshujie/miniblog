@@ -104,13 +104,12 @@ jobs:
           file: build/docker/miniblog/Dockerfile.prod.backend
           platforms: linux/amd64
           push: true
-          # 使用 GitHub Actions 缓存和 Registry 缓存双重策略
-          cache-from: |
-            type=gha
-            type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache
-          cache-to: |
-            type=gha,mode=max
-            type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache,mode=max
+          # 使用 GitHub Actions 缓存（最稳定）
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+          # 构建参数：启用 Go 模块和构建缓存
+          build-args: |
+            GOPROXY=https://goproxy.cn,direct
           tags: |
             ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
             ${{ env.BACKEND_IMAGE }}:latest
@@ -124,12 +123,8 @@ jobs:
           file: ./web/miniblog-web/Dockerfile.prod.frontend.blog
           platforms: linux/amd64
           push: true
-          cache-from: |
-            type=gha
-            type=registry,ref=${{ env.FE_BLOG_IMAGE }}:buildcache
-          cache-to: |
-            type=gha,mode=max
-            type=registry,ref=${{ env.FE_BLOG_IMAGE }}:buildcache,mode=max
+          cache-from: type=gha,scope=fe-blog
+          cache-to: type=gha,mode=max,scope=fe-blog
           tags: |
             ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_BLOG_IMAGE }}:latest
@@ -142,12 +137,8 @@ jobs:
           file: build/docker/miniblog/Dockerfile.prod.frontend.blog
           platforms: linux/amd64
           push: true
-          cache-from: |
-            type=gha
-            type=registry,ref=${{ env.FE_BLOG_IMAGE }}:buildcache
-          cache-to: |
-            type=gha,mode=max
-            type=registry,ref=${{ env.FE_BLOG_IMAGE }}:buildcache,mode=max
+          cache-from: type=gha,scope=fe-blog
+          cache-to: type=gha,mode=max,scope=fe-blog
           tags: |
             ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_BLOG_IMAGE }}:latest
@@ -161,12 +152,8 @@ jobs:
           file: ./web/miniblog-web-admin/Dockerfile.prod.frontend.admin
           platforms: linux/amd64
           push: true
-          cache-from: |
-            type=gha
-            type=registry,ref=${{ env.FE_ADMIN_IMAGE }}:buildcache
-          cache-to: |
-            type=gha,mode=max
-            type=registry,ref=${{ env.FE_ADMIN_IMAGE }}:buildcache,mode=max
+          cache-from: type=gha,scope=fe-admin
+          cache-to: type=gha,mode=max,scope=fe-admin
           tags: |
             ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_ADMIN_IMAGE }}:latest
@@ -179,12 +166,8 @@ jobs:
           file: build/docker/miniblog/Dockerfile.prod.frontend.admin
           platforms: linux/amd64
           push: true
-          cache-from: |
-            type=gha
-            type=registry,ref=${{ env.FE_ADMIN_IMAGE }}:buildcache
-          cache-to: |
-            type=gha,mode=max
-            type=registry,ref=${{ env.FE_ADMIN_IMAGE }}:buildcache,mode=max
+          cache-from: type=gha,scope=fe-admin
+          cache-to: type=gha,mode=max,scope=fe-admin
           tags: |
             ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_ADMIN_IMAGE }}:latest
