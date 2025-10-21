@@ -1,0 +1,90 @@
+name: DB Operations (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_db_init:
+        description: 'Skip database initialization'
+        type: boolean
+        default: true
+      skip_db_migrate:
+        description: 'Skip database migration'
+        type: boolean
+        default: true
+      skip_db_seed:
+        description: 'Skip database seed data'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  db-ops:
+    runs-on: [self-hosted, macmini, prod]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      # DB Init (optional)
+      - name: DB Init
+        if: ${{ !inputs.skip_db_init }}
+        run: |
+          ssh -F /dev/null \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
+            'bash -s' <<'ENDSSH'
+          set -euo pipefail
+          cd /opt/miniblog
+          export $(cat .env | grep -v '^#' | xargs)
+          export DB_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}"
+          export ENABLE_DB_INIT=true
+
+          ./scripts/db-init.sh
+          ENDSSH
+
+      # DB Migrate (optional)
+      - name: DB Migrate
+        if: ${{ !inputs.skip_db_migrate }}
+        run: |
+          ssh -F /dev/null \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
+            'bash -s' <<'ENDSSH'
+          set -euo pipefail
+          cd /opt/miniblog
+          export $(cat .env | grep -v '^#' | xargs)
+
+          ./scripts/db-migrate.sh
+          ENDSSH
+
+      # DB Seed (optional)
+      - name: DB Seed
+        if: ${{ !inputs.skip_db_seed }}
+        run: |
+          ssh -F /dev/null \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
+            'bash -s' <<'ENDSSH'
+          set -euo pipefail
+          cd /opt/miniblog
+          export $(cat .env | grep -v '^#' | xargs)
+          export ENABLE_DB_SEED=true
+
+          make db-seed
+          ENDSSH
+
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
