@@ -253,6 +253,23 @@ jobs:
           # Ensure nginx is connected to the application network and reload config to pick up new upstreams
           docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
           docker network connect miniblog_net nginx || true
+
+          # Poll backend health endpoint (from inside miniblog_net) before reloading nginx
+          echo "Polling backend health (up to 60s)..."
+          HEALTH_OK=1
+          for i in $(seq 1 30); do
+            if docker run --rm --network=miniblog_net curlimages/curl:8.1.2 -fsS http://miniblog-backend:8080/health >/dev/null 2>&1; then
+              echo "Backend healthy after $((i*2))s"
+              HEALTH_OK=0
+              break
+            fi
+            sleep 2
+          done
+          if [ "$HEALTH_OK" -ne 0 ]; then
+            echo "WARNING: Backend health check failed after 60s; nginx reload will not be attempted" >&2
+            exit 1
+          fi
+
           docker exec nginx nginx -t && docker exec nginx nginx -s reload || true
 
           # 6) 健康检查 + 简要状态
