@@ -93,10 +93,8 @@ jobs:
             env.DOCKER_CONFIG=${{ runner.temp }}/.docker
 
       - name: Login to GHCR
-        env:
-          DOCKER_CONFIG: ${{ runner.temp }}/.docker
         run: |
-          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+          echo "${{ secrets.GHCR_TOKEN }}" | docker --config="${{ runner.temp }}/.docker" login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
 
       # === Backend ===
       - name: Build & Push backend (linux/amd64)
