@@ -28,7 +28,7 @@ jobs:
   # 单元测试阶段
   test:
     if: ${{ !inputs.skip_tests }}
-    runs-on: [self-hosted, macmini, prod]
+    runs-on: [self-hosted, macOS, ARM64]
     steps:
       - uses: actions/checkout@v4
       
@@ -60,7 +60,7 @@ jobs:
   build-and-push:
     needs: [test]
     if: ${{ !cancelled() && (success() || inputs.skip_tests) }}
-    runs-on: [self-hosted, macmini, prod]
+    runs-on: [self-hosted, macOS, ARM64]
 
     steps:
       - uses: actions/checkout@v4
