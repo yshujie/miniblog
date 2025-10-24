@@ -65,151 +65,73 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Docker config and login to GHCR
+      - name: Login to GitHub Container Registry
         run: |
-          # 1. 创建 Docker 配置目录
-          DOCKER_CONFIG_DIR="${{ runner.temp }}/.docker"
-          mkdir -p "$DOCKER_CONFIG_DIR"
-          
-          # 2. 生成 base64 认证信息
-          AUTH=$(echo -n "${{ github.repository_owner }}:${{ secrets.GHCR_TOKEN }}" | base64)
-          
-          # 3. 写入配置文件（禁用 credsStore，直接存储认证信息）
-          cat > "$DOCKER_CONFIG_DIR/config.json" <<EOF
-          {
-            "auths": {
-              "ghcr.io": {
-                "auth": "$AUTH"
-              }
-            }
-          }
-          EOF
-          
-          # 4. 设置环境变量供后续步骤使用
-          echo "DOCKER_CONFIG=$DOCKER_CONFIG_DIR" >> $GITHUB_ENV
-          echo "✅ Docker 配置和 GHCR 认证完成"
+          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+          echo "✅ 已登录到 GHCR"
 
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
-        timeout-minutes: 5
-      
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        timeout-minutes: 5
-        with:
-          driver-opts: |
-            env.DOCKER_CONFIG=${{ runner.temp }}/.docker
-          buildkitd-flags: --debug
-
-      - name: Verify Docker and Buildx setup
         run: |
-          echo "=== Docker Version ==="
-          docker version
-          echo ""
-          echo "=== Buildx Version ==="
+          # 验证 buildx 已安装
+          echo "=== Buildx 版本 ==="
           docker buildx version
           echo ""
-          echo "=== Buildx Builders ==="
+          
+          # 创建或使用现有的 builder
+          if docker buildx inspect miniblog-builder &>/dev/null; then
+            echo "✅ 使用现有 builder: miniblog-builder"
+            docker buildx use miniblog-builder
+          else
+            echo "📦 创建新的 builder: miniblog-builder"
+            docker buildx create --name miniblog-builder --driver docker-container --use
+          fi
+          
+          # 启动 builder
+          docker buildx inspect --bootstrap
+          
+          echo ""
+          echo "=== 可用的 Builders ==="
           docker buildx ls
-          echo ""
-          echo "=== Docker Config ==="
-          echo "DOCKER_CONFIG=$DOCKER_CONFIG"
-          ls -la "$DOCKER_CONFIG" || echo "Config dir not found"
-          echo ""
-          echo "=== Test GHCR Connection ==="
-          docker pull ghcr.io/actions/runner:latest || echo "Failed to pull test image"
 
       # === Backend ===
       - name: Build & Push backend (linux/amd64)
-        uses: docker/build-push-action@v6
-        timeout-minutes: 30
-        with:
-          context: .
-          file: build/docker/miniblog/Dockerfile.prod.backend
-          platforms: linux/amd64
-          push: true
-          # 使用 GitHub Actions 缓存（最稳定）
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
-          # 构建参数：启用 Go 模块和构建缓存
-          build-args: |
-            GOPROXY=https://goproxy.cn,direct
-          tags: |
-            ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
-            ${{ env.BACKEND_IMAGE }}:latest
-          # 添加详细输出
-          provenance: false
-          sbom: false
+        run: |
+          echo "🔨 构建 Backend 镜像..."
+          docker buildx build \
+            --platform linux/amd64 \
+            --file build/docker/miniblog/Dockerfile.prod.backend \
+            --build-arg GOPROXY=https://goproxy.cn,direct \
+            --tag ${{ env.BACKEND_IMAGE }}:${{ env.TAG }} \
+            --tag ${{ env.BACKEND_IMAGE }}:latest \
+            --push \
+            .
+          echo "✅ Backend 镜像构建并推送成功"
 
-      # === Frontend Blog（两种路径，命中其一即可） ===
-      - name: Build & Push frontend-blog (web path)
-        if: ${{ hashFiles('web/miniblog-web/Dockerfile.prod.frontend.blog') != '' }}
-        uses: docker/build-push-action@v6
-        timeout-minutes: 20
-        with:
-          context: ./web/miniblog-web
-          file: ./web/miniblog-web/Dockerfile.prod.frontend.blog
-          platforms: linux/amd64
-          push: true
-          cache-from: type=gha,scope=fe-blog
-          cache-to: type=gha,mode=max,scope=fe-blog
-          tags: |
-            ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
-            ${{ env.FE_BLOG_IMAGE }}:latest
-          provenance: false
-          sbom: false
+      # === Frontend Blog ===
+      - name: Build & Push frontend-blog
+        run: |
+          echo "🔨 构建 Frontend Blog 镜像..."
+          docker buildx build \
+            --platform linux/amd64 \
+            --file build/docker/miniblog/Dockerfile.prod.frontend.blog \
+            --tag ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }} \
+            --tag ${{ env.FE_BLOG_IMAGE }}:latest \
+            --push \
+            .
+          echo "✅ Frontend Blog 镜像构建并推送成功"
 
-      - name: Build & Push frontend-blog (build/docker path)
-        if: ${{ hashFiles('build/docker/miniblog/Dockerfile.prod.frontend.blog') != '' }}
-        uses: docker/build-push-action@v6
-        timeout-minutes: 20
-        with:
-          context: .
-          file: build/docker/miniblog/Dockerfile.prod.frontend.blog
-          platforms: linux/amd64
-          push: true
-          cache-from: type=gha,scope=fe-blog
-          cache-to: type=gha,mode=max,scope=fe-blog
-          tags: |
-            ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
-            ${{ env.FE_BLOG_IMAGE }}:latest
-          provenance: false
-          sbom: false
-
-      # === Frontend Admin（同理两种路径） ===
-      - name: Build & Push frontend-admin (web path)
-        if: ${{ hashFiles('web/miniblog-web-admin/Dockerfile.prod.frontend.admin') != '' }}
-        uses: docker/build-push-action@v6
-        timeout-minutes: 20
-        with:
-          context: ./web/miniblog-web-admin
-          file: ./web/miniblog-web-admin/Dockerfile.prod.frontend.admin
-          platforms: linux/amd64
-          push: true
-          cache-from: type=gha,scope=fe-admin
-          cache-to: type=gha,mode=max,scope=fe-admin
-          tags: |
-            ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
-            ${{ env.FE_ADMIN_IMAGE }}:latest
-          provenance: false
-          sbom: false
-
-      - name: Build & Push frontend-admin (build/docker path)
-        if: ${{ hashFiles('build/docker/miniblog/Dockerfile.prod.frontend.admin') != '' }}
-        uses: docker/build-push-action@v6
-        timeout-minutes: 20
-        with:
-          context: .
-          file: build/docker/miniblog/Dockerfile.prod.frontend.admin
-          platforms: linux/amd64
-          push: true
-          cache-from: type=gha,scope=fe-admin
-          cache-to: type=gha,mode=max,scope=fe-admin
-          tags: |
-            ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
-            ${{ env.FE_ADMIN_IMAGE }}:latest
-          provenance: false
-          sbom: false
+      # === Frontend Admin ===
+      - name: Build & Push frontend-admin
+        run: |
+          echo "🔨 构建 Frontend Admin 镜像..."
+          docker buildx build \
+            --platform linux/amd64 \
+            --file build/docker/miniblog/Dockerfile.prod.frontend.admin \
+            --tag ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }} \
+            --tag ${{ env.FE_ADMIN_IMAGE }}:latest \
+            --push \
+            .
+          echo "✅ Frontend Admin 镜像构建并推送成功"
 
   deploy:
     # 使用 macOS 自托管 runner，避免容器 action 限制
