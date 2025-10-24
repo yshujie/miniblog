@@ -89,16 +89,40 @@ jobs:
           echo "DOCKER_CONFIG=$DOCKER_CONFIG_DIR" >> $GITHUB_ENV
           echo "✅ Docker 配置和 GHCR 认证完成"
 
-      - uses: docker/setup-qemu-action@v3
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        timeout-minutes: 5
       
-      - uses: docker/setup-buildx-action@v3
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        timeout-minutes: 5
         with:
           driver-opts: |
             env.DOCKER_CONFIG=${{ runner.temp }}/.docker
+          buildkitd-flags: --debug
+
+      - name: Verify Docker and Buildx setup
+        run: |
+          echo "=== Docker Version ==="
+          docker version
+          echo ""
+          echo "=== Buildx Version ==="
+          docker buildx version
+          echo ""
+          echo "=== Buildx Builders ==="
+          docker buildx ls
+          echo ""
+          echo "=== Docker Config ==="
+          echo "DOCKER_CONFIG=$DOCKER_CONFIG"
+          ls -la "$DOCKER_CONFIG" || echo "Config dir not found"
+          echo ""
+          echo "=== Test GHCR Connection ==="
+          docker pull ghcr.io/actions/runner:latest || echo "Failed to pull test image"
 
       # === Backend ===
       - name: Build & Push backend (linux/amd64)
         uses: docker/build-push-action@v6
+        timeout-minutes: 30
         with:
           context: .
           file: build/docker/miniblog/Dockerfile.prod.backend
@@ -113,11 +137,15 @@ jobs:
           tags: |
             ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
             ${{ env.BACKEND_IMAGE }}:latest
+          # 添加详细输出
+          provenance: false
+          sbom: false
 
       # === Frontend Blog（两种路径，命中其一即可） ===
       - name: Build & Push frontend-blog (web path)
         if: ${{ hashFiles('web/miniblog-web/Dockerfile.prod.frontend.blog') != '' }}
         uses: docker/build-push-action@v6
+        timeout-minutes: 20
         with:
           context: ./web/miniblog-web
           file: ./web/miniblog-web/Dockerfile.prod.frontend.blog
@@ -128,10 +156,13 @@ jobs:
           tags: |
             ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_BLOG_IMAGE }}:latest
+          provenance: false
+          sbom: false
 
       - name: Build & Push frontend-blog (build/docker path)
         if: ${{ hashFiles('build/docker/miniblog/Dockerfile.prod.frontend.blog') != '' }}
         uses: docker/build-push-action@v6
+        timeout-minutes: 20
         with:
           context: .
           file: build/docker/miniblog/Dockerfile.prod.frontend.blog
@@ -142,11 +173,14 @@ jobs:
           tags: |
             ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_BLOG_IMAGE }}:latest
+          provenance: false
+          sbom: false
 
       # === Frontend Admin（同理两种路径） ===
       - name: Build & Push frontend-admin (web path)
         if: ${{ hashFiles('web/miniblog-web-admin/Dockerfile.prod.frontend.admin') != '' }}
         uses: docker/build-push-action@v6
+        timeout-minutes: 20
         with:
           context: ./web/miniblog-web-admin
           file: ./web/miniblog-web-admin/Dockerfile.prod.frontend.admin
@@ -157,10 +191,13 @@ jobs:
           tags: |
             ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_ADMIN_IMAGE }}:latest
+          provenance: false
+          sbom: false
 
       - name: Build & Push frontend-admin (build/docker path)
         if: ${{ hashFiles('build/docker/miniblog/Dockerfile.prod.frontend.admin') != '' }}
         uses: docker/build-push-action@v6
+        timeout-minutes: 20
         with:
           context: .
           file: build/docker/miniblog/Dockerfile.prod.frontend.admin
@@ -171,6 +208,8 @@ jobs:
           tags: |
             ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_ADMIN_IMAGE }}:latest
+          provenance: false
+          sbom: false
 
   deploy:
     # 使用 macOS 自托管 runner，避免容器 action 限制
