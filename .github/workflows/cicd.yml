@@ -161,7 +161,7 @@ jobs:
             'bash -s' <<'ENDSSH'
           set -euo pipefail
 
-          # ---------- 0) 预检：只检测已放权的命令（不要用 `sudo -n true`） ----------
+          # ---------- 0) 预检：只检测已放权的命令 ----------
           if ! sudo -n /usr/bin/docker version >/dev/null 2>&1; then
             echo "ERROR: sudo NOPASSWD 对 /usr/bin/docker 未生效" >&2; exit 1
           fi
@@ -170,7 +170,7 @@ jobs:
           fi
           rmdir /tmp/_sudo_check_dir 2>/dev/null || true
 
-          # ---------- 1) 仅对 git 启用网络代理；Docker 执行前显式去代理 ----------
+          # ---------- 1) 仅给 git 配代理；Docker 前显式去代理 ----------
           PROXY_HTTP="${{ secrets.SVRA_HTTP_PROXY }}"
           PROXY_HTTPS="${{ secrets.SVRA_HTTPS_PROXY }}"
           PROXY_NO="${{ secrets.SVRA_NO_PROXY }}"
@@ -178,16 +178,18 @@ jobs:
           if [ -n "$PROXY_HTTP$PROXY_HTTPS" ]; then
             http_proxy="${PROXY_HTTP:-${PROXY_HTTPS:-}}"
             https_proxy="${PROXY_HTTPS:-${PROXY_HTTP:-}}"
+            NO_PROXY_STR="${PROXY_NO:-localhost,127.0.0.1,::1}"
             export http_proxy https_proxy HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy"
-            export no_proxy="${PROXY_NO:-localhost,127.0.0.1,::1}" NO_PROXY="${no_proxy}"
+            export no_proxy="$NO_PROXY_STR" NO_PROXY="$NO_PROXY_STR"
             GIT_PROXY=(-c http.proxy="$https_proxy" -c https.proxy="$https_proxy")
             echo "➡️ git 使用代理（值已隐藏）"
           else
             if command -v nc >/dev/null 2>&1 && nc -z 127.0.0.1 7890; then
-              export http_proxy="http://127.0.0.1:7890"
-              export https_proxy="$http_proxy"
-              export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy"
-              export no_proxy="localhost,127.0.0.1,::1" NO_PROXY="$no_proxy"
+              http_proxy="http://127.0.0.1:7890"
+              https_proxy="$http_proxy"
+              NO_PROXY_STR="localhost,127.0.0.1,::1"
+              export http_proxy https_proxy HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy"
+              export no_proxy="$NO_PROXY_STR" NO_PROXY="$NO_PROXY_STR"
               GIT_PROXY=(-c http.proxy="$https_proxy" -c https.proxy="$https_proxy")
               echo "➡️ git 将走 127.0.0.1:7890 代理"
             else
@@ -267,7 +269,7 @@ jobs:
           FEISHU_DOCREADER_APPSECRET=${{ secrets.FEISHU_DOCREADER_APPSECRET }}
           EOF
 
-          # ---------- 6) Docker：执行前去代理（避免影响 GHCR/内网） ----------
+          # ---------- 6) Docker：执行前去代理 ----------
           env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
             sudo -n /usr/bin/docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
           env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
