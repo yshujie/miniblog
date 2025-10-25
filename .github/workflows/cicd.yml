@@ -178,7 +178,7 @@ jobs:
           printf '{}' > "$DOCKER_CONFIG/config.json"
 
           # 目录与网络
-          docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
+          sudo docker network inspect miniblog_net >/dev/null 2>&1 || sudo docker network create miniblog_net
           if ! mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} 2>/dev/null; then
             sudo -n mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} || {
               echo "ERROR: Need permission to create /opt/miniblog & /data/logs/miniblog/*" >&2
@@ -231,27 +231,27 @@ jobs:
           EOF
 
           # 拉镜像并启动
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+          sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+          sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
           # 接入共享网络 & 健康检查 & nginx reload
-          docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
-          docker network connect miniblog_net nginx || true
+          sudo docker network inspect miniblog_net >/dev/null 2>&1 || sudo docker network create miniblog_net
+          sudo docker network connect miniblog_net nginx || true
 
           echo "Polling backend health (up to 60s)..."
           for i in $(seq 1 30); do
-            if docker run --rm --network=miniblog_net curlimages/curl:8.1.2 -fsS http://miniblog-backend:8080/health >/dev/null 2>&1; then
+            if sudo docker run --rm --network=miniblog_net curlimages/curl:8.1.2 -fsS http://miniblog-backend:8080/health >/dev/null 2>&1; then
               echo "Backend healthy"
               break
             fi
             sleep 2
           done
 
-          docker exec nginx nginx -t && docker exec nginx nginx -s reload || true
+          sudo docker exec nginx nginx -t && sudo docker exec nginx nginx -s reload || true
 
           sleep 2
           (curl -fsS http://127.0.0.1:8090/health && echo " HEALTH=OK") || (echo "HEALTH=FAIL"; exit 1)
-          docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+          sudo docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
           ENDSSH
 
       - name: Cleanup SSH Key
