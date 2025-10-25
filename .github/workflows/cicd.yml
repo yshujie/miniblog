@@ -25,7 +25,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # ====== 单元测试 ======
   test:
     if: ${{ !inputs.skip_tests }}
     runs-on: [self-hosted, macOS, ARM64]
@@ -51,20 +50,20 @@ jobs:
       - name: Run unit tests
         run: make test-backend
 
-  # ====== 构建并推送镜像 ======
   build-and-push:
     needs: [test]
     if: ${{ !cancelled() && (success() || inputs.skip_tests) }}
     runs-on: [self-hosted, macOS, ARM64]
     env:
+      # 明确关闭代理（避免 buildkit 里带进未知代理）
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      NO_PROXY: ghcr.io,*.ghcr.io,github.com,*.github.com
+      NO_PROXY: ""
     steps:
       - uses: actions/checkout@v4
 
-      # 0) 本 job 使用“空”的 Docker 配置，明确给 docker.io 匿名条目，完全不触发钥匙串
-      - name: Disable macOS keychain for this job
+      # 0) 彻底“隔离”本次 Docker 配置，杜绝钥匙串
+      - name: Use ephemeral DOCKER_CONFIG (no credsStore)
         run: |
           export DOCKER_CONFIG="$RUNNER_TEMP/.docker"
           mkdir -p "$DOCKER_CONFIG"
@@ -76,10 +75,10 @@ jobs:
           }
           JSON
           echo "DOCKER_CONFIG=$DOCKER_CONFIG" >> "$GITHUB_ENV"
-          echo "🔒 Using ephemeral DOCKER_CONFIG=$DOCKER_CONFIG (no credsStore, docker.io anon)"
+          echo "🔒 Using DOCKER_CONFIG=$DOCKER_CONFIG"
 
-      # 0.1) 把 buildx 插件显式暴露到临时 DOCKER_CONFIG（方案 A）
-      - name: Make buildx available with ephemeral DOCKER_CONFIG
+      # 0.1) 把 buildx 插件显式暴露到这个临时 DOCKER_CONFIG（方案A）
+      - name: Expose buildx under ephemeral DOCKER_CONFIG
         run: |
           mkdir -p "$DOCKER_CONFIG/cli-plugins"
           if [ -x /Applications/Docker.app/Contents/Resources/cli-plugins/docker-buildx ]; then
@@ -95,29 +94,23 @@ jobs:
           ln -sf "$SRC" "$DOCKER_CONFIG/cli-plugins/docker-buildx"
           docker buildx version
 
-      # 1) 仅对 ghcr.io 注入内联凭证；并“重建” builder，把 DOCKER_CONFIG 注入 buildkit
-      - name: Prepare registry auth and Setup Docker Buildx
-        env:
-          HTTP_PROXY: ""
-          HTTPS_PROXY: ""
-          NO_PROXY: ghcr.io,*.ghcr.io,github.com,*.github.com
+      # 1) GHCR 认证走 DOCKER_AUTH_CONFIG（不触发 login/keychain）
+      - name: Prepare GHCR auth & (re)create builder with env.DOCKER_CONFIG only
         run: |
-          # GHCR 凭证（GHCR_TOKEN 优先，否则 GITHUB_TOKEN）
           USER="${{ github.repository_owner }}"
           TOKEN="${{ secrets.GHCR_TOKEN }}"
           [ -z "$TOKEN" ] && TOKEN="${{ secrets.GITHUB_TOKEN }}"
-          [ -n "$TOKEN" ] || { echo "ERROR: Neither GHCR_TOKEN nor GITHUB_TOKEN available." >&2; exit 1; }
+          [ -n "$TOKEN" ] || { echo "ERROR: Neither GHCR_TOKEN nor GITHUB_TOKEN available."; exit 1; }
           AUTH=$(printf "%s:%s" "$USER" "$TOKEN" | base64 | tr -d '\n')
           echo 'DOCKER_AUTH_CONFIG={"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}' >> "$GITHUB_ENV"
-          echo "✅ DOCKER_AUTH_CONFIG ready (inline, no keychain)"
+          echo "✅ DOCKER_AUTH_CONFIG ready"
 
-          # 关键：删除旧 builder，按当前 DOCKER_CONFIG 环境重建，并把 env 注入 buildkit
-          docker buildx rm -f miniblog-builder || true
+          # 干净重建 builder：只注入 DOCKER_CONFIG（不要传 NO_PROXY/HTTP(S)_PROXY，避免逗号被拆）
+          if docker buildx inspect miniblog-builder >/dev/null 2>&1; then
+            docker buildx rm -f miniblog-builder >/dev/null 2>&1 || true
+          fi
           docker buildx create --name miniblog-builder --driver docker-container --use \
-            --driver-opt env.DOCKER_CONFIG="$DOCKER_CONFIG" \
-            --driver-opt env.HTTP_PROXY="$HTTP_PROXY" \
-            --driver-opt env.HTTPS_PROXY="$HTTPS_PROXY" \
-            --driver-opt env.NO_PROXY="$NO_PROXY"
+            --driver-opt env.DOCKER_CONFIG="$DOCKER_CONFIG"
           docker buildx inspect --bootstrap
           docker buildx ls
 
@@ -155,7 +148,6 @@ jobs:
             --push \
             .
 
-  # ====== 部署到 Server A ======
   deploy:
     runs-on: [self-hosted, macOS, ARM64]
     needs: build-and-push
@@ -171,29 +163,20 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SVRA_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy to server (login with a real shell user)
-        env:
-          HOST: ${{ secrets.SVRA_HOST }}
-          # 优先使用可登录账号（建议设置这个机密），否则回退到旧变量，再不行用 root
-          LOGIN_USER: ${{ secrets.SVRA_LOGIN_USER }}
-          LEGACY_USER: ${{ secrets.SVRA_USER }}
+      - name: Deploy to Server A via SSH
         run: |
-          USER="${LOGIN_USER:-$LEGACY_USER}"
-          [ -n "$USER" ] || USER="root"
-          echo "→ SSH as $USER@${HOST}"
-
           ssh -F /dev/null \
             -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
-            "$USER@$HOST" 'bash -s' <<'ENDSSH'
+            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
+            'bash -s' <<'ENDSSH'
           set -euo pipefail
 
-          # 远端同样使用临时 DOCKER_CONFIG，避免任何 credsStore/钥匙串
+          # 服务器侧也使用临时 DOCKER_CONFIG，避免 credHelper
           export DOCKER_CONFIG="$(mktemp -d)"
           printf '{}' > "$DOCKER_CONFIG/config.json"
 
-          # 基础准备
           docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
           if ! mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} 2>/dev/null; then
             sudo -n mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} || {
@@ -203,25 +186,21 @@ jobs:
           fi
           cd /opt/miniblog
 
-          # 拉取/更新仓库（私库可在仓库机密中提供 SVRA_GIT_TOKEN）
           if [ -d .git ]; then
             git fetch --all -p && git reset --hard origin/main
           else
-            REPO_URL="https://github.com/${{ github.repository }}.git"
-            if [ -n "${{ secrets.SVRA_GIT_TOKEN }}" ]; then
-              REPO_URL="https://${{ secrets.SVRA_GIT_TOKEN }}@github.com/${{ github.repository }}.git"
-            fi
-            git clone "$REPO_URL" .
+            git clone https://github.com/${{ github.repository }}.git . || {
+              echo "Repo private? Provide SVRA_GIT_TOKEN if needed." >&2
+              exit 1
+            }
           fi
 
-          # GHCR 鉴权（优先 GHCR_TOKEN，其次 GITHUB_TOKEN）
-          USER_GH="${{ github.repository_owner }}"
-          TOKEN_GH="${{ secrets.GHCR_TOKEN }}"
-          [ -z "$TOKEN_GH" ] && TOKEN_GH="${{ secrets.GITHUB_TOKEN }}"
-          AUTH=$(printf "%s:%s" "$USER_GH" "$TOKEN_GH" | base64 | tr -d '\n')
+          USER="${{ github.repository_owner }}"
+          TOKEN="${{ secrets.GHCR_TOKEN }}"
+          [ -z "$TOKEN" ] && TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          AUTH=$(printf "%s:%s" "$USER" "$TOKEN" | base64 | tr -d '\n')
           export DOCKER_AUTH_CONFIG='{"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}'
 
-          # 写 .env（镜像标签使用本次构建的 SHA）
           cat > .env <<'EOF'
           BACKEND_IMAGE_TAG=${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
           FRONTEND_BLOG_IMAGE_TAG=${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
@@ -246,11 +225,9 @@ jobs:
           FEISHU_DOCREADER_APPSECRET=${{ secrets.FEISHU_DOCREADER_APPSECRET }}
           EOF
 
-          # 拉镜像 & 启动
           docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
           docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
-          # 接入共享网络 & 探活 & reload
           docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
           docker network connect miniblog_net nginx || true
 
