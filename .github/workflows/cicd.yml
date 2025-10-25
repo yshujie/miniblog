@@ -63,16 +63,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 0) 本 job 使用“空”的 Docker 配置，彻底绕过 macOS Keychain/credStore
+      # 0) 本 job 使用“空”的 Docker 配置，明确给 docker.io 匿名条目，完全不触发钥匙串
       - name: Disable macOS keychain for this job
         run: |
           export DOCKER_CONFIG="$RUNNER_TEMP/.docker"
           mkdir -p "$DOCKER_CONFIG"
-          printf '{}' > "$DOCKER_CONFIG/config.json"
+          cat > "$DOCKER_CONFIG/config.json" <<'JSON'
+          {
+            "auths": {
+              "https://index.docker.io/v1/": {}
+            }
+          }
+          JSON
           echo "DOCKER_CONFIG=$DOCKER_CONFIG" >> "$GITHUB_ENV"
-          echo "🔒 Using ephemeral DOCKER_CONFIG=$DOCKER_CONFIG (no credsStore)"
+          echo "🔒 Using ephemeral DOCKER_CONFIG=$DOCKER_CONFIG (no credsStore, docker.io anon)"
 
-      # 0.1) 把 buildx 暴露到临时 DOCKER_CONFIG
+      # 0.1) 把 buildx 插件显式暴露到临时 DOCKER_CONFIG（方案 A）
       - name: Make buildx available with ephemeral DOCKER_CONFIG
         run: |
           mkdir -p "$DOCKER_CONFIG/cli-plugins"
@@ -89,9 +95,14 @@ jobs:
           ln -sf "$SRC" "$DOCKER_CONFIG/cli-plugins/docker-buildx"
           docker buildx version
 
-      # 1) 仅对 ghcr.io 注入内联凭证（优先 GHCR_TOKEN，其次 GITHUB_TOKEN）
-      - name: Prepare registry auth (DOCKER_AUTH_CONFIG)
+      # 1) 仅对 ghcr.io 注入内联凭证；并“重建” builder，把 DOCKER_CONFIG 注入 buildkit
+      - name: Prepare registry auth and Setup Docker Buildx
+        env:
+          HTTP_PROXY: ""
+          HTTPS_PROXY: ""
+          NO_PROXY: ghcr.io,*.ghcr.io,github.com,*.github.com
         run: |
+          # GHCR 凭证（GHCR_TOKEN 优先，否则 GITHUB_TOKEN）
           USER="${{ github.repository_owner }}"
           TOKEN="${{ secrets.GHCR_TOKEN }}"
           [ -z "$TOKEN" ] && TOKEN="${{ secrets.GITHUB_TOKEN }}"
@@ -100,14 +111,13 @@ jobs:
           echo 'DOCKER_AUTH_CONFIG={"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}' >> "$GITHUB_ENV"
           echo "✅ DOCKER_AUTH_CONFIG ready (inline, no keychain)"
 
-      - name: Setup Docker Buildx
-        run: |
-          docker buildx version
-          if docker buildx inspect miniblog-builder &>/dev/null; then
-            docker buildx use miniblog-builder
-          else
-            docker buildx create --name miniblog-builder --driver docker-container --use
-          fi
+          # 关键：删除旧 builder，按当前 DOCKER_CONFIG 环境重建，并把 env 注入 buildkit
+          docker buildx rm -f miniblog-builder || true
+          docker buildx create --name miniblog-builder --driver docker-container --use \
+            --driver-opt env.DOCKER_CONFIG="$DOCKER_CONFIG" \
+            --driver-opt env.HTTP_PROXY="$HTTP_PROXY" \
+            --driver-opt env.HTTPS_PROXY="$HTTPS_PROXY" \
+            --driver-opt env.NO_PROXY="$NO_PROXY"
           docker buildx inspect --bootstrap
           docker buildx ls
 
