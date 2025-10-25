@@ -10,7 +10,6 @@ on:
         type: boolean
         default: false
 
-# 让 GITHUB_TOKEN 能推 GHCR
 permissions:
   contents: read
   packages: write
@@ -26,6 +25,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ====== 单元测试 ======
   test:
     if: ${{ !inputs.skip_tests }}
     runs-on: [self-hosted, macOS, ARM64]
@@ -51,6 +51,7 @@ jobs:
       - name: Run unit tests
         run: make test-backend
 
+  # ====== 构建并推送镜像 ======
   build-and-push:
     needs: [test]
     if: ${{ !cancelled() && (success() || inputs.skip_tests) }}
@@ -62,7 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 0) 本 job 使用“空”的 Docker 配置，彻底绕开 macOS Keychain/credStore
+      # 0) 本 job 使用“空”的 Docker 配置，彻底绕过 macOS Keychain/credStore
       - name: Disable macOS keychain for this job
         run: |
           export DOCKER_CONFIG="$RUNNER_TEMP/.docker"
@@ -71,11 +72,29 @@ jobs:
           echo "DOCKER_CONFIG=$DOCKER_CONFIG" >> "$GITHUB_ENV"
           echo "🔒 Using ephemeral DOCKER_CONFIG=$DOCKER_CONFIG (no credsStore)"
 
-      # 1) 生成 DOCKER_AUTH_CONFIG（优先 GHCR_TOKEN；否则用 GITHUB_TOKEN）
+      # 0.1) 把 buildx 暴露到临时 DOCKER_CONFIG
+      - name: Make buildx available with ephemeral DOCKER_CONFIG
+        run: |
+          mkdir -p "$DOCKER_CONFIG/cli-plugins"
+          if [ -x /Applications/Docker.app/Contents/Resources/cli-plugins/docker-buildx ]; then
+            SRC=/Applications/Docker.app/Contents/Resources/cli-plugins/docker-buildx
+          elif [ -x "$HOME/.docker/cli-plugins/docker-buildx" ]; then
+            SRC="$HOME/.docker/cli-plugins/docker-buildx"
+          elif command -v docker-buildx >/dev/null 2>&1; then
+            SRC="$(command -v docker-buildx)"
+          else
+            echo "ERROR: docker-buildx binary not found on this runner" >&2
+            exit 1
+          fi
+          ln -sf "$SRC" "$DOCKER_CONFIG/cli-plugins/docker-buildx"
+          docker buildx version
+
+      # 1) 仅对 ghcr.io 注入内联凭证（优先 GHCR_TOKEN，其次 GITHUB_TOKEN）
       - name: Prepare registry auth (DOCKER_AUTH_CONFIG)
         run: |
           USER="${{ github.repository_owner }}"
-          TOKEN="${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}"
+          TOKEN="${{ secrets.GHCR_TOKEN }}"
+          [ -z "$TOKEN" ] && TOKEN="${{ secrets.GITHUB_TOKEN }}"
           [ -n "$TOKEN" ] || { echo "ERROR: Neither GHCR_TOKEN nor GITHUB_TOKEN available." >&2; exit 1; }
           AUTH=$(printf "%s:%s" "$USER" "$TOKEN" | base64 | tr -d '\n')
           echo 'DOCKER_AUTH_CONFIG={"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}' >> "$GITHUB_ENV"
@@ -126,6 +145,7 @@ jobs:
             --push \
             .
 
+  # ====== 部署到 Server A ======
   deploy:
     runs-on: [self-hosted, macOS, ARM64]
     needs: build-and-push
@@ -165,7 +185,7 @@ jobs:
           fi
           cd /opt/miniblog
 
-          # 2) 拉代码（公库直接 https；私库可提供 SVRA_GIT_TOKEN）
+          # 2) 拉代码（公库直接 https；私库需提供 SVRA_GIT_TOKEN）
           if [ -d .git ]; then
             git fetch --all -p && git reset --hard origin/main
           else
@@ -175,15 +195,16 @@ jobs:
                   clone https://github.com/${{ github.repository }}.git .
             else
               git clone https://github.com/${{ github.repository }}.git . || {
-                echo "ERROR: Repo likely private. Set SVRA_GIT_TOKEN (classic PAT with repo:read)" >&2
+                echo "ERROR: Repo likely private. Set SVRA_GIT_TOKEN (classic PAT with repo read)" >&2
                 exit 1
               }
             fi
           fi
 
-          # 3) GHCR 认证（仍走内联 DOCKER_AUTH_CONFIG）
+          # 3) GHCR 认证（仍走内联 DOCKER_AUTH_CONFIG，GHCR_TOKEN 优先）
           USER="${{ github.repository_owner }}"
-          TOKEN="${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}"
+          TOKEN="${{ secrets.GHCR_TOKEN }}"
+          [ -z "$TOKEN" ] && TOKEN="${{ secrets.GITHUB_TOKEN }}"
           AUTH=$(printf "%s:%s" "$USER" "$TOKEN" | base64 | tr -d '\n')
           export DOCKER_AUTH_CONFIG='{"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}'
 
