@@ -25,13 +25,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # 单元测试阶段
   test:
     if: ${{ !inputs.skip_tests }}
     runs-on: [self-hosted, macOS, ARM64]
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -40,20 +39,16 @@ jobs:
           cache-dependency-path: |
             go.sum
             go.work.sum
-      
-      - name: Fix Go module cache permissions
+
+      - name: Fix Go module cache permissions (best-effort)
         run: |
-          # 修复 Go 模块缓存的权限问题
-          if [ -d ~/go/pkg/mod ]; then
-            chmod -R u+w ~/go/pkg/mod || true
-            echo "✅ Go 模块缓存权限已修复"
-          else
-            echo "✅ Go 模块缓存目录不存在，跳过"
+          if [ -d "$HOME/go/pkg/mod" ]; then
+            chmod -R u+w "$HOME/go/pkg/mod" || true
           fi
-      
+
       - name: Download dependencies
         run: go mod download
-      
+
       - name: Run unit tests
         run: make test-backend
 
@@ -61,47 +56,47 @@ jobs:
     needs: [test]
     if: ${{ !cancelled() && (success() || inputs.skip_tests) }}
     runs-on: [self-hosted, macOS, ARM64]
-
+    # 关键：让 docker 使用临时配置目录，避免写入 macOS 钥匙串
+    env:
+      DOCKER_CONFIG: ${{ runner.temp }}/docker-config
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      NO_PROXY: ghcr.io,*.ghcr.io,github.com,*.github.com
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }} # 可选；若未配置将回落到 GITHUB_TOKEN
     steps:
       - uses: actions/checkout@v4
 
-      - name: Login to GitHub Container Registry
-        env:
-          # 禁用代理以直接连接 GHCR（避免代理干扰认证）
-          HTTP_PROXY: ""
-          HTTPS_PROXY: ""
-          NO_PROXY: "ghcr.io,*.ghcr.io,github.com,*.github.com"
+      - name: Prepare Docker config (no keychain)
         run: |
-          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
-          echo "✅ 已登录到 GHCR"
+          mkdir -p "$DOCKER_CONFIG"
+          echo '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
+
+      - name: Login to GitHub Container Registry
+        run: |
+          TOKEN="${GHCR_TOKEN:-${GITHUB_TOKEN}}"
+          if [ -z "$TOKEN" ]; then
+            echo "ERROR: Neither GHCR_TOKEN nor GITHUB_TOKEN is available." >&2
+            exit 1
+          fi
+          echo "$TOKEN" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+          echo "✅ Logged in to GHCR with custom DOCKER_CONFIG"
 
       - name: Setup Docker Buildx
         run: |
-          # 验证 buildx 已安装
-          echo "=== Buildx 版本 ==="
           docker buildx version
-          echo ""
-          
-          # 创建或使用现有的 builder
           if docker buildx inspect miniblog-builder &>/dev/null; then
-            echo "✅ 使用现有 builder: miniblog-builder"
             docker buildx use miniblog-builder
           else
-            echo "📦 创建新的 builder: miniblog-builder"
             docker buildx create --name miniblog-builder --driver docker-container --use
           fi
-          
-          # 启动 builder
+          # 确保 QEMU 可用
           docker buildx inspect --bootstrap
-          
-          echo ""
-          echo "=== 可用的 Builders ==="
           docker buildx ls
 
       # === Backend ===
       - name: Build & Push backend (linux/amd64)
         run: |
-          echo "🔨 构建 Backend 镜像..."
           docker buildx build \
             --platform linux/amd64 \
             --file build/docker/miniblog/Dockerfile.prod.backend \
@@ -110,12 +105,10 @@ jobs:
             --tag ${{ env.BACKEND_IMAGE }}:latest \
             --push \
             .
-          echo "✅ Backend 镜像构建并推送成功"
 
       # === Frontend Blog ===
-      - name: Build & Push frontend-blog
+      - name: Build & Push frontend-blog (linux/amd64)
         run: |
-          echo "🔨 构建 Frontend Blog 镜像..."
           docker buildx build \
             --platform linux/amd64 \
             --file build/docker/miniblog/Dockerfile.prod.frontend.blog \
@@ -123,12 +116,10 @@ jobs:
             --tag ${{ env.FE_BLOG_IMAGE }}:latest \
             --push \
             .
-          echo "✅ Frontend Blog 镜像构建并推送成功"
 
       # === Frontend Admin ===
-      - name: Build & Push frontend-admin
+      - name: Build & Push frontend-admin (linux/amd64)
         run: |
-          echo "🔨 构建 Frontend Admin 镜像..."
           docker buildx build \
             --platform linux/amd64 \
             --file build/docker/miniblog/Dockerfile.prod.frontend.admin \
@@ -136,10 +127,8 @@ jobs:
             --tag ${{ env.FE_ADMIN_IMAGE }}:latest \
             --push \
             .
-          echo "✅ Frontend Admin 镜像构建并推送成功"
 
   deploy:
-    # 使用 macOS 自托管 runner，避免容器 action 限制
     runs-on: [self-hosted, macOS, ARM64]
     needs: build-and-push
     environment: production
@@ -147,7 +136,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 准备 SSH 密钥（一次性设置）
       - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh
@@ -156,6 +144,9 @@ jobs:
           ssh-keyscan -H ${{ secrets.SVRA_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy to Server A via SSH
+        env:
+          # 供远端 docker login 使用
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           ssh -F /dev/null \
             -i ~/.ssh/deploy_key \
@@ -165,29 +156,30 @@ jobs:
             'bash -s' <<'ENDSSH'
           set -euo pipefail
 
-          # 1) 预置网络/目录（幂等）
+          # --- 1) 网络与目录（幂等） ---
           docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
-          # Try to create directories; if normal mkdir fails (permission), try non-interactive sudo (-n).
           if ! mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} 2>/dev/null; then
-            echo "Attempting to use sudo to create directories (non-interactive)" >&2
-            sudo -n mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} || (
-              echo "ERROR: Unable to create required directories. Ensure deploy user has NOPASSWD sudo or create these dirs manually." >&2
+            sudo -n mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} || {
+              echo "ERROR: Need permission to create /opt/miniblog and /data/logs/miniblog/*" >&2
               exit 1
-            )
+            }
           fi
           cd /opt/miniblog
 
-          # 2) 拉代码（要求服务器已配置 Deploy Key：Host github-miniblog）
+          # --- 2) 拉取部署仓库（默认用 HTTPS，无需 SSH） ---
           if [ -d .git ]; then
-            git fetch --all -p && git reset --hard origin/main
+            git fetch --all -p
+            git reset --hard origin/main
           else
-            git clone github-miniblog:${{ github.repository }} .
+            git clone https://github.com/${{ github.repository }}.git .
           fi
 
-          # 3) 登录 GHCR（拉镜像）
-          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+          # --- 3) 登录 GHCR（远端）---
+          if [ -n "${GHCR_TOKEN:-}" ]; then
+            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+          fi
 
-          # 4) 写入 .env（用带引号的 heredoc 防止远端 shell 展开）
+          # --- 4) 生成 .env ---
           cat > .env <<'EOF'
           BACKEND_IMAGE_TAG=${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
           FRONTEND_BLOG_IMAGE_TAG=${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
@@ -212,15 +204,14 @@ jobs:
           FEISHU_DOCREADER_APPSECRET=${{ secrets.FEISHU_DOCREADER_APPSECRET }}
           EOF
 
-          # 5) 拉取并无停机更新（生产覆盖文件固定 8090 端口）
+          # --- 5) 拉取镜像 & 无停机更新 ---
           docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
           docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
-          # Ensure nginx is connected to the application network and reload config to pick up new upstreams
+          # 确保 nginx 在同一网络并热加载
           docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
           docker network connect miniblog_net nginx || true
 
-          # Poll backend health endpoint (from inside miniblog_net) before reloading nginx
           echo "Polling backend health (up to 60s)..."
           HEALTH_OK=1
           for i in $(seq 1 30); do
@@ -232,27 +223,18 @@ jobs:
             sleep 2
           done
           if [ "$HEALTH_OK" -ne 0 ]; then
-            echo "WARNING: Backend health check failed after 60s; nginx reload will not be attempted" >&2
+            echo "WARNING: Backend health check failed after 60s" >&2
             exit 1
           fi
 
           docker exec nginx nginx -t && docker exec nginx nginx -s reload || true
 
-          # 6) 健康检查 + 简要状态
+          # --- 6) 健康检查 + 运行状态 ---
           sleep 2
           (curl -fsS http://127.0.0.1:8090/health && echo " HEALTH=OK") || (echo "HEALTH=FAIL"; exit 1)
           docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
           ENDSSH
 
-      # 数据库相关步骤（首次部署时可能需要）：
-      # 已由维护人员在目标环境手动执行。若将来需要恢复自动化，请恢复下面被移除的步骤：
-      #  - DB Init  (首次初始化)
-      #  - DB Migrate (数据库迁移)
-      #  - DB Seed (种子数据导入)
-      # 为避免意外在每次部署执行，已暂时移除这些步骤。
-
-      # 清理 SSH 密钥
       - name: Cleanup SSH Key
         if: always()
-        run: |
-          rm -f ~/.ssh/deploy_key
+        run: rm -f ~/.ssh/deploy_key
