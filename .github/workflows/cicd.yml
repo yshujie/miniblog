@@ -10,6 +10,7 @@ on:
         type: boolean
         default: false
 
+# 让 GITHUB_TOKEN 能推 GHCR
 permissions:
   contents: read
   packages: write
@@ -61,19 +62,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 生成 DOCKER_AUTH_CONFIG（用 GHCR_TOKEN；没有就回退 GITHUB_TOKEN）
+      # 0) 本 job 使用“空”的 Docker 配置，彻底绕开 macOS Keychain/credStore
+      - name: Disable macOS keychain for this job
+        run: |
+          export DOCKER_CONFIG="$RUNNER_TEMP/.docker"
+          mkdir -p "$DOCKER_CONFIG"
+          printf '{}' > "$DOCKER_CONFIG/config.json"
+          echo "DOCKER_CONFIG=$DOCKER_CONFIG" >> "$GITHUB_ENV"
+          echo "🔒 Using ephemeral DOCKER_CONFIG=$DOCKER_CONFIG (no credsStore)"
+
+      # 1) 生成 DOCKER_AUTH_CONFIG（优先 GHCR_TOKEN；否则用 GITHUB_TOKEN）
       - name: Prepare registry auth (DOCKER_AUTH_CONFIG)
         run: |
           USER="${{ github.repository_owner }}"
           TOKEN="${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}"
-          if [ -z "$TOKEN" ]; then
-            echo "ERROR: Neither GHCR_TOKEN nor GITHUB_TOKEN available." >&2
-            exit 1
-          fi
+          [ -n "$TOKEN" ] || { echo "ERROR: Neither GHCR_TOKEN nor GITHUB_TOKEN available." >&2; exit 1; }
           AUTH=$(printf "%s:%s" "$USER" "$TOKEN" | base64 | tr -d '\n')
-          {
-            echo 'DOCKER_AUTH_CONFIG={"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}'
-          } >> "$GITHUB_ENV"
+          echo 'DOCKER_AUTH_CONFIG={"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}' >> "$GITHUB_ENV"
           echo "✅ DOCKER_AUTH_CONFIG ready (inline, no keychain)"
 
       - name: Setup Docker Buildx
@@ -87,6 +92,7 @@ jobs:
           docker buildx inspect --bootstrap
           docker buildx ls
 
+      # === Backend ===
       - name: Build & Push backend (linux/amd64)
         run: |
           docker buildx build \
@@ -98,6 +104,7 @@ jobs:
             --push \
             .
 
+      # === Frontend Blog ===
       - name: Build & Push frontend-blog (linux/amd64)
         run: |
           docker buildx build \
@@ -108,6 +115,7 @@ jobs:
             --push \
             .
 
+      # === Frontend Admin ===
       - name: Build & Push frontend-admin (linux/amd64)
         run: |
           docker buildx build \
@@ -133,7 +141,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SVRA_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy to Server A via SSH (ephemeral auth, no docker login)
+      - name: Deploy to Server A via SSH
         run: |
           ssh -F /dev/null \
             -i ~/.ssh/deploy_key \
@@ -143,30 +151,43 @@ jobs:
             'bash -s' <<'ENDSSH'
           set -euo pipefail
 
+          # 0) 服务器侧也使用临时 DOCKER_CONFIG（避免任何 credHelper 干扰）
+          export DOCKER_CONFIG="$(mktemp -d)"
+          printf '{}' > "$DOCKER_CONFIG/config.json"
+
+          # 1) 预置网络/目录（幂等）
           docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
           if ! mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} 2>/dev/null; then
             sudo -n mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} || {
-              echo "ERROR: Need permission to create /opt/miniblog and /data/logs/miniblog/*" >&2
+              echo "ERROR: Need permission to create /opt/miniblog & /data/logs/miniblog/*" >&2
               exit 1
             }
           fi
           cd /opt/miniblog
 
-          # 拉代码（HTTPS，公共仓库零依赖；设为私库时用只读 Token 替换）
+          # 2) 拉代码（公库直接 https；私库可提供 SVRA_GIT_TOKEN）
           if [ -d .git ]; then
-            git fetch --all -p
-            git reset --hard origin/main
+            git fetch --all -p && git reset --hard origin/main
           else
-            git clone https://github.com/${{ github.repository }}.git .
+            if [ -n "${SVRA_GIT_TOKEN:-}" ]; then
+              AUTH=$(printf "%s:%s" "${{ github.repository_owner }}" "$SVRA_GIT_TOKEN" | base64 | tr -d '\n')
+              git -c http.extraheader="AUTHORIZATION: basic $AUTH" \
+                  clone https://github.com/${{ github.repository }}.git .
+            else
+              git clone https://github.com/${{ github.repository }}.git . || {
+                echo "ERROR: Repo likely private. Set SVRA_GIT_TOKEN (classic PAT with repo:read)" >&2
+                exit 1
+              }
+            fi
           fi
 
-          # 远端也用 DOCKER_AUTH_CONFIG（不进行 docker login）
+          # 3) GHCR 认证（仍走内联 DOCKER_AUTH_CONFIG）
           USER="${{ github.repository_owner }}"
           TOKEN="${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}"
           AUTH=$(printf "%s:%s" "$USER" "$TOKEN" | base64 | tr -d '\n')
           export DOCKER_AUTH_CONFIG='{"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}'
 
-          # 生成 .env
+          # 4) 写入 .env
           cat > .env <<'EOF'
           BACKEND_IMAGE_TAG=${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
           FRONTEND_BLOG_IMAGE_TAG=${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
@@ -191,9 +212,11 @@ jobs:
           FEISHU_DOCREADER_APPSECRET=${{ secrets.FEISHU_DOCREADER_APPSECRET }}
           EOF
 
+          # 5) 拉取并无停机更新
           docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
           docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
+          # Nginx 网络&热加载
           docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
           docker network connect miniblog_net nginx || true
 
@@ -211,6 +234,7 @@ jobs:
 
           docker exec nginx nginx -t && docker exec nginx nginx -s reload || true
 
+          # 6) 健康检查 + 简要状态
           sleep 2
           (curl -fsS http://127.0.0.1:8090/health && echo " HEALTH=OK") || (echo "HEALTH=FAIL"; exit 1)
           docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
