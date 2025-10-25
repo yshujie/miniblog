@@ -161,13 +161,16 @@ jobs:
             'bash -s' <<'ENDSSH'
           set -euo pipefail
 
-          # ---------- 0) 可选：sudo 无密码快速检查 ----------
-          if ! sudo -n true 2>/dev/null; then
-            echo "ERROR: deploy 用户需要 NOPASSWD 的 sudo（至少对 docker 与目录操作）" >&2
-            exit 1
+          # ---------- 0) 预检：只检测已放权的命令（不要用 `sudo -n true`） ----------
+          if ! sudo -n /usr/bin/docker version >/dev/null 2>&1; then
+            echo "ERROR: sudo NOPASSWD 对 /usr/bin/docker 未生效" >&2; exit 1
           fi
+          if ! sudo -n /usr/bin/install -d -m 755 -o "$(id -un)" -g "$(id -gn)" /tmp/_sudo_check_dir 2>/dev/null; then
+            echo "ERROR: sudo NOPASSWD 对 /usr/bin/install 未生效" >&2; exit 1
+          fi
+          rmdir /tmp/_sudo_check_dir 2>/dev/null || true
 
-          # ---------- 1) 仅对 git 启用代理（来自 secrets），Docker 前会显式去代理 ----------
+          # ---------- 1) 仅对 git 启用网络代理；Docker 执行前显式去代理 ----------
           PROXY_HTTP="${{ secrets.SVRA_HTTP_PROXY }}"
           PROXY_HTTPS="${{ secrets.SVRA_HTTPS_PROXY }}"
           PROXY_NO="${{ secrets.SVRA_NO_PROXY }}"
@@ -180,7 +183,6 @@ jobs:
             GIT_PROXY=(-c http.proxy="$https_proxy" -c https.proxy="$https_proxy")
             echo "➡️ git 使用代理（值已隐藏）"
           else
-            # 无 secrets 时：尝试本地 127.0.0.1:7890
             if command -v nc >/dev/null 2>&1 && nc -z 127.0.0.1 7890; then
               export http_proxy="http://127.0.0.1:7890"
               export https_proxy="$http_proxy"
@@ -202,13 +204,13 @@ jobs:
           LOG_DIR="/data/logs/miniblog"
           NET_NAME="miniblog_net"
 
-          # 用 sudo 创建并把属主改回 deploy 用户
-          sudo install -d -m 755 -o "$(id -un)" -g "$(id -gn)" "$APP_DIR"
-          sudo install -d -m 755 -o "$(id -un)" -g "$(id -gn)" \
+          sudo -n /usr/bin/install -d -m 755 -o "$(id -un)" -g "$(id -gn)" "$APP_DIR"
+          sudo -n /usr/bin/install -d -m 755 -o "$(id -un)" -g "$(id -gn)" \
             "$LOG_DIR" "$LOG_DIR/backend" "$LOG_DIR/frontend-blog" "$LOG_DIR/frontend-admin"
 
           # 网络
-          sudo docker network inspect "$NET_NAME" >/dev/null 2>&1 || sudo docker network create "$NET_NAME"
+          sudo -n /usr/bin/docker network inspect "$NET_NAME" >/dev/null 2>&1 || \
+            sudo -n /usr/bin/docker network create "$NET_NAME"
 
           cd "$APP_DIR"
 
@@ -216,9 +218,7 @@ jobs:
           REPO_URL="https://github.com/${{ github.repository }}.git"
           if [ -d .git ]; then
             for t in 1 2 3; do
-              if git "${GIT_PROXY[@]}" \
-                   -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
-                   fetch --all -p; then
+              if git "${GIT_PROXY[@]}" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 fetch --all -p; then
                 git reset --hard origin/main
                 break
               fi
@@ -227,9 +227,7 @@ jobs:
             done
           else
             for t in 1 2 3; do
-              if git "${GIT_PROXY[@]}" \
-                    -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
-                    clone "$REPO_URL" .; then
+              if git "${GIT_PROXY[@]}" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 clone "$REPO_URL" .; then
                 break
               fi
               echo "git clone 重试 $t/3"; sleep 2
@@ -269,19 +267,20 @@ jobs:
           FEISHU_DOCREADER_APPSECRET=${{ secrets.FEISHU_DOCREADER_APPSECRET }}
           EOF
 
-          # ---------- 6) Docker：操作前去代理（避免影响 GHCR/内网） ----------
+          # ---------- 6) Docker：执行前去代理（避免影响 GHCR/内网） ----------
           env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
-            sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            sudo -n /usr/bin/docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
           env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
-            sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            sudo -n /usr/bin/docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
           # 接入共享网络 & 健康检查 & nginx reload
-          sudo docker network inspect "$NET_NAME" >/dev/null 2>&1 || sudo docker network create "$NET_NAME"
-          sudo docker network connect "$NET_NAME" nginx || true
+          sudo -n /usr/bin/docker network inspect "$NET_NAME" >/dev/null 2>&1 || \
+            sudo -n /usr/bin/docker network create "$NET_NAME"
+          sudo -n /usr/bin/docker network connect "$NET_NAME" nginx || true
 
           echo "Polling backend health (up to 60s)..."
           for i in $(seq 1 30); do
-            if sudo docker run --rm --network="$NET_NAME" curlimages/curl:8.1.2 \
+            if sudo -n /usr/bin/docker run --rm --network="$NET_NAME" curlimages/curl:8.1.2 \
                  -fsS http://miniblog-backend:8080/health >/dev/null 2>&1; then
               echo "Backend healthy"
               break
@@ -289,11 +288,12 @@ jobs:
             sleep 2
           done
 
-          sudo docker exec nginx nginx -t && sudo docker exec nginx nginx -s reload || true
+          sudo -n /usr/bin/docker exec nginx nginx -t && \
+          sudo -n /usr/bin/docker exec nginx nginx -s reload || true
 
           sleep 2
           (curl -fsS http://127.0.0.1:8090/health && echo " HEALTH=OK") || (echo "HEALTH=FAIL"; exit 1)
-          sudo docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+          sudo -n /usr/bin/docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
           ENDSSH
 
       - name: Cleanup SSH Key
