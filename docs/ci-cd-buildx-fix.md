@@ -3,6 +3,7 @@
 ## 问题描述
 
 CI/CD 在 `setup-buildx-action` 步骤失败，日志显示：
+
 ```
 ##[group]Download buildx from GitHub Releases
 ##[endgroup]
@@ -24,6 +25,7 @@ Post job cleanup.
 ## 解决方案
 
 ### 重构前（使用 GitHub Actions）
+
 ```yaml
 - uses: docker/setup-qemu-action@v3
 - uses: docker/setup-buildx-action@v3
@@ -31,6 +33,7 @@ Post job cleanup.
 ```
 
 ### 重构后（使用原生 Docker 命令）
+
 ```yaml
 - name: Login to GitHub Container Registry
   run: docker login ghcr.io ...
@@ -68,6 +71,7 @@ Post job cleanup.
 ## 后续优化
 
 考虑添加：
+
 - 构建缓存优化（使用 Docker layer cache）
 - 并行构建多个镜像
 - 构建时间统计
