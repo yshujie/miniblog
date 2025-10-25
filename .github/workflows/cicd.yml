@@ -163,7 +163,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SVRA_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy to Server A via SSH
+      - name: Deploy to Server via SSH (use SVRA_USER)
         run: |
           ssh -F /dev/null \
             -i ~/.ssh/deploy_key \
@@ -173,10 +173,11 @@ jobs:
             'bash -s' <<'ENDSSH'
           set -euo pipefail
 
-          # 服务器侧也使用临时 DOCKER_CONFIG，避免 credHelper
+          # 远端也用临时 DOCKER_CONFIG，避免任何 credsStore/钥匙串干扰
           export DOCKER_CONFIG="$(mktemp -d)"
           printf '{}' > "$DOCKER_CONFIG/config.json"
 
+          # 目录与网络
           docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
           if ! mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} 2>/dev/null; then
             sudo -n mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} || {
@@ -186,21 +187,25 @@ jobs:
           fi
           cd /opt/miniblog
 
+          # 拉取/更新仓库（支持私库：提供 SVRA_GIT_TOKEN 即可）
           if [ -d .git ]; then
             git fetch --all -p && git reset --hard origin/main
           else
-            git clone https://github.com/${{ github.repository }}.git . || {
-              echo "Repo private? Provide SVRA_GIT_TOKEN if needed." >&2
-              exit 1
-            }
+            REPO_URL="https://github.com/${{ github.repository }}.git"
+            if [ -n "${{ secrets.SVRA_GIT_TOKEN }}" ]; then
+              REPO_URL="https://${{ secrets.SVRA_GIT_TOKEN }}@github.com/${{ github.repository }}.git"
+            fi
+            git clone "$REPO_URL" .
           fi
 
-          USER="${{ github.repository_owner }}"
-          TOKEN="${{ secrets.GHCR_TOKEN }}"
-          [ -z "$TOKEN" ] && TOKEN="${{ secrets.GITHUB_TOKEN }}"
-          AUTH=$(printf "%s:%s" "$USER" "$TOKEN" | base64 | tr -d '\n')
+          # GHCR 鉴权：优先 GHCR_TOKEN，其次 GITHUB_TOKEN
+          USER_GH="${{ github.repository_owner }}"
+          TOKEN_GH="${{ secrets.GHCR_TOKEN }}"
+          [ -z "$TOKEN_GH" ] && TOKEN_GH="${{ secrets.GITHUB_TOKEN }}"
+          AUTH=$(printf "%s:%s" "$USER_GH" "$TOKEN_GH" | base64 | tr -d '\n')
           export DOCKER_AUTH_CONFIG='{"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}'
 
+          # 写入 .env，使用本次构建的镜像标签
           cat > .env <<'EOF'
           BACKEND_IMAGE_TAG=${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
           FRONTEND_BLOG_IMAGE_TAG=${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
@@ -225,9 +230,11 @@ jobs:
           FEISHU_DOCREADER_APPSECRET=${{ secrets.FEISHU_DOCREADER_APPSECRET }}
           EOF
 
+          # 拉镜像并启动
           docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
           docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
+          # 接入共享网络 & 健康检查 & nginx reload
           docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
           docker network connect miniblog_net nginx || true
 
