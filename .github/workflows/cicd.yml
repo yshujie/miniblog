@@ -42,9 +42,7 @@ jobs:
 
       - name: Fix Go module cache permissions (best-effort)
         run: |
-          if [ -d "$HOME/go/pkg/mod" ]; then
-            chmod -R u+w "$HOME/go/pkg/mod" || true
-          fi
+          [ -d "$HOME/go/pkg/mod" ] && chmod -R u+w "$HOME/go/pkg/mod" || true
 
       - name: Download dependencies
         run: go mod download
@@ -56,31 +54,27 @@ jobs:
     needs: [test]
     if: ${{ !cancelled() && (success() || inputs.skip_tests) }}
     runs-on: [self-hosted, macOS, ARM64]
-    # 关键：让 docker 使用临时配置目录，避免写入 macOS 钥匙串
     env:
-      DOCKER_CONFIG: ${{ runner.temp }}/docker-config
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       NO_PROXY: ghcr.io,*.ghcr.io,github.com,*.github.com
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }} # 可选；若未配置将回落到 GITHUB_TOKEN
     steps:
       - uses: actions/checkout@v4
 
-      - name: Prepare Docker config (no keychain)
+      # 生成 DOCKER_AUTH_CONFIG（用 GHCR_TOKEN；没有就回退 GITHUB_TOKEN）
+      - name: Prepare registry auth (DOCKER_AUTH_CONFIG)
         run: |
-          mkdir -p "$DOCKER_CONFIG"
-          echo '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
-
-      - name: Login to GitHub Container Registry
-        run: |
-          TOKEN="${GHCR_TOKEN:-${GITHUB_TOKEN}}"
+          USER="${{ github.repository_owner }}"
+          TOKEN="${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}"
           if [ -z "$TOKEN" ]; then
-            echo "ERROR: Neither GHCR_TOKEN nor GITHUB_TOKEN is available." >&2
+            echo "ERROR: Neither GHCR_TOKEN nor GITHUB_TOKEN available." >&2
             exit 1
           fi
-          echo "$TOKEN" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
-          echo "✅ Logged in to GHCR with custom DOCKER_CONFIG"
+          AUTH=$(printf "%s:%s" "$USER" "$TOKEN" | base64 | tr -d '\n')
+          {
+            echo 'DOCKER_AUTH_CONFIG={"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}'
+          } >> "$GITHUB_ENV"
+          echo "✅ DOCKER_AUTH_CONFIG ready (inline, no keychain)"
 
       - name: Setup Docker Buildx
         run: |
@@ -90,11 +84,9 @@ jobs:
           else
             docker buildx create --name miniblog-builder --driver docker-container --use
           fi
-          # 确保 QEMU 可用
           docker buildx inspect --bootstrap
           docker buildx ls
 
-      # === Backend ===
       - name: Build & Push backend (linux/amd64)
         run: |
           docker buildx build \
@@ -106,7 +98,6 @@ jobs:
             --push \
             .
 
-      # === Frontend Blog ===
       - name: Build & Push frontend-blog (linux/amd64)
         run: |
           docker buildx build \
@@ -117,7 +108,6 @@ jobs:
             --push \
             .
 
-      # === Frontend Admin ===
       - name: Build & Push frontend-admin (linux/amd64)
         run: |
           docker buildx build \
@@ -143,10 +133,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SVRA_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy to Server A via SSH
-        env:
-          # 供远端 docker login 使用
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Deploy to Server A via SSH (ephemeral auth, no docker login)
         run: |
           ssh -F /dev/null \
             -i ~/.ssh/deploy_key \
@@ -156,7 +143,6 @@ jobs:
             'bash -s' <<'ENDSSH'
           set -euo pipefail
 
-          # --- 1) 网络与目录（幂等） ---
           docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
           if ! mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} 2>/dev/null; then
             sudo -n mkdir -p /opt/miniblog /data/logs/miniblog/{backend,frontend-blog,frontend-admin} || {
@@ -166,7 +152,7 @@ jobs:
           fi
           cd /opt/miniblog
 
-          # --- 2) 拉取部署仓库（默认用 HTTPS，无需 SSH） ---
+          # 拉代码（HTTPS，公共仓库零依赖；设为私库时用只读 Token 替换）
           if [ -d .git ]; then
             git fetch --all -p
             git reset --hard origin/main
@@ -174,12 +160,13 @@ jobs:
             git clone https://github.com/${{ github.repository }}.git .
           fi
 
-          # --- 3) 登录 GHCR（远端）---
-          if [ -n "${GHCR_TOKEN:-}" ]; then
-            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
-          fi
+          # 远端也用 DOCKER_AUTH_CONFIG（不进行 docker login）
+          USER="${{ github.repository_owner }}"
+          TOKEN="${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}"
+          AUTH=$(printf "%s:%s" "$USER" "$TOKEN" | base64 | tr -d '\n')
+          export DOCKER_AUTH_CONFIG='{"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}'
 
-          # --- 4) 生成 .env ---
+          # 生成 .env
           cat > .env <<'EOF'
           BACKEND_IMAGE_TAG=${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
           FRONTEND_BLOG_IMAGE_TAG=${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
@@ -204,11 +191,9 @@ jobs:
           FEISHU_DOCREADER_APPSECRET=${{ secrets.FEISHU_DOCREADER_APPSECRET }}
           EOF
 
-          # --- 5) 拉取镜像 & 无停机更新 ---
           docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
           docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
-          # 确保 nginx 在同一网络并热加载
           docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
           docker network connect miniblog_net nginx || true
 
@@ -222,14 +207,10 @@ jobs:
             fi
             sleep 2
           done
-          if [ "$HEALTH_OK" -ne 0 ]; then
-            echo "WARNING: Backend health check failed after 60s" >&2
-            exit 1
-          fi
+          [ "$HEALTH_OK" -eq 0 ] || { echo "WARNING: Backend health check failed"; exit 1; }
 
           docker exec nginx nginx -t && docker exec nginx nginx -s reload || true
 
-          # --- 6) 健康检查 + 运行状态 ---
           sleep 2
           (curl -fsS http://127.0.0.1:8090/health && echo " HEALTH=OK") || (echo "HEALTH=FAIL"; exit 1)
           docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
