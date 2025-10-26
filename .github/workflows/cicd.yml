@@ -61,15 +61,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use ephemeral DOCKER_CONFIG (no credsStore)
+      - name: Use ephemeral DOCKER_CONFIG (no credsStore) + write GHCR auth
         run: |
           export DOCKER_CONFIG="$RUNNER_TEMP/.docker"
           mkdir -p "$DOCKER_CONFIG"
-          cat > "$DOCKER_CONFIG/config.json" <<'JSON'
-          { "auths": { "https://index.docker.io/v1/": {} } }
+
+          USER="${{ github.repository_owner }}"
+          TOKEN="${{ secrets.GHCR_TOKEN }}"
+          [ -z "$TOKEN" ] && TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          [ -n "$TOKEN" ] || { echo "ERROR: Neither GHCR_TOKEN nor GITHUB_TOKEN available."; exit 1; }
+          AUTH_BASE64=$(printf "%s:%s" "$USER" "$TOKEN" | base64 | tr -d '\n')
+
+          # 单一 config.json，包含 docker.io 空登录 & ghcr.io 凭据
+          cat > "$DOCKER_CONFIG/config.json" <<JSON
+          {
+            "auths": {
+              "https://index.docker.io/v1/": {},
+              "ghcr.io": { "auth": "$AUTH_BASE64" }
+            }
+          }
           JSON
+
           echo "DOCKER_CONFIG=$DOCKER_CONFIG" >> "$GITHUB_ENV"
-          echo "🔒 Using DOCKER_CONFIG=$DOCKER_CONFIG"
+          echo "🔒 Using DOCKER_CONFIG=$DOCKER_CONFIG (with GHCR auth)"
 
       - name: Expose buildx under ephemeral DOCKER_CONFIG
         run: |
@@ -87,16 +101,8 @@ jobs:
           ln -sf "$SRC" "$DOCKER_CONFIG/cli-plugins/docker-buildx"
           docker buildx version
 
-      - name: Prepare GHCR auth & (re)create builder with env.DOCKER_CONFIG only
+      - name: (Re)create buildx builder using env.DOCKER_CONFIG only
         run: |
-          USER="${{ github.repository_owner }}"
-          TOKEN="${{ secrets.GHCR_TOKEN }}"
-          [ -z "$TOKEN" ] && TOKEN="${{ secrets.GITHUB_TOKEN }}"
-          [ -n "$TOKEN" ] || { echo "ERROR: Neither GHCR_TOKEN nor GITHUB_TOKEN available."; exit 1; }
-          AUTH=$(printf "%s:%s" "$USER" "$TOKEN" | base64 | tr -d '\n')
-          echo 'DOCKER_AUTH_CONFIG={"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}' >> "$GITHUB_ENV"
-          echo "✅ DOCKER_AUTH_CONFIG ready"
-
           if docker buildx inspect miniblog-builder >/dev/null 2>&1; then
             docker buildx rm -f miniblog-builder >/dev/null 2>&1 || true
           fi
@@ -197,10 +203,6 @@ jobs:
             fi
           fi
 
-          # 远端也用临时 DOCKER_CONFIG，避免 credsStore/钥匙串干扰
-          export DOCKER_CONFIG="$(mktemp -d)"
-          printf '{}' > "$DOCKER_CONFIG/config.json"
-
           # ---------- 2) 目录与权限 ----------
           APP_DIR="/opt/miniblog"
           LOG_DIR="/data/logs/miniblog"
@@ -237,15 +239,22 @@ jobs:
             done
           fi
 
-          # ---------- 4) GHCR 鉴权（仅保存在当前 shell；下文用 sudo 保留此变量） ----------
+          # ---------- 4) GHCR 鉴权（方案 A：临时 config.json + --config） ----------
           USER_GH="${{ github.repository_owner }}"
           TOKEN_GH="${{ secrets.GHCR_TOKEN }}"
           [ -z "$TOKEN_GH" ] && TOKEN_GH="${{ secrets.GITHUB_TOKEN }}"
-          AUTH=$(printf "%s:%s" "$USER_GH" "$TOKEN_GH" | base64 | tr -d '\n')
-          export DOCKER_AUTH_CONFIG='{"auths":{"ghcr.io":{"auth":"'"$AUTH"'"}}}'
+          AUTH_BASE64=$(printf "%s:%s" "$USER_GH" "$TOKEN_GH" | base64 | tr -d '\n')
 
-          # 统一的 docker 命令（关键：保留 DOCKER_AUTH_CONFIG）
-          SUDO_DOCKER='sudo -n --preserve-env=DOCKER_AUTH_CONFIG /usr/bin/docker'
+          DOCKER_CFG_DIR="$(mktemp -d)"
+          # SSH 会话结束自动清理
+          trap 'rm -rf "$DOCKER_CFG_DIR"' EXIT
+
+          cat > "$DOCKER_CFG_DIR/config.json" <<JSON
+          { "auths": { "ghcr.io": { "auth": "$AUTH_BASE64" } } }
+          JSON
+
+          # 统一的 docker 命令（数组，等价于：sudo -n /usr/bin/docker --config "$DOCKER_CFG_DIR"）
+          SUDO_DOCKER=(sudo -n /usr/bin/docker --config "$DOCKER_CFG_DIR")
 
           # ---------- 5) 写 .env（使用本次构建镜像标签） ----------
           cat > .env <<'EOF'
@@ -274,17 +283,18 @@ jobs:
 
           # ---------- 6) Docker：执行前去代理（避免影响 GHCR/内网） ----------
           env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
-            $SUDO_DOCKER compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            "${SUDO_DOCKER[@]}" compose -f docker-compose.yml -f docker-compose.prod.yml pull
           env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
-            $SUDO_DOCKER compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            "${SUDO_DOCKER[@]}" compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
           # 接入共享网络 & 健康检查 & nginx reload
-          $SUDO_DOCKER network inspect "$NET_NAME" >/dev/null 2>&1 || $SUDO_DOCKER network create "$NET_NAME"
-          $SUDO_DOCKER network connect "$NET_NAME" nginx || true
+          "${SUDO_DOCKER[@]}" network inspect "$NET_NAME" >/dev/null 2>&1 || \
+            "${SUDO_DOCKER[@]}" network create "$NET_NAME"
+          "${SUDO_DOCKER[@]}" network connect "$NET_NAME" nginx || true
 
           echo "Polling backend health (up to 60s)..."
           for i in $(seq 1 30); do
-            if $SUDO_DOCKER run --rm --network="$NET_NAME" curlimages/curl:8.1.2 \
+            if "${SUDO_DOCKER[@]}" run --rm --network="$NET_NAME" curlimages/curl:8.1.2 \
                  -fsS http://miniblog-backend:8080/health >/dev/null 2>&1; then
               echo "Backend healthy"
               break
@@ -292,11 +302,12 @@ jobs:
             sleep 2
           done
 
-          $SUDO_DOCKER exec nginx nginx -t && $SUDO_DOCKER exec nginx nginx -s reload || true
+          "${SUDO_DOCKER[@]}" exec nginx nginx -t && \
+          "${SUDO_DOCKER[@]}" exec nginx nginx -s reload || true
 
           sleep 2
           (curl -fsS http://127.0.0.1:8090/health && echo " HEALTH=OK") || (echo "HEALTH=FAIL"; exit 1)
-          $SUDO_DOCKER ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+          "${SUDO_DOCKER[@]}" ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
           ENDSSH
 
       - name: Cleanup SSH Key
