@@ -64,12 +64,39 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-qemu-action@v3
+        with:
+          cache-image: false
+
       - uses: docker/setup-buildx-action@v3
+        with:
+          install: true     # 安装 buildx 插件，避免后续 post 阶段告警
+          cleanup: false    # 保留到作业结束
+
+      # 强制把 Dockerfile 的 syntax 指令替换为 local，避免访问 docker/dockerfile:1.x
+      - name: Force Dockerfile syntax=local (backend)
+        run: |
+          f="build/docker/miniblog/Dockerfile.prod.backend"
+          if [ -f "$f" ]; then
+            if head -n1 "$f" | grep -q '^# syntax='; then
+              sed -i '' -e '1s|^# syntax=.*|# syntax=local|' "$f"
+            else
+              sed -i '' '1s;^;# syntax=local\n;' "$f"
+            fi
+          fi
 
       - name: Prepare temp Docker config (no keychain)
         run: |
           mkdir -p "$DOCKER_CONFIG"
-          echo '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
+          cat > "$DOCKER_CONFIG/config.json" <<'JSON'
+          {
+            "auths": {},
+            "credsStore": "",
+            "credHelpers": {
+              "docker.io": "",
+              "ghcr.io": ""
+            }
+          }
+          JSON
 
       - name: Set registry auth for GHCR (via GITHUB_TOKEN)
         env:
@@ -79,12 +106,15 @@ jobs:
           AUTH=$(printf '%s:%s' "$USER" "$TOKEN" | base64 | tr -d '\n')
           {
             echo 'DOCKER_AUTH_CONFIG<<EOF'
-            echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$AUTH\"}}}"
+            # 同样写入 credsStore/credHelpers，保证 buildx 转发给 buildkit 后也不触发 Keychain
+            echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$AUTH\"}}, \"credsStore\": \"\", \"credHelpers\": {\"docker.io\": \"\", \"ghcr.io\": \"\"}}"
             echo 'EOF'
           } >> "$GITHUB_ENV"
 
       - name: Build & Push backend
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_CONFIG: ${{ env.DOCKER_CONFIG }}
         with:
           context: .
           file: build/docker/miniblog/Dockerfile.prod.backend
@@ -95,6 +125,9 @@ jobs:
           tags: |
             ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
             ${{ env.BACKEND_IMAGE }}:latest
+          # 可选缓存
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Cleanup temp Docker config
         if: always()
@@ -115,12 +148,40 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-qemu-action@v3
+        with:
+          cache-image: false
+
       - uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+          cleanup: false
+
+      # 强制把两个前端 Dockerfile 的 syntax 置为 local
+      - name: Force Dockerfile syntax=local (frontends)
+        run: |
+          for f in build/docker/miniblog/Dockerfile.prod.frontend.blog build/docker/miniblog/Dockerfile.prod.frontend.admin; do
+            if [ -f "$f" ]; then
+              if head -n1 "$f" | grep -q '^# syntax='; then
+                sed -i '' -e '1s|^# syntax=.*|# syntax=local|' "$f"
+              else
+                sed -i '' '1s;^;# syntax=local\n;' "$f"
+              fi
+            fi
+          done
 
       - name: Prepare temp Docker config (no keychain)
         run: |
           mkdir -p "$DOCKER_CONFIG"
-          echo '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
+          cat > "$DOCKER_CONFIG/config.json" <<'JSON'
+          {
+            "auths": {},
+            "credsStore": "",
+            "credHelpers": {
+              "docker.io": "",
+              "ghcr.io": ""
+            }
+          }
+          JSON
 
       - name: Set registry auth for GHCR (via GITHUB_TOKEN)
         env:
@@ -130,12 +191,14 @@ jobs:
           AUTH=$(printf '%s:%s' "$USER" "$TOKEN" | base64 | tr -d '\n')
           {
             echo 'DOCKER_AUTH_CONFIG<<EOF'
-            echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$AUTH\"}}}"
+            echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$AUTH\"}}, \"credsStore\": \"\", \"credHelpers\": {\"docker.io\": \"\", \"ghcr.io\": \"\"}}"
             echo 'EOF'
           } >> "$GITHUB_ENV"
 
       - name: Build & Push frontend-blog
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_CONFIG: ${{ env.DOCKER_CONFIG }}
         with:
           context: .
           file: build/docker/miniblog/Dockerfile.prod.frontend.blog
@@ -144,9 +207,13 @@ jobs:
           tags: |
             ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_BLOG_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build & Push frontend-admin
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_CONFIG: ${{ env.DOCKER_CONFIG }}
         with:
           context: .
           file: build/docker/miniblog/Dockerfile.prod.frontend.admin
@@ -155,6 +222,8 @@ jobs:
           tags: |
             ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_ADMIN_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Cleanup temp Docker config
         if: always()
@@ -209,7 +278,6 @@ jobs:
           set -euo pipefail
           cd /opt/miniblog
 
-          # 生成 .env 文件（变量在 GitHub 侧已展开）
           cat > .env <<EOF
           BACKEND_IMAGE_TAG=${_IMG_BACKEND}
           FRONTEND_BLOG_IMAGE_TAG=${_IMG_FE_BLOG}
