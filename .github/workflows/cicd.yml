@@ -228,6 +228,13 @@ jobs:
           username: ${{ secrets.SVRA_USER }}
           key:      ${{ secrets.DEPLOY_SSH_KEY }}
           port:     ${{ secrets.SVRA_SSH_PORT || 22 }}
+          # 关键：将上面 env 中的变量名传递给远端
+          envs: >
+            _IMG_BACKEND,_IMG_FE_BLOG,_IMG_FE_ADMIN,
+            _GH_USER,_GH_TOKEN,_GHCR_USERNAME,
+            _MYSQL_HOST,_MYSQL_PORT,_MYSQL_DBNAME,_MYSQL_USERNAME,_MYSQL_PASSWORD,
+            _REDIS_HOST,_REDIS_PORT,_REDIS_DB,_REDIS_PASSWORD,
+            _JWT_SECRET,_FEISHU_APPID,_FEISHU_SECRET
           script_stop: true
           script: |
             set -euo pipefail
