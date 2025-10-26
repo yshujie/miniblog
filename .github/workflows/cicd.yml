@@ -63,15 +63,18 @@ jobs:
           install: true
           cleanup: false
 
+      # 关键修正：不写入 credsStore，彻底绕过 Keychain
       - name: Prepare temp Docker config (no keychain)
         run: |
           mkdir -p "$DOCKER_CONFIG"
           cat > "$DOCKER_CONFIG/config.json" <<'JSON'
-          {
-            "auths": {},
-            "credsStore": ""
-          }
+          { "auths": {} }
           JSON
+
+      # 关键修正：预拉 Dockerfile 前端镜像，避免 build 阶段去解析/拉取触发 Keychain
+      - name: Pre-pull dockerfile frontend (avoid keychain)
+        run: |
+          docker --config "$DOCKER_CONFIG" pull docker.io/docker/dockerfile:1.7
 
       - name: Set registry auth for GHCR (via GITHUB_TOKEN)
         env:
@@ -126,15 +129,18 @@ jobs:
           install: true
           cleanup: false
 
+      # 关键修正：不写入 credsStore，彻底绕过 Keychain
       - name: Prepare temp Docker config (no keychain)
         run: |
           mkdir -p "$DOCKER_CONFIG"
           cat > "$DOCKER_CONFIG/config.json" <<'JSON'
-          {
-            "auths": {},
-            "credsStore": ""
-          }
+          { "auths": {} }
           JSON
+
+      # 关键修正：预拉 Dockerfile 前端镜像，避免 build 阶段去解析/拉取触发 Keychain
+      - name: Pre-pull dockerfile frontend (avoid keychain)
+        run: |
+          docker --config "$DOCKER_CONFIG" pull docker.io/docker/dockerfile:1.7
 
       - name: Set registry auth for GHCR (via GITHUB_TOKEN)
         env:
