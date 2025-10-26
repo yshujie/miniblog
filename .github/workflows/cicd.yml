@@ -219,18 +219,18 @@ jobs:
           EOF
 
           # 创建必要的网络和目录
-          docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
-          mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
+          sudo docker network inspect miniblog_net >/dev/null 2>&1 || sudo docker network create miniblog_net
+          sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
 
-          # GHCR 登录（部署账户已在 docker 组，无需 sudo）
-          echo "${_GH_TOKEN}" | docker login ghcr.io -u "${_GH_USER}" --password-stdin
+          # GHCR 登录（使用 sudo，deploy 不在 docker 组）
+          echo "${_GH_TOKEN}" | sudo docker login ghcr.io -u "${_GH_USER}" --password-stdin
 
           # 拉取并滚动更新
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+          sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+          sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
           # 查看状态
-          docker compose ps
+          sudo docker compose ps
           EOSSH
 
       - name: Cleanup
