@@ -54,261 +54,157 @@ jobs:
     needs: [test]
     if: ${{ !cancelled() && (success() || inputs.skip_tests) }}
     runs-on: [self-hosted, macOS, ARM64]
-    env:
-      HTTP_PROXY: ""
-      HTTPS_PROXY: ""
-      NO_PROXY: ""
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use ephemeral DOCKER_CONFIG (no credsStore) + write GHCR auth
-        run: |
-          export DOCKER_CONFIG="$RUNNER_TEMP/.docker"
-          mkdir -p "$DOCKER_CONFIG"
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN || github.token }}
 
-          USER="${{ github.repository_owner }}"
-          TOKEN="${{ secrets.GHCR_TOKEN }}"
-          [ -z "$TOKEN" ] && TOKEN="${{ secrets.GITHUB_TOKEN }}"
-          [ -n "$TOKEN" ] || { echo "ERROR: Neither GHCR_TOKEN nor GITHUB_TOKEN available."; exit 1; }
-          AUTH_BASE64=$(printf "%s:%s" "$USER" "$TOKEN" | base64 | tr -d '\n')
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-          # 单一 config.json，包含 docker.io 空登录 & ghcr.io 凭据
-          cat > "$DOCKER_CONFIG/config.json" <<JSON
-          {
-            "auths": {
-              "https://index.docker.io/v1/": {},
-              "ghcr.io": { "auth": "$AUTH_BASE64" }
-            }
-          }
-          JSON
+      - name: Build & Push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: build/docker/miniblog/Dockerfile.prod.backend
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          build-args: |
+            GOPROXY=https://goproxy.cn,direct
 
-          echo "DOCKER_CONFIG=$DOCKER_CONFIG" >> "$GITHUB_ENV"
-          echo "🔒 Using DOCKER_CONFIG=$DOCKER_CONFIG (with GHCR auth)"
+      - name: Build & Push frontend-blog
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: build/docker/miniblog/Dockerfile.prod.frontend.blog
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
+            ${{ env.FE_BLOG_IMAGE }}:latest
 
-      - name: Expose buildx under ephemeral DOCKER_CONFIG
-        run: |
-          mkdir -p "$DOCKER_CONFIG/cli-plugins"
-          if [ -x /Applications/Docker.app/Contents/Resources/cli-plugins/docker-buildx ]; then
-            SRC=/Applications/Docker.app/Contents/Resources/cli-plugins/docker-buildx
-          elif [ -x "$HOME/.docker/cli-plugins/docker-buildx" ]; then
-            SRC="$HOME/.docker/cli-plugins/docker-buildx"
-          elif command -v docker-buildx >/dev/null 2>&1; then
-            SRC="$(command -v docker-buildx)"
-          else
-            echo "ERROR: docker-buildx binary not found on this runner" >&2
-            exit 1
-          fi
-          ln -sf "$SRC" "$DOCKER_CONFIG/cli-plugins/docker-buildx"
-          docker buildx version
-
-      - name: (Re)create buildx builder using env.DOCKER_CONFIG only
-        run: |
-          if docker buildx inspect miniblog-builder >/dev/null 2>&1; then
-            docker buildx rm -f miniblog-builder >/dev/null 2>&1 || true
-          fi
-          docker buildx create --name miniblog-builder --driver docker-container --use \
-            --driver-opt env.DOCKER_CONFIG="$DOCKER_CONFIG"
-          docker buildx inspect --bootstrap
-          docker buildx ls
-
-      - name: Build & Push backend (linux/amd64)
-        run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --file build/docker/miniblog/Dockerfile.prod.backend \
-            --build-arg GOPROXY=https://goproxy.cn,direct \
-            --tag ${{ env.BACKEND_IMAGE }}:${{ env.TAG }} \
-            --tag ${{ env.BACKEND_IMAGE }}:latest \
-            --push \
-            .
-
-      - name: Build & Push frontend-blog (linux/amd64)
-        run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --file build/docker/miniblog/Dockerfile.prod.frontend.blog \
-            --tag ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }} \
-            --tag ${{ env.FE_BLOG_IMAGE }}:latest \
-            --push \
-            .
-
-      - name: Build & Push frontend-admin (linux/amd64)
-        run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --file build/docker/miniblog/Dockerfile.prod.frontend.admin \
-            --tag ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }} \
-            --tag ${{ env.FE_ADMIN_IMAGE }}:latest \
-            --push \
-            .
+      - name: Build & Push frontend-admin
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: build/docker/miniblog/Dockerfile.prod.frontend.admin
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
+            ${{ env.FE_ADMIN_IMAGE }}:latest
 
   deploy:
     runs-on: [self-hosted, macOS, ARM64]
     needs: build-and-push
     environment: production
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup SSH Key
+      - name: Prepare SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SVRA_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SVRA_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy to Server via SSH (use SVRA_USER)
+      - name: Ensure remote dir & ownership
         run: |
-          ssh -F /dev/null \
-            -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
-            'bash -s' <<'ENDSSH'
-          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
+            "sudo mkdir -p /opt/miniblog && sudo chown $(id -un):$(id -gn) /opt/miniblog"
 
-          # ---------- 0) 预检：只检测已放权的命令 ----------
-          if ! sudo -n /usr/bin/docker version >/dev/null 2>&1; then
-            echo "ERROR: sudo NOPASSWD 对 /usr/bin/docker 未生效" >&2; exit 1
-          fi
-          if ! sudo -n /usr/bin/install -d -m 755 -o "$(id -un)" -g "$(id -gn)" /tmp/_sudo_check_dir 2>/dev/null; then
-            echo "ERROR: sudo NOPASSWD 对 /usr/bin/install 未生效" >&2; exit 1
-          fi
-          rmdir /tmp/_sudo_check_dir 2>/dev/null || true
+      - name: Upload compose files
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            docker-compose.yml docker-compose.prod.yml \
+            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }}:/opt/miniblog/
 
-          # ---------- 1) 仅给 git 配代理；Docker 前显式去代理 ----------
-          PROXY_HTTP="${{ secrets.SVRA_HTTP_PROXY }}"
-          PROXY_HTTPS="${{ secrets.SVRA_HTTPS_PROXY }}"
-          PROXY_NO="${{ secrets.SVRA_NO_PROXY }}"
-          GIT_PROXY=()
-          if [ -n "$PROXY_HTTP$PROXY_HTTPS" ]; then
-            http_proxy="${PROXY_HTTP:-${PROXY_HTTPS:-}}"
-            https_proxy="${PROXY_HTTPS:-${PROXY_HTTP:-}}"
-            NO_PROXY_STR="${PROXY_NO:-localhost,127.0.0.1,::1}"
-            export http_proxy https_proxy HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy"
-            export no_proxy="$NO_PROXY_STR" NO_PROXY="$NO_PROXY_STR"
-            GIT_PROXY=(-c http.proxy="$https_proxy" -c https.proxy="$https_proxy")
-            echo "➡️ git 使用代理（值已隐藏）"
-          else
-            if command -v nc >/dev/null 2>&1 && nc -z 127.0.0.1 7890; then
-              http_proxy="http://127.0.0.1:7890"
-              https_proxy="$http_proxy"
-              NO_PROXY_STR="localhost,127.0.0.1,::1"
-              export http_proxy https_proxy HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy"
-              export no_proxy="$NO_PROXY_STR" NO_PROXY="$NO_PROXY_STR"
-              GIT_PROXY=(-c http.proxy="$https_proxy" -c https.proxy="$https_proxy")
-              echo "➡️ git 将走 127.0.0.1:7890 代理"
-            else
-              echo "➡️ 未配置代理，git 直连（若被墙请设置 SVRA_HTTP_PROXY）"
-            fi
-          fi
+      - name: Deploy (docker login + compose pull/up)
+        env:
+          # 远端拉取 GHCR 的 token：优先使用专门的只读 PAT；无则退回 GHCR_TOKEN；再无则用 GITHUB_TOKEN（短时有效）
+          GHCR_PULL_TOKEN: ${{ secrets.SVRA_GHCR_PULL_TOKEN || secrets.GHCR_TOKEN || github.token }}
+          GHCR_USER: ${{ github.repository_owner }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FE_BLOG_IMAGE: ${{ env.FE_BLOG_IMAGE }}
+          FE_ADMIN_IMAGE: ${{ env.FE_ADMIN_IMAGE }}
+          TAG: ${{ env.TAG }}
+          # 应用运行所需的机密
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
+          MYSQL_DBNAME: ${{ secrets.MYSQL_DBNAME }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          REDIS_DB: ${{ secrets.REDIS_DB }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          FEISHU_DOCREADER_APPID: ${{ secrets.FEISHU_DOCREADER_APPID }}
+          FEISHU_DOCREADER_APPSECRET: ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
+          # 健康检查（可按需调整）
+          HEALTH_URL: http://127.0.0.1:8090/health
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} 'bash -seu -o pipefail << "EOF"
+          APP_DIR=/opt/miniblog
 
-          # ---------- 2) 目录与权限 ----------
-          APP_DIR="/opt/miniblog"
-          LOG_DIR="/data/logs/miniblog"
-          NET_NAME="miniblog_net"
+          # 1) 预检 docker / compose
+          sudo -n docker version >/dev/null
+          sudo -n docker compose version >/dev/null
 
-          sudo -n /usr/bin/install -d -m 755 -o "$(id -un)" -g "$(id -gn)" "$APP_DIR"
-          sudo -n /usr/bin/install -d -m 755 -o "$(id -un)" -g "$(id -gn)" \
-            "$LOG_DIR" "$LOG_DIR/backend" "$LOG_DIR/frontend-blog" "$LOG_DIR/frontend-admin"
-
-          # 预建（或复用）docker 网络
-          sudo -n /usr/bin/docker network inspect "$NET_NAME" >/dev/null 2>&1 || \
-            sudo -n /usr/bin/docker network create "$NET_NAME"
-
-          cd "$APP_DIR"
-
-          # ---------- 3) 拉取/更新仓库（带代理 + 重试） ----------
-          REPO_URL="https://github.com/${{ github.repository }}.git"
-          if [ -d .git ]; then
-            for t in 1 2 3; do
-              if git "${GIT_PROXY[@]}" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 fetch --all -p; then
-                git reset --hard origin/main
-                break
-              fi
-              echo "git fetch 重试 $t/3"; sleep 2
-              [ $t -eq 3 ] && { echo "git fetch 失败"; exit 1; }
-            done
-          else
-            for t in 1 2 3; do
-              if git "${GIT_PROXY[@]}" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 clone "$REPO_URL" .; then
-                break
-              fi
-              echo "git clone 重试 $t/3"; sleep 2
-              [ $t -eq 3 ] && { echo "git clone 失败"; exit 1; }
-            done
-          fi
-
-          # ---------- 4) GHCR 鉴权（方案 A：临时 config.json + --config） ----------
-          USER_GH="${{ github.repository_owner }}"
-          TOKEN_GH="${{ secrets.GHCR_TOKEN }}"
-          [ -z "$TOKEN_GH" ] && TOKEN_GH="${{ secrets.GITHUB_TOKEN }}"
-          AUTH_BASE64=$(printf "%s:%s" "$USER_GH" "$TOKEN_GH" | base64 | tr -d '\n')
-
-          DOCKER_CFG_DIR="$(mktemp -d)"
-          # SSH 会话结束自动清理
-          trap 'rm -rf "$DOCKER_CFG_DIR"' EXIT
-
-          cat > "$DOCKER_CFG_DIR/config.json" <<JSON
-          { "auths": { "ghcr.io": { "auth": "$AUTH_BASE64" } } }
-          JSON
-
-          # 统一的 docker 命令（数组，等价于：sudo -n /usr/bin/docker --config "$DOCKER_CFG_DIR"）
-          SUDO_DOCKER=(sudo -n /usr/bin/docker --config "$DOCKER_CFG_DIR")
-
-          # ---------- 5) 写 .env（使用本次构建镜像标签） ----------
-          cat > .env <<'EOF'
-          BACKEND_IMAGE_TAG=${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
-          FRONTEND_BLOG_IMAGE_TAG=${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
-          FRONTEND_ADMIN_IMAGE_TAG=${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
+          # 2) 写 .env（把发布镜像 tag 注入）
+          cat > "$APP_DIR/.env" <<ENV
+          BACKEND_IMAGE_TAG=${BACKEND_IMAGE}:${TAG}
+          FRONTEND_BLOG_IMAGE_TAG=${FE_BLOG_IMAGE}:${TAG}
+          FRONTEND_ADMIN_IMAGE_TAG=${FE_ADMIN_IMAGE}:${TAG}
 
           GIN_MODE=release
 
-          MYSQL_HOST=${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT=${{ secrets.MYSQL_PORT }}
-          MYSQL_DATABASE=${{ secrets.MYSQL_DBNAME }}
-          MYSQL_USERNAME=${{ secrets.MYSQL_USERNAME }}
-          MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_HOST=${MYSQL_HOST}
+          MYSQL_PORT=${MYSQL_PORT}
+          MYSQL_DATABASE=${MYSQL_DBNAME}
+          MYSQL_USERNAME=${MYSQL_USERNAME}
+          MYSQL_PASSWORD=${MYSQL_PASSWORD}
 
-          REDIS_HOST=${{ secrets.REDIS_HOST }}
-          REDIS_PORT=${{ secrets.REDIS_PORT }}
-          REDIS_DB=${{ secrets.REDIS_DB }}
-          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          REDIS_HOST=${REDIS_HOST}
+          REDIS_PORT=${REDIS_PORT}
+          REDIS_DB=${REDIS_DB}
+          REDIS_PASSWORD=${REDIS_PASSWORD}
 
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_SECRET=${JWT_SECRET}
 
-          FEISHU_DOCREADER_APPID=${{ secrets.FEISHU_DOCREADER_APPID }}
-          FEISHU_DOCREADER_APPSECRET=${{ secrets.FEISHU_DOCREADER_APPSECRET }}
-          EOF
+          FEISHU_DOCREADER_APPID=${FEISHU_DOCREADER_APPID}
+          FEISHU_DOCREADER_APPSECRET=${FEISHU_DOCREADER_APPSECRET}
+          ENV
 
-          # ---------- 6) Docker：执行前去代理（避免影响 GHCR/内网） ----------
-          env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
-            "${SUDO_DOCKER[@]}" compose -f docker-compose.yml -f docker-compose.prod.yml pull
-          env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
-            "${SUDO_DOCKER[@]}" compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+          # 3) 登录 GHCR（stdin，不依赖 DOCKER_AUTH_CONFIG）
+          echo "${GHCR_PULL_TOKEN}" | sudo -n docker login ghcr.io -u "${GHCR_USER}" --password-stdin >/dev/null 2>&1
 
-          # 接入共享网络 & 健康检查 & nginx reload
-          "${SUDO_DOCKER[@]}" network inspect "$NET_NAME" >/dev/null 2>&1 || \
-            "${SUDO_DOCKER[@]}" network create "$NET_NAME"
-          "${SUDO_DOCKER[@]}" network connect "$NET_NAME" nginx || true
+          # 4) 拉取并启动
+          cd "$APP_DIR"
+          sudo -n docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+          sudo -n docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
-          echo "Polling backend health (up to 60s)..."
-          for i in $(seq 1 30); do
-            if "${SUDO_DOCKER[@]}" run --rm --network="$NET_NAME" curlimages/curl:8.1.2 \
-                 -fsS http://miniblog-backend:8080/health >/dev/null 2>&1; then
-              echo "Backend healthy"
-              break
+          # 5) 简单健康检查（30s）
+          for i in $(seq 1 15); do
+            if curl -fsS "${HEALTH_URL}" >/dev/null 2>&1; then
+              echo "Health OK"; break
             fi
             sleep 2
+            [ "$i" -eq 15 ] && { echo "HEALTH=FAIL"; exit 1; }
           done
 
-          "${SUDO_DOCKER[@]}" exec nginx nginx -t && \
-          "${SUDO_DOCKER[@]}" exec nginx nginx -s reload || true
-
-          sleep 2
-          (curl -fsS http://127.0.0.1:8090/health && echo " HEALTH=OK") || (echo "HEALTH=FAIL"; exit 1)
-          "${SUDO_DOCKER[@]}" ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
-          ENDSSH
+          # 6) 展示运行状态
+          sudo -n docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+          EOF'
 
       - name: Cleanup SSH Key
         if: always()
