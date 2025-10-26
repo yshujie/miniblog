@@ -64,8 +64,8 @@ cors:
 
 # HTTPS 服务器相关配置
 tls:
-  cert: /etc/miniblog/ssl/api.yangshujie.com.crt # 服务端证书文件
-  key: /etc/miniblog/ssl/api.yangshujie.com.key # 服务端私钥文件
+  cert: /etc/miniblog/ssl/yangshujie.com.crt # 服务端证书文件（通配符证书）
+  key: /etc/miniblog/ssl/yangshujie.com.key # 服务端私钥文件（通配符证书）
   strict: false # 当 true 时（或环境变量 TLS_STRICT=1），若证书/私钥不存在启动将失败（生产可启用）
 
 # feishu 配置

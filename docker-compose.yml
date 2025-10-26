@@ -39,8 +39,8 @@ services:
       - ./configs:/app/configs:ro
       - /data/logs/miniblog/backend:/data/logs/miniblog
       - miniblog-uploads:/app/uploads
-      - /data/ssl/certs/api.yangshujie.com.crt:/etc/miniblog/ssl/api.yangshujie.com.crt:ro
-      - /data/ssl/private/api.yangshujie.com.key:/etc/miniblog/ssl/api.yangshujie.com.key:ro
+      - /data/ssl/certs/yangshujie.com.crt:/etc/miniblog/ssl/yangshujie.com.crt:ro
+      - /data/ssl/private/yangshujie.com.key:/etc/miniblog/ssl/yangshujie.com.key:ro
     networks:
       - miniblog_net
     ports:
