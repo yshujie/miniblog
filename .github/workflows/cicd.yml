@@ -26,12 +26,12 @@ concurrency:
 
 jobs:
   # ========================================
-  # Job 1: 测试阶段（临时禁用以加快 CI/CD 测试）
+  # Job 1: 测试阶段（临时禁用）
   # ========================================
   test:
     name: Run Tests
     runs-on: [self-hosted, macOS, ARM64]
-    if: false  # 临时禁用
+    if: false
 
     steps:
       - uses: actions/checkout@v4
@@ -45,10 +45,8 @@ jobs:
       - name: Fix Go module cache permissions
         run: |
           [ -d "$HOME/go/pkg/mod" ] && chmod -R u+w "$HOME/go/pkg/mod" || true
-      - name: Download dependencies
-        run: go mod download
-      - name: Run unit tests
-        run: make test-backend
+      - run: go mod download
+      - run: make test-backend
 
   # ========================================
   # Job 2: 构建后端镜像
@@ -59,7 +57,7 @@ jobs:
     needs: test
     if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
     env:
-      # 关键：让 Docker 使用工作目录下的临时配置，绕过 macOS Keychain
+      # 用本仓库里的临时 Docker 配置，避免读取/写入 macOS Keychain
       DOCKER_CONFIG: ${{ github.workspace }}/.docker-ci
 
     steps:
@@ -73,13 +71,17 @@ jobs:
           mkdir -p "$DOCKER_CONFIG"
           echo '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
 
-      - name: Login to GHCR (via GITHUB_TOKEN)
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          logout: false
+      - name: Set registry auth for GHCR (via GITHUB_TOKEN)
+        env:
+          USER:  ${{ github.actor }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          AUTH=$(printf '%s:%s' "$USER" "$TOKEN" | base64 | tr -d '\n')
+          {
+            echo 'DOCKER_AUTH_CONFIG<<EOF'
+            echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$AUTH\"}}}"
+            echo 'EOF'
+          } >> "$GITHUB_ENV"
 
       - name: Build & Push backend
         uses: docker/build-push-action@v6
@@ -120,13 +122,17 @@ jobs:
           mkdir -p "$DOCKER_CONFIG"
           echo '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
 
-      - name: Login to GHCR (via GITHUB_TOKEN)
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          logout: false
+      - name: Set registry auth for GHCR (via GITHUB_TOKEN)
+        env:
+          USER:  ${{ github.actor }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          AUTH=$(printf '%s:%s' "$USER" "$TOKEN" | base64 | tr -d '\n')
+          {
+            echo 'DOCKER_AUTH_CONFIG<<EOF'
+            echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$AUTH\"}}}"
+            echo 'EOF'
+          } >> "$GITHUB_ENV"
 
       - name: Build & Push frontend-blog
         uses: docker/build-push-action@v6
@@ -184,7 +190,7 @@ jobs:
           _IMG_FE_BLOG: ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
           _IMG_FE_ADMIN: ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
           _GH_USER: ${{ github.repository_owner }}
-          _GH_TOKEN: ${{ secrets.GHCR_TOKEN }}   # 服务器用 PAT；GITHUB_TOKEN 不可用
+          _GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
           _MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
           _MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
           _MYSQL_DBNAME: ${{ secrets.MYSQL_DBNAME }}
@@ -203,7 +209,7 @@ jobs:
           set -euo pipefail
           cd /opt/miniblog
 
-          # 生成 .env 文件（Actions 已展开变量）
+          # 生成 .env 文件（变量在 GitHub 侧已展开）
           cat > .env <<EOF
           BACKEND_IMAGE_TAG=${_IMG_BACKEND}
           FRONTEND_BLOG_IMAGE_TAG=${_IMG_FE_BLOG}
@@ -228,14 +234,11 @@ jobs:
           FEISHU_DOCREADER_APPSECRET=${_FEISHU_SECRET}
           EOF
 
-          # 创建必要的网络和目录
           sudo docker network inspect miniblog_net >/dev/null 2>&1 || sudo docker network create miniblog_net
           sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
 
-          # GHCR 登录（Linux 主机，不牵扯 Keychain）
           echo "${_GH_TOKEN}" | sudo docker login ghcr.io -u "${_GH_USER}" --password-stdin
 
-          # 拉取&滚更
           sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
           sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
