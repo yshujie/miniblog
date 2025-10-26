@@ -31,28 +31,22 @@ jobs:
   test:
     name: Run Tests
     runs-on: [self-hosted, macOS, ARM64]
-    if: false  # 临时禁用测试阶段
+    if: false  # 临时禁用
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
           cache: true
           cache-dependency-path: |
             go.sum
             go.work.sum
-
       - name: Fix Go module cache permissions
         run: |
           [ -d "$HOME/go/pkg/mod" ] && chmod -R u+w "$HOME/go/pkg/mod" || true
-
       - name: Download dependencies
         run: go mod download
-
       - name: Run unit tests
         run: make test-backend
 
@@ -64,23 +58,28 @@ jobs:
     runs-on: [self-hosted, macOS, ARM64]
     needs: test
     if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    env:
+      # 关键：让 Docker 使用工作目录下的临时配置，绕过 macOS Keychain
+      DOCKER_CONFIG: ${{ github.workspace }}/.docker-ci
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Prepare temp Docker config (no keychain)
+        run: |
+          mkdir -p "$DOCKER_CONFIG"
+          echo '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
 
-      - name: Login to GHCR
+      - name: Login to GHCR (via GITHUB_TOKEN)
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          logout: false
 
       - name: Build & Push backend
         uses: docker/build-push-action@v6
@@ -95,6 +94,10 @@ jobs:
             ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
             ${{ env.BACKEND_IMAGE }}:latest
 
+      - name: Cleanup temp Docker config
+        if: always()
+        run: rm -rf "$DOCKER_CONFIG"
+
   # ========================================
   # Job 3: 构建前端镜像（并行）
   # ========================================
@@ -103,23 +106,27 @@ jobs:
     runs-on: [self-hosted, macOS, ARM64]
     needs: test
     if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    env:
+      DOCKER_CONFIG: ${{ github.workspace }}/.docker-ci
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Prepare temp Docker config (no keychain)
+        run: |
+          mkdir -p "$DOCKER_CONFIG"
+          echo '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
 
-      - name: Login to GHCR
+      - name: Login to GHCR (via GITHUB_TOKEN)
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          logout: false
 
       - name: Build & Push frontend-blog
         uses: docker/build-push-action@v6
@@ -143,6 +150,10 @@ jobs:
             ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_ADMIN_IMAGE }}:latest
 
+      - name: Cleanup temp Docker config
+        if: always()
+        run: rm -rf "$DOCKER_CONFIG"
+
   # ========================================
   # Job 4: 部署到生产环境
   # ========================================
@@ -152,8 +163,7 @@ jobs:
     needs: [build-backend, build-frontends]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Prepare SSH
         run: |
@@ -174,7 +184,7 @@ jobs:
           _IMG_FE_BLOG: ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
           _IMG_FE_ADMIN: ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
           _GH_USER: ${{ github.repository_owner }}
-          _GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          _GH_TOKEN: ${{ secrets.GHCR_TOKEN }}   # 服务器用 PAT；GITHUB_TOKEN 不可用
           _MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
           _MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
           _MYSQL_DBNAME: ${{ secrets.MYSQL_DBNAME }}
@@ -193,7 +203,7 @@ jobs:
           set -euo pipefail
           cd /opt/miniblog
 
-          # 生成 .env 文件（所有变量已在 Actions 展开）
+          # 生成 .env 文件（Actions 已展开变量）
           cat > .env <<EOF
           BACKEND_IMAGE_TAG=${_IMG_BACKEND}
           FRONTEND_BLOG_IMAGE_TAG=${_IMG_FE_BLOG}
@@ -222,14 +232,13 @@ jobs:
           sudo docker network inspect miniblog_net >/dev/null 2>&1 || sudo docker network create miniblog_net
           sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
 
-          # GHCR 登录（使用 sudo，deploy 不在 docker 组）
+          # GHCR 登录（Linux 主机，不牵扯 Keychain）
           echo "${_GH_TOKEN}" | sudo docker login ghcr.io -u "${_GH_USER}" --password-stdin
 
-          # 拉取并滚动更新
+          # 拉取&滚更
           sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
           sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
-          # 查看状态
           sudo docker compose ps
           EOSSH
 
