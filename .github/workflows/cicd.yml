@@ -25,14 +25,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # ========================================
-  # Job 1: 测试阶段（临时禁用）
-  # ========================================
   test:
     name: Run Tests
     runs-on: [self-hosted, macOS, ARM64]
     if: false
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -48,18 +44,13 @@ jobs:
       - run: go mod download
       - run: make test-backend
 
-  # ========================================
-  # Job 2: 构建后端镜像
-  # ========================================
   build-backend:
     name: Build Backend Image
     runs-on: [self-hosted, macOS, ARM64]
     needs: test
     if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
     env:
-      # 用本仓库里的临时 Docker 配置，避免读取/写入 macOS Keychain
       DOCKER_CONFIG: ${{ github.workspace }}/.docker-ci
-
     steps:
       - uses: actions/checkout@v4
 
@@ -69,20 +60,8 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
         with:
-          install: true     # 安装 buildx 插件，避免后续 post 阶段告警
-          cleanup: false    # 保留到作业结束
-
-      # 强制把 Dockerfile 的 syntax 指令替换为 local，避免访问 docker/dockerfile:1.x
-      - name: Force Dockerfile syntax=local (backend)
-        run: |
-          f="build/docker/miniblog/Dockerfile.prod.backend"
-          if [ -f "$f" ]; then
-            if head -n1 "$f" | grep -q '^# syntax='; then
-              sed -i '' -e '1s|^# syntax=.*|# syntax=local|' "$f"
-            else
-              sed -i '' '1s;^;# syntax=local\n;' "$f"
-            fi
-          fi
+          install: true
+          cleanup: false
 
       - name: Prepare temp Docker config (no keychain)
         run: |
@@ -90,11 +69,7 @@ jobs:
           cat > "$DOCKER_CONFIG/config.json" <<'JSON'
           {
             "auths": {},
-            "credsStore": "",
-            "credHelpers": {
-              "docker.io": "",
-              "ghcr.io": ""
-            }
+            "credsStore": ""
           }
           JSON
 
@@ -106,8 +81,8 @@ jobs:
           AUTH=$(printf '%s:%s' "$USER" "$TOKEN" | base64 | tr -d '\n')
           {
             echo 'DOCKER_AUTH_CONFIG<<EOF'
-            # 同样写入 credsStore/credHelpers，保证 buildx 转发给 buildkit 后也不触发 Keychain
-            echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$AUTH\"}}, \"credsStore\": \"\", \"credHelpers\": {\"docker.io\": \"\", \"ghcr.io\": \"\"}}"
+            # 仅提供 auths，不能包含 credsStore/credHelpers
+            echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$AUTH\"}}}"
             echo 'EOF'
           } >> "$GITHUB_ENV"
 
@@ -125,7 +100,6 @@ jobs:
           tags: |
             ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
             ${{ env.BACKEND_IMAGE }}:latest
-          # 可选缓存
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -133,9 +107,6 @@ jobs:
         if: always()
         run: rm -rf "$DOCKER_CONFIG"
 
-  # ========================================
-  # Job 3: 构建前端镜像（并行）
-  # ========================================
   build-frontends:
     name: Build Frontend Images
     runs-on: [self-hosted, macOS, ARM64]
@@ -143,7 +114,6 @@ jobs:
     if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
     env:
       DOCKER_CONFIG: ${{ github.workspace }}/.docker-ci
-
     steps:
       - uses: actions/checkout@v4
 
@@ -156,30 +126,13 @@ jobs:
           install: true
           cleanup: false
 
-      # 强制把两个前端 Dockerfile 的 syntax 置为 local
-      - name: Force Dockerfile syntax=local (frontends)
-        run: |
-          for f in build/docker/miniblog/Dockerfile.prod.frontend.blog build/docker/miniblog/Dockerfile.prod.frontend.admin; do
-            if [ -f "$f" ]; then
-              if head -n1 "$f" | grep -q '^# syntax='; then
-                sed -i '' -e '1s|^# syntax=.*|# syntax=local|' "$f"
-              else
-                sed -i '' '1s;^;# syntax=local\n;' "$f"
-              fi
-            fi
-          done
-
       - name: Prepare temp Docker config (no keychain)
         run: |
           mkdir -p "$DOCKER_CONFIG"
           cat > "$DOCKER_CONFIG/config.json" <<'JSON'
           {
             "auths": {},
-            "credsStore": "",
-            "credHelpers": {
-              "docker.io": "",
-              "ghcr.io": ""
-            }
+            "credsStore": ""
           }
           JSON
 
@@ -191,7 +144,7 @@ jobs:
           AUTH=$(printf '%s:%s' "$USER" "$TOKEN" | base64 | tr -d '\n')
           {
             echo 'DOCKER_AUTH_CONFIG<<EOF'
-            echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$AUTH\"}}, \"credsStore\": \"\", \"credHelpers\": {\"docker.io\": \"\", \"ghcr.io\": \"\"}}"
+            echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$AUTH\"}}}"
             echo 'EOF'
           } >> "$GITHUB_ENV"
 
@@ -229,14 +182,10 @@ jobs:
         if: always()
         run: rm -rf "$DOCKER_CONFIG"
 
-  # ========================================
-  # Job 4: 部署到生产环境
-  # ========================================
   deploy:
     name: Deploy to Production
     runs-on: [self-hosted, macOS, ARM64]
     needs: [build-backend, build-frontends]
-
     steps:
       - uses: actions/checkout@v4
 
