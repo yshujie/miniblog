@@ -1,12 +1,12 @@
-name: CI/CD (miniblog - production)
+name: CI/CD (miniblog - production, linux runner)
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       skip_tests:
-        description: 'Skip tests'
+        description: "Skip tests"
         type: boolean
         default: false
 
@@ -14,85 +14,115 @@ permissions:
   contents: read
   packages: write
 
-env:
-  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/miniblog-backend
-  FE_BLOG_IMAGE: ghcr.io/${{ github.repository_owner }}/miniblog-frontend-blog
-  FE_ADMIN_IMAGE: ghcr.io/${{ github.repository_owner }}/miniblog-frontend-admin
-  TAG: ${{ github.sha }}
-
 concurrency:
   group: miniblog-prod
   cancel-in-progress: false
 
+env:
+  GO_VERSION: "1.24"
+  TAG: ${{ github.sha }}
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/miniblog-backend
+  FE_BLOG_IMAGE: ghcr.io/${{ github.repository_owner }}/miniblog-frontend-blog
+  FE_ADMIN_IMAGE: ghcr.io/${{ github.repository_owner }}/miniblog-frontend-admin
+
 jobs:
+  validate-secrets:
+    name: Validate Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Required Secrets (non-blocking)
+        env:
+          SVRA_HOST:           ${{ secrets.SVRA_HOST }}
+          SVRA_USER:           ${{ secrets.SVRA_USER }}
+          DEPLOY_SSH_KEY:      ${{ secrets.DEPLOY_SSH_KEY }}
+          GHCR_TOKEN:          ${{ secrets.GHCR_TOKEN }}
+          MYSQL_HOST:          ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT:          ${{ secrets.MYSQL_PORT }}
+          MYSQL_DBNAME:        ${{ secrets.MYSQL_DBNAME }}
+          MYSQL_USERNAME:      ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD:      ${{ secrets.MYSQL_PASSWORD }}
+          REDIS_HOST:          ${{ secrets.REDIS_HOST }}
+          REDIS_PORT:          ${{ secrets.REDIS_PORT }}
+          REDIS_DB:            ${{ secrets.REDIS_DB }}
+          REDIS_PASSWORD:      ${{ secrets.REDIS_PASSWORD }}
+          JWT_SECRET:          ${{ secrets.JWT_SECRET }}
+          FEISHU_APPID:        ${{ secrets.FEISHU_DOCREADER_APPID }}
+          FEISHU_SECRET:       ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
+        run: |
+          echo "🔍 Validating required secrets (non-blocking)..."
+          REQUIRED_ON_MAIN=(SVRA_HOST SVRA_USER DEPLOY_SSH_KEY GHCR_TOKEN MYSQL_HOST MYSQL_DBNAME MYSQL_USERNAME MYSQL_PASSWORD REDIS_HOST REDIS_PASSWORD JWT_SECRET)
+          OPTIONAL=(MYSQL_PORT REDIS_PORT REDIS_DB FEISHU_APPID FEISHU_SECRET)
+          FAILED=0
+
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            for k in "${REQUIRED_ON_MAIN[@]}"; do
+              v="${!k}"
+              if [ -z "$v" ]; then
+                echo "❌ $k is not set"
+                FAILED=1
+              else
+                echo "✅ $k is set"
+              fi
+            done
+          else
+            echo "ℹ️ Not on main, skipping strict checks"
+          fi
+
+          for k in "${OPTIONAL[@]}"; do
+            v="${!k}"
+            if [ -z "$v" ]; then
+              echo "⚠️ $k not set (optional)"
+            else
+              echo "✅ $k is set"
+            fi
+          done
+
+          echo
+          if [ $FAILED -eq 1 ]; then
+            echo "⚠️ Secrets validation failed, but continuing (non-blocking)."
+          else
+            echo "✅ Secrets validation passed."
+          fi
+
   test:
     name: Run Tests
-    runs-on: [self-hosted, macOS, ARM64]
-    if: false
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_tests != true }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: ${{ env.GO_VERSION }}
           cache: true
-          cache-dependency-path: |
-            go.sum
-            go.work.sum
-      - name: Fix Go module cache permissions
+      - name: Download deps
         run: |
-          [ -d "$HOME/go/pkg/mod" ] && chmod -R u+w "$HOME/go/pkg/mod" || true
-      - run: go mod download
-      - run: make test-backend
+          go mod download
+          go mod verify
+      - name: Run unit tests
+        run: |
+          go test -v ./...
 
-  build-backend:
-    name: Build Backend Image
-    runs-on: [self-hosted, macOS, ARM64]
-    needs: test
+  build-and-push:
+    name: Build & Push Images (GHCR)
+    runs-on: ubuntu-latest
+    needs: [validate-secrets, test]
     if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
-    env:
-      DOCKER_CONFIG: ${{ github.workspace }}/.docker-ci
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-qemu-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
-          cache-image: false
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/setup-buildx-action@v3
-        with:
-          install: true
-          cleanup: false
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
 
-      # 关键修正：不写入 credsStore，彻底绕过 Keychain
-      - name: Prepare temp Docker config (no keychain)
-        run: |
-          mkdir -p "$DOCKER_CONFIG"
-          cat > "$DOCKER_CONFIG/config.json" <<'JSON'
-          { "auths": {} }
-          JSON
-
-      # 关键修正：预拉 Dockerfile 前端镜像，避免 build 阶段去解析/拉取触发 Keychain
-      - name: Pre-pull dockerfile frontend (avoid keychain)
-        run: |
-          docker --config "$DOCKER_CONFIG" pull docker.io/docker/dockerfile:1.7
-
-      - name: Set registry auth for GHCR (via GITHUB_TOKEN)
-        env:
-          USER:  ${{ github.actor }}
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          AUTH=$(printf '%s:%s' "$USER" "$TOKEN" | base64 | tr -d '\n')
-          {
-            echo 'DOCKER_AUTH_CONFIG<<EOF'
-            # 仅提供 auths，不能包含 credsStore/credHelpers
-            echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$AUTH\"}}}"
-            echo 'EOF'
-          } >> "$GITHUB_ENV"
-
+      # Backend
       - name: Build & Push backend
         uses: docker/build-push-action@v6
-        env:
-          DOCKER_CONFIG: ${{ env.DOCKER_CONFIG }}
         with:
           context: .
           file: build/docker/miniblog/Dockerfile.prod.backend
@@ -106,58 +136,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Cleanup temp Docker config
-        if: always()
-        run: rm -rf "$DOCKER_CONFIG"
-
-  build-frontends:
-    name: Build Frontend Images
-    runs-on: [self-hosted, macOS, ARM64]
-    needs: test
-    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
-    env:
-      DOCKER_CONFIG: ${{ github.workspace }}/.docker-ci
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-qemu-action@v3
-        with:
-          cache-image: false
-
-      - uses: docker/setup-buildx-action@v3
-        with:
-          install: true
-          cleanup: false
-
-      # 关键修正：不写入 credsStore，彻底绕过 Keychain
-      - name: Prepare temp Docker config (no keychain)
-        run: |
-          mkdir -p "$DOCKER_CONFIG"
-          cat > "$DOCKER_CONFIG/config.json" <<'JSON'
-          { "auths": {} }
-          JSON
-
-      # 关键修正：预拉 Dockerfile 前端镜像，避免 build 阶段去解析/拉取触发 Keychain
-      - name: Pre-pull dockerfile frontend (avoid keychain)
-        run: |
-          docker --config "$DOCKER_CONFIG" pull docker.io/docker/dockerfile:1.7
-
-      - name: Set registry auth for GHCR (via GITHUB_TOKEN)
-        env:
-          USER:  ${{ github.actor }}
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          AUTH=$(printf '%s:%s' "$USER" "$TOKEN" | base64 | tr -d '\n')
-          {
-            echo 'DOCKER_AUTH_CONFIG<<EOF'
-            echo "{\"auths\": {\"ghcr.io\": {\"auth\": \"$AUTH\"}}}"
-            echo 'EOF'
-          } >> "$GITHUB_ENV"
-
+      # Frontend - blog
       - name: Build & Push frontend-blog
         uses: docker/build-push-action@v6
-        env:
-          DOCKER_CONFIG: ${{ env.DOCKER_CONFIG }}
         with:
           context: .
           file: build/docker/miniblog/Dockerfile.prod.frontend.blog
@@ -169,10 +150,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Frontend - admin
       - name: Build & Push frontend-admin
         uses: docker/build-push-action@v6
-        env:
-          DOCKER_CONFIG: ${{ env.DOCKER_CONFIG }}
         with:
           context: .
           file: build/docker/miniblog/Dockerfile.prod.frontend.admin
@@ -184,90 +164,102 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Cleanup temp Docker config
-        if: always()
-        run: rm -rf "$DOCKER_CONFIG"
-
   deploy:
     name: Deploy to Production
-    runs-on: [self-hosted, macOS, ARM64]
-    needs: [build-backend, build-frontends]
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Prepare SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.SVRA_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
       - name: Upload compose files
-        run: |
-          REMOTE="${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }}"
-          ssh -i ~/.ssh/deploy_key "$REMOTE" "mkdir -p /opt/miniblog"
-          scp -i ~/.ssh/deploy_key docker-compose.yml docker-compose.prod.yml "$REMOTE:/opt/miniblog/"
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host:     ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USER }}
+          key:      ${{ secrets.DEPLOY_SSH_KEY }}
+          port:     ${{ secrets.SVRA_SSH_PORT || 22 }}
+          source:   "docker-compose.yml,docker-compose.prod.yml"
+          target:   "/opt/miniblog"
 
-      - name: Deploy on server
+      - name: Deploy on server (docker compose)
+        uses: appleboy/ssh-action@v1.0.0
         env:
-          _IMG_BACKEND: ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
-          _IMG_FE_BLOG: ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
+          _IMG_BACKEND:  ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
+          _IMG_FE_BLOG:  ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
           _IMG_FE_ADMIN: ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
-          _GH_USER: ${{ github.repository_owner }}
-          _GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          _MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          _MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
+          _GH_USER:      ${{ github.repository_owner }}
+          _GH_TOKEN:     ${{ secrets.GHCR_TOKEN }}
+          _MYSQL_HOST:   ${{ secrets.MYSQL_HOST }}
+          _MYSQL_PORT:   ${{ secrets.MYSQL_PORT }}
           _MYSQL_DBNAME: ${{ secrets.MYSQL_DBNAME }}
           _MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
           _MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          _REDIS_HOST: ${{ secrets.REDIS_HOST }}
-          _REDIS_PORT: ${{ secrets.REDIS_PORT }}
-          _REDIS_DB: ${{ secrets.REDIS_DB }}
+          _REDIS_HOST:   ${{ secrets.REDIS_HOST }}
+          _REDIS_PORT:   ${{ secrets.REDIS_PORT }}
+          _REDIS_DB:     ${{ secrets.REDIS_DB }}
           _REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
-          _JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          _JWT_SECRET:   ${{ secrets.JWT_SECRET }}
           _FEISHU_APPID: ${{ secrets.FEISHU_DOCREADER_APPID }}
           _FEISHU_SECRET: ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
+        with:
+          host:     ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USER }}
+          key:      ${{ secrets.DEPLOY_SSH_KEY }}
+          port:     ${{ secrets.SVRA_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/miniblog
+
+            cat > .env <<EOF
+            BACKEND_IMAGE_TAG=${_IMG_BACKEND}
+            FRONTEND_BLOG_IMAGE_TAG=${_IMG_FE_BLOG}
+            FRONTEND_ADMIN_IMAGE_TAG=${_IMG_FE_ADMIN}
+
+            GIN_MODE=release
+
+            MYSQL_HOST=${_MYSQL_HOST}
+            MYSQL_PORT=${_MYSQL_PORT}
+            MYSQL_DATABASE=${_MYSQL_DBNAME}
+            MYSQL_USERNAME=${_MYSQL_USERNAME}
+            MYSQL_PASSWORD=${_MYSQL_PASSWORD}
+
+            REDIS_HOST=${_REDIS_HOST}
+            REDIS_PORT=${_REDIS_PORT}
+            REDIS_DB=${_REDIS_DB}
+            REDIS_PASSWORD=${_REDIS_PASSWORD}
+
+            JWT_SECRET=${_JWT_SECRET}
+
+            FEISHU_DOCREADER_APPID=${_FEISHU_APPID}
+            FEISHU_DOCREADER_APPSECRET=${_FEISHU_SECRET}
+            EOF
+
+            sudo docker network inspect miniblog_net >/dev/null 2>&1 || sudo docker network create miniblog_net
+            sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
+
+            # 使用 PAT 登录 GHCR，确保服务器侧可拉取私有/最新镜像
+            if [ -n "${_GH_TOKEN}" ]; then
+              echo "${_GH_TOKEN}" | sudo docker login ghcr.io -u "${_GH_USER}" --password-stdin
+            fi
+
+            sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+            sudo docker compose ps
+
+  notify:
+    name: Send Notification
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Log deployment status
         run: |
-          REMOTE="${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }}"
-          ssh -i ~/.ssh/deploy_key "$REMOTE" bash -s <<'EOSSH'
-          set -euo pipefail
-          cd /opt/miniblog
-
-          cat > .env <<EOF
-          BACKEND_IMAGE_TAG=${_IMG_BACKEND}
-          FRONTEND_BLOG_IMAGE_TAG=${_IMG_FE_BLOG}
-          FRONTEND_ADMIN_IMAGE_TAG=${_IMG_FE_ADMIN}
-
-          GIN_MODE=release
-
-          MYSQL_HOST=${_MYSQL_HOST}
-          MYSQL_PORT=${_MYSQL_PORT}
-          MYSQL_DATABASE=${_MYSQL_DBNAME}
-          MYSQL_USERNAME=${_MYSQL_USERNAME}
-          MYSQL_PASSWORD=${_MYSQL_PASSWORD}
-
-          REDIS_HOST=${_REDIS_HOST}
-          REDIS_PORT=${_REDIS_PORT}
-          REDIS_DB=${_REDIS_DB}
-          REDIS_PASSWORD=${_REDIS_PASSWORD}
-
-          JWT_SECRET=${_JWT_SECRET}
-
-          FEISHU_DOCREADER_APPID=${_FEISHU_APPID}
-          FEISHU_DOCREADER_APPSECRET=${_FEISHU_SECRET}
-          EOF
-
-          sudo docker network inspect miniblog_net >/dev/null 2>&1 || sudo docker network create miniblog_net
-          sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
-
-          echo "${_GH_TOKEN}" | sudo docker login ghcr.io -u "${_GH_USER}" --password-stdin
-
-          sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-          sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-
-          sudo docker compose ps
-          EOSSH
-
-      - name: Cleanup
-        if: always()
-        run: rm -f ~/.ssh/deploy_key
+          if [ "${{ needs.deploy.result }}" = "success" ]; then
+            echo "✅ Deployment to production succeeded"
+          else
+            echo "❌ Deployment to production failed"
+            exit 1
+          fi
