@@ -1,18 +1,18 @@
-name: CI/CD (miniblog - simple A)
+name: CI/CD (miniblog - production)
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
     inputs:
       skip_tests:
-        description: 'Skip unit tests'
+        description: 'Skip tests'
         type: boolean
         default: false
 
 permissions:
   contents: read
-  packages: write   # push 到 GHCR 需要
+  packages: write
 
 env:
   BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/miniblog-backend
@@ -25,15 +25,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  # ========================================
+  # Job 1: 测试阶段
+  # ========================================
+  test:
+    name: Run Tests
     runs-on: [self-hosted, macOS, ARM64]
+    if: ${{ !inputs.skip_tests }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      # ----(可选) 后端单元测试----
       - name: Setup Go
-        if: ${{ !inputs.skip_tests }}
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -42,18 +46,33 @@ jobs:
             go.sum
             go.work.sum
 
-      - name: Run unit tests
-        if: ${{ !inputs.skip_tests }}
+      - name: Fix Go module cache permissions
         run: |
           [ -d "$HOME/go/pkg/mod" ] && chmod -R u+w "$HOME/go/pkg/mod" || true
-          go mod download
-          make test-backend
 
-      # ---- Docker 构建并推送 GHCR（linux/amd64）----
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run unit tests
+        run: make test-backend
+
+  # ========================================
+  # Job 2: 构建后端镜像
+  # ========================================
+  build-backend:
+    name: Build Backend Image
+    runs-on: [self-hosted, macOS, ARM64]
+    needs: test
+    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Login to GHCR
@@ -75,6 +94,32 @@ jobs:
           tags: |
             ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
             ${{ env.BACKEND_IMAGE }}:latest
+
+  # ========================================
+  # Job 3: 构建前端镜像（并行）
+  # ========================================
+  build-frontends:
+    name: Build Frontend Images
+    runs-on: [self-hosted, macOS, ARM64]
+    needs: test
+    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Build & Push frontend-blog
         uses: docker/build-push-action@v6
@@ -98,7 +143,18 @@ jobs:
             ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_ADMIN_IMAGE }}:latest
 
-      # ---- 部署（方案 A：远端用户可直接运行 docker）----
+  # ========================================
+  # Job 4: 部署到生产环境
+  # ========================================
+  deploy:
+    name: Deploy to Production
+    runs-on: [self-hosted, macOS, ARM64]
+    needs: [build-backend, build-frontends]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Prepare SSH
         run: |
           mkdir -p ~/.ssh
@@ -106,118 +162,77 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SVRA_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Upload compose files and configs
+      - name: Upload compose files
         run: |
           REMOTE="${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }}"
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes "$REMOTE" "mkdir -p /opt/miniblog"
+          ssh -i ~/.ssh/deploy_key "$REMOTE" "mkdir -p /opt/miniblog"
           scp -i ~/.ssh/deploy_key docker-compose.yml docker-compose.prod.yml "$REMOTE:/opt/miniblog/"
-          scp -i ~/.ssh/deploy_key -r configs "$REMOTE:/opt/miniblog/"
 
       - name: Deploy on server
         env:
-          BACKEND_TAG: ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
-          FE_BLOG_TAG: ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
-          FE_ADMIN_TAG: ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          GHCR_USER: ${{ github.repository_owner }}
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
-          MYSQL_DBNAME: ${{ secrets.MYSQL_DBNAME }}
-          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          REDIS_HOST: ${{ secrets.REDIS_HOST }}
-          REDIS_PORT: ${{ secrets.REDIS_PORT }}
-          REDIS_DB: ${{ secrets.REDIS_DB }}
-          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          FEISHU_APPID: ${{ secrets.FEISHU_DOCREADER_APPID }}
-          FEISHU_SECRET: ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
+          _IMG_BACKEND: ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
+          _IMG_FE_BLOG: ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
+          _IMG_FE_ADMIN: ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
+          _GH_USER: ${{ github.repository_owner }}
+          _GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          _MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          _MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
+          _MYSQL_DBNAME: ${{ secrets.MYSQL_DBNAME }}
+          _MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          _MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          _REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          _REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          _REDIS_DB: ${{ secrets.REDIS_DB }}
+          _REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          _JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          _FEISHU_APPID: ${{ secrets.FEISHU_DOCREADER_APPID }}
+          _FEISHU_SECRET: ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
         run: |
           REMOTE="${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }}"
-          
-          # 在本地准备 .env 内容
-          cat > /tmp/miniblog.env << 'ENVEOF'
-          BACKEND_IMAGE_TAG=${BACKEND_TAG}
-          FRONTEND_BLOG_IMAGE_TAG=${FE_BLOG_TAG}
-          FRONTEND_ADMIN_IMAGE_TAG=${FE_ADMIN_TAG}
-          
-          GIN_MODE=release
-          
-          MYSQL_HOST=${MYSQL_HOST}
-          MYSQL_PORT=${MYSQL_PORT}
-          MYSQL_DATABASE=${MYSQL_DBNAME}
-          MYSQL_USERNAME=${MYSQL_USERNAME}
-          MYSQL_PASSWORD=${MYSQL_PASSWORD}
-          
-          REDIS_HOST=${REDIS_HOST}
-          REDIS_PORT=${REDIS_PORT}
-          REDIS_DB=${REDIS_DB}
-          REDIS_PASSWORD=${REDIS_PASSWORD}
-          
-          JWT_SECRET=${JWT_SECRET}
-          
-          FEISHU_DOCREADER_APPID=${FEISHU_APPID}
-          FEISHU_DOCREADER_APPSECRET=${FEISHU_SECRET}
-          ENVEOF
-          
-          # 用实际值替换变量
-          sed -i '' \
-            -e "s|\${BACKEND_TAG}|${BACKEND_TAG}|g" \
-            -e "s|\${FE_BLOG_TAG}|${FE_BLOG_TAG}|g" \
-            -e "s|\${FE_ADMIN_TAG}|${FE_ADMIN_TAG}|g" \
-            -e "s|\${MYSQL_HOST}|${MYSQL_HOST}|g" \
-            -e "s|\${MYSQL_PORT}|${MYSQL_PORT}|g" \
-            -e "s|\${MYSQL_DBNAME}|${MYSQL_DBNAME}|g" \
-            -e "s|\${MYSQL_USERNAME}|${MYSQL_USERNAME}|g" \
-            -e "s|\${MYSQL_PASSWORD}|${MYSQL_PASSWORD}|g" \
-            -e "s|\${REDIS_HOST}|${REDIS_HOST}|g" \
-            -e "s|\${REDIS_PORT}|${REDIS_PORT}|g" \
-            -e "s|\${REDIS_DB}|${REDIS_DB}|g" \
-            -e "s|\${REDIS_PASSWORD}|${REDIS_PASSWORD}|g" \
-            -e "s|\${JWT_SECRET}|${JWT_SECRET}|g" \
-            -e "s|\${FEISHU_APPID}|${FEISHU_APPID}|g" \
-            -e "s|\${FEISHU_SECRET}|${FEISHU_SECRET}|g" \
-            /tmp/miniblog.env
-          
-          # 上传 .env 文件
-          scp -i ~/.ssh/deploy_key /tmp/miniblog.env "$REMOTE:/opt/miniblog/.env"
-          rm -f /tmp/miniblog.env
-          
-          # 执行部署
-          ssh -i ~/.ssh/deploy_key "$REMOTE" bash -s <<DEPLOY_SCRIPT
+          ssh -i ~/.ssh/deploy_key "$REMOTE" bash -s <<'EOSSH'
           set -euo pipefail
+          cd /opt/miniblog
 
-          APP_DIR=/opt/miniblog
-          cd "\$APP_DIR"
+          # 生成 .env 文件（所有变量已在 Actions 展开）
+          cat > .env <<EOF
+          BACKEND_IMAGE_TAG=${_IMG_BACKEND}
+          FRONTEND_BLOG_IMAGE_TAG=${_IMG_FE_BLOG}
+          FRONTEND_ADMIN_IMAGE_TAG=${_IMG_FE_ADMIN}
 
-          # 创建必要的网络
+          GIN_MODE=release
+
+          MYSQL_HOST=${_MYSQL_HOST}
+          MYSQL_PORT=${_MYSQL_PORT}
+          MYSQL_DATABASE=${_MYSQL_DBNAME}
+          MYSQL_USERNAME=${_MYSQL_USERNAME}
+          MYSQL_PASSWORD=${_MYSQL_PASSWORD}
+
+          REDIS_HOST=${_REDIS_HOST}
+          REDIS_PORT=${_REDIS_PORT}
+          REDIS_DB=${_REDIS_DB}
+          REDIS_PASSWORD=${_REDIS_PASSWORD}
+
+          JWT_SECRET=${_JWT_SECRET}
+
+          FEISHU_DOCREADER_APPID=${_FEISHU_APPID}
+          FEISHU_DOCREADER_APPSECRET=${_FEISHU_SECRET}
+          EOF
+
+          # 创建必要的网络和目录
           docker network inspect miniblog_net >/dev/null 2>&1 || docker network create miniblog_net
-
-          # 创建必要的目录
           mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
 
-          # GHCR 登录
-          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+          # GHCR 登录（部署账户已在 docker 组，无需 sudo）
+          echo "${_GH_TOKEN}" | docker login ghcr.io -u "${_GH_USER}" --password-stdin
 
-          # 拉取并启动
+          # 拉取并滚动更新
           docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
           docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
-          # 健康检查
-          echo "等待服务启动..."
-          sleep 10
-          
-          # 检查后端健康
-          if curl -fsS http://localhost:8090/health >/dev/null 2>&1; then
-            echo "✅ 后端服务健康"
-          else
-            echo "⚠️  后端服务未就绪"
-          fi
-
           # 查看状态
           docker compose ps
-          DEPLOY_SCRIPT
+          EOSSH
 
-      - name: Cleanup SSH key
+      - name: Cleanup
         if: always()
         run: rm -f ~/.ssh/deploy_key
