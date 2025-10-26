@@ -65,7 +65,6 @@ services:
     networks:
       - miniblog_net
     volumes:
-      - /data/logs/miniblog/frontend-blog:/var/log/nginx
       - blog-dist:/app/dist
 
   miniblog-frontend-admin:
@@ -80,7 +79,6 @@ services:
     networks:
       - miniblog_net
     volumes:
-      - /data/logs/miniblog/frontend-admin:/var/log/nginx
       - admin-dist:/app/dist
 
 volumes:
