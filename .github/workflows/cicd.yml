@@ -36,6 +36,7 @@ jobs:
           SVRA_USER:           ${{ secrets.SVRA_USER }}
           DEPLOY_SSH_KEY:      ${{ secrets.DEPLOY_SSH_KEY }}
           GHCR_TOKEN:          ${{ secrets.GHCR_TOKEN }}
+          GHCR_USERNAME:       ${{ secrets.GHCR_USERNAME }}
           MYSQL_HOST:          ${{ secrets.MYSQL_HOST }}
           MYSQL_PORT:          ${{ secrets.MYSQL_PORT }}
           MYSQL_DBNAME:        ${{ secrets.MYSQL_DBNAME }}
@@ -51,15 +52,38 @@ jobs:
         run: |
           echo "🔍 Validating required secrets (non-blocking)..."
           REQUIRED_ON_MAIN=(SVRA_HOST SVRA_USER DEPLOY_SSH_KEY MYSQL_HOST MYSQL_DBNAME MYSQL_USERNAME MYSQL_PASSWORD REDIS_HOST REDIS_PASSWORD JWT_SECRET)
-          OPTIONAL=(MYSQL_PORT REDIS_PORT REDIS_DB FEISHU_APPID FEISHU_SECRET GHCR_TOKEN)
+          OPTIONAL=(MYSQL_PORT REDIS_PORT REDIS_DB FEISHU_APPID FEISHU_SECRET GHCR_TOKEN GHCR_USERNAME)
           FAILED=0
+
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            for k in "${REQUIRED_ON_MAIN[@]}"; do v="${!k}"; [ -z "$v" ] && { echo "❌ $k is not set"; FAILED=1; } || echo "✅ $k is set"; done
+            for k in "${REQUIRED_ON_MAIN[@]}"; do
+              v="${!k}"
+              if [ -z "$v" ]; then
+                echo "❌ $k is not set"
+                FAILED=1
+              else
+                echo "✅ $k is set"
+              fi
+            done
           else
             echo "ℹ️ Not on main, skipping strict checks"
           fi
-          for k in "${OPTIONAL[@]}"; do v="${!k}"; [ -z "$v" ] && echo "⚠️ $k not set (optional)" || echo "✅ $k is set"; done
-          echo; [ $FAILED -eq 1 ] && echo "⚠️ Secrets validation failed, but continuing (non-blocking)." || echo "✅ Secrets validation passed."
+
+          for k in "${OPTIONAL[@]}"; do
+            v="${!k}"
+            if [ -z "$v" ]; then
+              echo "⚠️ $k not set (optional)"
+            else
+              echo "✅ $k is set"
+            fi
+          done
+
+          echo
+          if [ $FAILED -eq 1 ]; then
+            echo "⚠️ Secrets validation failed, but continuing (non-blocking)."
+          else
+            echo "✅ Secrets validation passed."
+          fi
 
   test:
     name: Run Tests
@@ -83,10 +107,10 @@ jobs:
     name: Build & Push Images (GHCR)
     runs-on: ubuntu-latest
     needs: [validate-secrets, test]
-    if: ${{ always() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
+    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
     env:
-      # 将 PAT 暴露为 job 级环境变量，便于在 if: 中判断
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
     steps:
       - uses: actions/checkout@v4
 
@@ -95,18 +119,18 @@ jobs:
           docker logout ghcr.io || true
           rm -f ~/.docker/config.json || true
 
-      # 优先用 PAT（若提供）
+      # 优先使用 PAT（可跨仓库/组织），可选提供 GHCR_USERNAME
       - name: Login to GHCR with PAT (if provided)
-        if: ${{ env.GHCR_TOKEN != '' }}
+        if: env.GHCR_TOKEN != ''
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          username: ${{ env.GHCR_USERNAME != '' && env.GHCR_USERNAME || github.repository_owner }}
           password: ${{ env.GHCR_TOKEN }}
 
-      # 回落使用 GITHUB_TOKEN
+      # 回落到 GITHUB_TOKEN（需与当前仓库/包归属一致）
       - name: Login to GHCR with GITHUB_TOKEN (fallback)
-        if: ${{ env.GHCR_TOKEN == '' }}
+        if: env.GHCR_TOKEN == ''
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -116,6 +140,7 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Backend
       - name: Build & Push backend
         uses: docker/build-push-action@v6
         with:
@@ -128,11 +153,10 @@ jobs:
           tags: |
             ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
             ${{ env.BACKEND_IMAGE }}:latest
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Frontend - blog
       - name: Build & Push frontend-blog
         uses: docker/build-push-action@v6
         with:
@@ -143,11 +167,10 @@ jobs:
           tags: |
             ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_BLOG_IMAGE }}:latest
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Frontend - admin
       - name: Build & Push frontend-admin
         uses: docker/build-push-action@v6
         with:
@@ -158,8 +181,6 @@ jobs:
           tags: |
             ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
             ${{ env.FE_ADMIN_IMAGE }}:latest
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -167,7 +188,7 @@ jobs:
     name: Deploy to Production
     runs-on: ubuntu-latest
     needs: [build-and-push]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
@@ -177,35 +198,36 @@ jobs:
           host:     ${{ secrets.SVRA_HOST }}
           username: ${{ secrets.SVRA_USER }}
           key:      ${{ secrets.DEPLOY_SSH_KEY }}
-          port:     ${{ (secrets.SVRA_SSH_PORT != '' && secrets.SVRA_SSH_PORT) || '22' }}
+          port:     ${{ secrets.SVRA_SSH_PORT || 22 }}
           source:   "docker-compose.yml,docker-compose.prod.yml"
           target:   "/opt/miniblog"
 
       - name: Deploy on server (docker compose)
         uses: appleboy/ssh-action@v1.0.0
         env:
-          _IMG_BACKEND:    ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
-          _IMG_FE_BLOG:    ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
-          _IMG_FE_ADMIN:   ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
-          _GH_USER:        ${{ github.repository_owner }}
-          _GH_TOKEN:       ${{ secrets.GHCR_TOKEN }}
-          _MYSQL_HOST:     ${{ secrets.MYSQL_HOST }}
-          _MYSQL_PORT:     ${{ secrets.MYSQL_PORT }}
-          _MYSQL_DBNAME:   ${{ secrets.MYSQL_DBNAME }}
-          _MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
-          _MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          _REDIS_HOST:     ${{ secrets.REDIS_HOST }}
-          _REDIS_PORT:     ${{ secrets.REDIS_PORT }}
-          _REDIS_DB:       ${{ secrets.REDIS_DB }}
-          _REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
-          _JWT_SECRET:     ${{ secrets.JWT_SECRET }}
-          _FEISHU_APPID:   ${{ secrets.FEISHU_DOCREADER_APPID }}
-          _FEISHU_SECRET:  ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
+          _IMG_BACKEND:     ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
+          _IMG_FE_BLOG:     ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
+          _IMG_FE_ADMIN:    ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
+          _GH_USER:         ${{ github.repository_owner }}
+          _GH_TOKEN:        ${{ secrets.GHCR_TOKEN }}
+          _GHCR_USERNAME:   ${{ secrets.GHCR_USERNAME }}
+          _MYSQL_HOST:      ${{ secrets.MYSQL_HOST }}
+          _MYSQL_PORT:      ${{ secrets.MYSQL_PORT }}
+          _MYSQL_DBNAME:    ${{ secrets.MYSQL_DBNAME }}
+          _MYSQL_USERNAME:  ${{ secrets.MYSQL_USERNAME }}
+          _MYSQL_PASSWORD:  ${{ secrets.MYSQL_PASSWORD }}
+          _REDIS_HOST:      ${{ secrets.REDIS_HOST }}
+          _REDIS_PORT:      ${{ secrets.REDIS_PORT }}
+          _REDIS_DB:        ${{ secrets.REDIS_DB }}
+          _REDIS_PASSWORD:  ${{ secrets.REDIS_PASSWORD }}
+          _JWT_SECRET:      ${{ secrets.JWT_SECRET }}
+          _FEISHU_APPID:    ${{ secrets.FEISHU_DOCREADER_APPID }}
+          _FEISHU_SECRET:   ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
         with:
-          host:       ${{ secrets.SVRA_HOST }}
-          username:   ${{ secrets.SVRA_USER }}
-          key:        ${{ secrets.DEPLOY_SSH_KEY }}
-          port:       ${{ (secrets.SVRA_SSH_PORT != '' && secrets.SVRA_SSH_PORT) || '22' }}
+          host:     ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USER }}
+          key:      ${{ secrets.DEPLOY_SSH_KEY }}
+          port:     ${{ secrets.SVRA_SSH_PORT || 22 }}
           script_stop: true
           script: |
             set -euo pipefail
@@ -234,12 +256,15 @@ jobs:
             FEISHU_DOCREADER_APPID=${_FEISHU_APPID}
             FEISHU_DOCREADER_APPSECRET=${_FEISHU_SECRET}
             EOF
+            sudo chmod 600 .env
 
             sudo docker network inspect miniblog_net >/dev/null 2>&1 || sudo docker network create miniblog_net
             sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
 
+            # 使用 PAT 登录 GHCR（如提供），支持自定义 GHCR 用户名；否则跳过（compose 会尝试匿名/已有登录）
             if [ -n "${_GH_TOKEN}" ]; then
-              echo "${_GH_TOKEN}" | sudo docker login ghcr.io -u "${_GH_USER}" --password-stdin
+              DOCKER_USER="${_GHCR_USERNAME:-${_GH_USER}}"
+              echo "${_GH_TOKEN}" | sudo docker login ghcr.io -u "${DOCKER_USER}" --password-stdin
             fi
 
             sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
@@ -251,12 +276,15 @@ jobs:
     name: Send Notification
     needs: [deploy]
     runs-on: ubuntu-latest
-    if: ${{ always() }}
+    if: always()
     steps:
       - name: Log deployment status
         run: |
-          if [ "${{ needs.deploy.result }}" = "success" ]; then
+          STATUS="${{ needs.deploy.result }}"
+          if [ "$STATUS" = "success" ]; then
             echo "✅ Deployment to production succeeded"
+          elif [ "$STATUS" = "skipped" ]; then
+            echo "ℹ️ Deployment skipped (non-main push)"
           else
             echo "❌ Deployment to production failed"
             exit 1
