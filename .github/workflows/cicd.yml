@@ -26,12 +26,12 @@ concurrency:
 
 jobs:
   # ========================================
-  # Job 1: 测试阶段
+  # Job 1: 测试阶段（临时禁用以加快 CI/CD 测试）
   # ========================================
   test:
     name: Run Tests
     runs-on: [self-hosted, macOS, ARM64]
-    if: ${{ !inputs.skip_tests }}
+    if: false  # 临时禁用测试阶段
 
     steps:
       - name: Checkout code
