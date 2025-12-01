@@ -1,7 +1,28 @@
 name: CI/CD (miniblog - production, linux runner)
 
+# ============================================================================
+# GitHub Secrets 配置指引
+# ----------------------------------------------------------------------------
+# 必需（main push / workflow_dispatch 才强制）：
+#   SVRB_HOST, SVRB_USER, SVRB_SSH_KEY, SVRB_SSH_PORT (可选，默认 22)
+#   MYSQL_HOST, MYSQL_DBNAME, MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_PORT (可选)
+#   REDIS_HOST, REDIS_PASSWORD, REDIS_PORT (可选), REDIS_DB (可选)
+#   JWT_SECRET
+#
+# 可选：
+#   GHCR_TOKEN, GHCR_USERNAME   # 如果需要跨仓库/组织推送 GHCR
+#   FEISHU_DOCREADER_APPID, FEISHU_DOCREADER_APPSECRET
+#
+# 说明：
+# - PR 只做 lint/test，不用这些 Secrets。
+# - main push / workflow_dispatch 缺必需项会直接失败。
+# - 部署只针对 ServerB（应用机），ServerA 不在 CI 管理范围。
+# ============================================================================
+
 on:
   push:
+    branches: [ main ]
+  pull_request:
     branches: [ main ]
   workflow_dispatch:
     inputs:
@@ -30,11 +51,12 @@ jobs:
     name: Validate Secrets
     runs-on: ubuntu-latest
     steps:
-      - name: Check Required Secrets (non-blocking)
+      - name: Check Required Secrets
         env:
-          SVRA_HOST:           ${{ secrets.SVRA_HOST }}
-          SVRA_USER:           ${{ secrets.SVRA_USER }}
-          DEPLOY_SSH_KEY:      ${{ secrets.DEPLOY_SSH_KEY }}
+          SVRB_HOST:           ${{ secrets.SVRB_HOST }}
+          SVRB_USER:           ${{ secrets.SVRB_USER }}
+          SVRB_SSH_KEY:        ${{ secrets.SVRB_SSH_KEY }}
+          SVRB_SSH_PORT:       ${{ secrets.SVRB_SSH_PORT }}
           GHCR_TOKEN:          ${{ secrets.GHCR_TOKEN }}
           GHCR_USERNAME:       ${{ secrets.GHCR_USERNAME }}
           MYSQL_HOST:          ${{ secrets.MYSQL_HOST }}
@@ -51,25 +73,36 @@ jobs:
           FEISHU_SECRET:       ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
         run: |
           echo "🔍 Validating required secrets (non-blocking)..."
-          REQUIRED_ON_MAIN=(SVRA_HOST SVRA_USER DEPLOY_SSH_KEY MYSQL_HOST MYSQL_DBNAME MYSQL_USERNAME MYSQL_PASSWORD REDIS_HOST REDIS_PASSWORD JWT_SECRET)
-          OPTIONAL=(MYSQL_PORT REDIS_PORT REDIS_DB FEISHU_APPID FEISHU_SECRET GHCR_TOKEN GHCR_USERNAME)
+          REQUIRED_APP=(SVRB_HOST SVRB_USER SVRB_SSH_KEY MYSQL_HOST MYSQL_DBNAME MYSQL_USERNAME MYSQL_PASSWORD REDIS_HOST REDIS_PASSWORD JWT_SECRET)
+          OPTIONAL_APP=(SVRB_SSH_PORT MYSQL_PORT REDIS_PORT REDIS_DB FEISHU_APPID FEISHU_SECRET GHCR_TOKEN GHCR_USERNAME)
           FAILED=0
+          ENFORCE=0
 
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            for k in "${REQUIRED_ON_MAIN[@]}"; do
-              v="${!k}"
-              if [ -z "$v" ]; then
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            ENFORCE=1
+            echo "📋 Enforcing required secrets for main push."
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENFORCE=1
+            echo "📋 Enforcing required secrets for workflow_dispatch."
+          else
+            echo "ℹ️ PR/other branches: reporting missing secrets as warnings."
+          fi
+
+          for k in "${REQUIRED_APP[@]}"; do
+            v="${!k}"
+            if [ -z "$v" ]; then
+              if [ $ENFORCE -eq 1 ]; then
                 echo "❌ $k is not set"
                 FAILED=1
               else
-                echo "✅ $k is set"
+                echo "⚠️ $k is not set (required on deploy)"
               fi
-            done
-          else
-            echo "ℹ️ Not on main, skipping strict checks"
-          fi
+            else
+              echo "✅ $k is set"
+            fi
+          done
 
-          for k in "${OPTIONAL[@]}"; do
+          for k in "${OPTIONAL_APP[@]}"; do
             v="${!k}"
             if [ -z "$v" ]; then
               echo "⚠️ $k not set (optional)"
@@ -80,7 +113,11 @@ jobs:
 
           echo
           if [ $FAILED -eq 1 ]; then
-            echo "⚠️ Secrets validation failed, but continuing (non-blocking)."
+            if [ $ENFORCE -eq 1 ]; then
+              echo "❌ Secrets validation failed. Stop pipeline."
+              exit 1
+            fi
+            echo "⚠️ Secrets validation failed, but continuing (non-blocking for PRs)."
           else
             echo "✅ Secrets validation passed."
           fi
@@ -103,11 +140,45 @@ jobs:
         run: |
           go test -v ./...
 
+  lint:
+    name: Lint (go vet)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Run go vet
+        run: |
+          go vet ./...
+
   build-and-push:
     name: Build & Push Images (GHCR)
     runs-on: ubuntu-latest
-    needs: [validate-secrets, test]
-    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    needs: [validate-secrets, lint, test]
+    if: |
+      always() &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (needs.lint.result == 'success' || needs.lint.result == 'skipped') &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        github.event_name == 'workflow_dispatch'
+      )
+    strategy:
+      matrix:
+        include:
+          - name: backend
+            context: .
+            file: build/docker/miniblog/Dockerfile.prod.backend
+            build_args: |
+              GOPROXY=https://goproxy.cn,direct
+          - name: frontend-blog
+            context: .
+            file: build/docker/miniblog/Dockerfile.prod.frontend.blog
+          - name: frontend-admin
+            context: .
+            file: build/docker/miniblog/Dockerfile.prod.frontend.admin
     env:
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
       GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
@@ -140,69 +211,41 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Backend
-      - name: Build & Push backend
+      - name: Build & Push ${{ matrix.name }}
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: build/docker/miniblog/Dockerfile.prod.backend
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           platforms: linux/amd64
           push: true
-          build-args: |
-            GOPROXY=https://goproxy.cn,direct
+          build-args: ${{ matrix.build_args || '' }}
           tags: |
-            ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
-            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ matrix.name == 'backend' && env.BACKEND_IMAGE || matrix.name == 'frontend-blog' && env.FE_BLOG_IMAGE || env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
+            ${{ matrix.name == 'backend' && env.BACKEND_IMAGE || matrix.name == 'frontend-blog' && env.FE_BLOG_IMAGE || env.FE_ADMIN_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Frontend - blog
-      - name: Build & Push frontend-blog
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: build/docker/miniblog/Dockerfile.prod.frontend.blog
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
-            ${{ env.FE_BLOG_IMAGE }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Frontend - admin
-      - name: Build & Push frontend-admin
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: build/docker/miniblog/Dockerfile.prod.frontend.admin
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
-            ${{ env.FE_ADMIN_IMAGE }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy:
-    name: Deploy to Production
+  deploy-app:
+    name: Deploy to ServerB (app)
     runs-on: ubuntu-latest
     needs: [build-and-push]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 
       - name: Upload compose files
         uses: appleboy/scp-action@v0.1.7
         with:
-          host:     ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USER }}
-          key:      ${{ secrets.DEPLOY_SSH_KEY }}
-          port:     ${{ secrets.SVRA_SSH_PORT || 22 }}
+          host:     ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USER }}
+          key:      ${{ secrets.SVRB_SSH_KEY }}
+          port:     ${{ secrets.SVRB_SSH_PORT || 22 }}
           source:   "docker-compose.yml,docker-compose.prod.yml"
           target:   "/opt/miniblog"
 
-      - name: Deploy on server (docker compose)
+      - name: Deploy on ServerB (docker compose)
         uses: appleboy/ssh-action@v1.0.0
         env:
           _IMG_BACKEND:     ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
@@ -224,10 +267,10 @@ jobs:
           _FEISHU_APPID:    ${{ secrets.FEISHU_DOCREADER_APPID }}
           _FEISHU_SECRET:   ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
         with:
-          host:     ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USER }}
-          key:      ${{ secrets.DEPLOY_SSH_KEY }}
-          port:     ${{ secrets.SVRA_SSH_PORT || 22 }}
+          host:     ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USER }}
+          key:      ${{ secrets.SVRB_SSH_KEY }}
+          port:     ${{ secrets.SVRB_SSH_PORT || 22 }}
           # 关键：将上面 env 中的变量名传递给远端
           envs: >
             _IMG_BACKEND,_IMG_FE_BLOG,_IMG_FE_ADMIN,
@@ -281,18 +324,26 @@ jobs:
 
   notify:
     name: Send Notification
-    needs: [deploy]
+    needs: [deploy-app]
     runs-on: ubuntu-latest
-    if: always()
+    if: |
+      always() &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        github.event_name == 'workflow_dispatch'
+      )
     steps:
       - name: Log deployment status
         run: |
-          STATUS="${{ needs.deploy.result }}"
-          if [ "$STATUS" = "success" ]; then
+          APP_STATUS="${{ needs.deploy-app.result }}"
+
+          echo "App deploy: $APP_STATUS"
+
+          if [ "$APP_STATUS" = "success" ]; then
             echo "✅ Deployment to production succeeded"
-          elif [ "$STATUS" = "skipped" ]; then
-            echo "ℹ️ Deployment skipped (non-main push)"
+          elif [ "$APP_STATUS" = "skipped" ]; then
+            echo "ℹ️ App deployment skipped (non-main push)"
           else
-            echo "❌ Deployment to production failed"
+            echo "❌ Deployment failed"
             exit 1
           fi
