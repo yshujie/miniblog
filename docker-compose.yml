@@ -39,8 +39,6 @@ services:
       - ./configs:/app/configs:ro
       - /data/logs/miniblog/backend:/data/logs/miniblog
       - miniblog-uploads:/app/uploads
-      - /data/ssl/certs/yangshujie.com.crt:/etc/miniblog/ssl/yangshujie.com.crt:ro
-      - /data/ssl/private/yangshujie.com.key:/etc/miniblog/ssl/yangshujie.com.key:ro
     networks:
       - miniblog-network     # 业务网
       - infra-network        # 访问基础设施
