@@ -308,7 +308,12 @@ jobs:
             EOF
             sudo chmod 600 .env
 
-            sudo docker network inspect miniblog_net >/dev/null 2>&1 || sudo docker network create miniblog_net
+            # 创建业务网络（miniblog），infra-network 由基础设施预创建
+            sudo docker network inspect miniblog-network >/dev/null 2>&1 || sudo docker network create miniblog-network
+            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
+              echo "⚠️ infra-network 不存在，请先在基础设施侧创建（overlay/attachable）"
+              exit 1
+            fi
             sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
 
             # 使用 PAT 登录 GHCR（如提供），支持自定义 GHCR 用户名；否则跳过（compose 会尝试匿名/已有登录）
