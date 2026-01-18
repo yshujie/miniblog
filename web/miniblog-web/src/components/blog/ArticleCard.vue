@@ -64,7 +64,7 @@
 <script setup lang="ts">
 import 'md-editor-v3/lib/style.css'
 import { MdPreview, MdCatalog } from 'md-editor-v3'
-import { computed, defineProps, ref, onMounted, nextTick, onUpdated } from 'vue'
+import { computed, ref, onMounted, onUpdated } from 'vue'
 import { Article } from '@/types/article'
 import { fetchArticleDetail } from '@/api/blog'
 

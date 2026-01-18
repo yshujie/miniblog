@@ -1,9 +1,11 @@
 import axios from 'axios'
 import type { ApiResponse } from '../types/response'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
+
 // 创建 axios 实例
 const http = axios.create({
-  baseURL: 'https://api.yangshujie.com/v1', // 修改为您的实际服务器地址
+  baseURL: API_BASE_URL, // dev 默认走 Vite 代理
   timeout: 5000, // 请求超时时间
   headers: {
     'Content-Type': 'application/json'

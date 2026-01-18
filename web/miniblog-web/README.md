@@ -45,6 +45,8 @@ npm install
 npm run dev
 ```
 
+> 开发环境默认通过 Vite 代理把以 `/api` 开头的请求转发到 `https://api.yangshujie.com`，避免 CORS。可在 `.env.development` 修改 `VITE_API_BASE_URL`（默认 `/api/v1`）或在 `vite.config.ts` 调整代理目标。
+
 ### Type-Check, Compile and Minify for Production
 
 ```sh

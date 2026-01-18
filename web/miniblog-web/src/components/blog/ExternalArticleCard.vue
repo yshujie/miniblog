@@ -18,7 +18,7 @@
     </div>
 </template>
 <script setup lang="ts">
-import { computed, defineProps, ref, watch, onUnmounted } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { Article } from '@/types/article'
 import { fetchArticleDetail } from '@/api/blog'
 import { ElLoading } from 'element-plus'
