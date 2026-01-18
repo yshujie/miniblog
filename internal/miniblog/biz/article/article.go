@@ -172,6 +172,7 @@ func (b *articleBiz) Unpublish(ctx context.Context, articleId uint64) error {
 
 // loadArticleContent 加载文章内容
 func loadArticleContent(externalLink string, ctx context.Context) (string, error) {
+	return "", nil
 	// 读取文档内容
 	content, err := feishu.GetClient(
 		viper.GetString("feishu.docreader.appid"),
