@@ -1,6 +1,6 @@
 <template>
   <el-footer class="footer-bar">
-    &copy; 2025 clack 的技术博客 · Powered by Golang + Vue3 + Element Plus
+    &copy; 2025 Shujie's Blog · Powered by Golang + Vue3 + Element Plus
   </el-footer>
 </template>
 

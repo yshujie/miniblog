@@ -6,7 +6,7 @@
       <el-avatar class="avatar" :src="logo" size="large">
         <img :src="logo" alt="logo" />
       </el-avatar>
-      <h1>clack 的技术博客</h1>
+      <h1>Shujie's Blog</h1>
       <p class="desc">
         《费曼物理讲义》中讲：What I cannot create, I do not understand.
         <br />
