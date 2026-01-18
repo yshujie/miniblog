@@ -5,11 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/viper"
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/errno"
-	"github.com/yshujie/miniblog/internal/pkg/feishu"
 	"github.com/yshujie/miniblog/internal/pkg/log"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
 )
@@ -172,21 +170,21 @@ func (b *articleBiz) Unpublish(ctx context.Context, articleId uint64) error {
 
 // loadArticleContent 加载文章内容
 func loadArticleContent(externalLink string, ctx context.Context) (string, error) {
-	return "", nil
+	return "content from local", nil
 	// 读取文档内容
-	content, err := feishu.GetClient(
-		viper.GetString("feishu.docreader.appid"),
-		viper.GetString("feishu.docreader.appsecret"),
-		ctx,
-	).
-		DocReader.ReadContent(externalLink, "docx", "markdown")
-	if err != nil {
-		log.Warnw("failed to read doc content", "error", err)
-		return "", errno.ErrReadDocFailed
-	}
+	// content, err := feishu.GetClient(
+	// 	viper.GetString("feishu.docreader.appid"),
+	// 	viper.GetString("feishu.docreader.appsecret"),
+	// 	ctx,
+	// ).
+	// 	DocReader.ReadContent(externalLink, "docx", "markdown")
+	// if err != nil {
+	// 	log.Warnw("failed to read doc content", "error", err)
+	// 	return "", errno.ErrReadDocFailed
+	// }
 
-	log.Infow("read doc content", "content", content)
-	return content, nil
+	// log.Infow("read doc content", "content", content)
+	// return content, nil
 }
 
 // GetList 获取所有文章
