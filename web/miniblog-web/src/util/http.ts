@@ -1,7 +1,9 @@
 import axios from 'axios'
 import type { ApiResponse } from '../types/response'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
+// Default to proxy path in dev, fall back to public API domain in production.
+const DEFAULT_BASE_URL = import.meta.env.PROD ? 'https://api.yangshujie.com/v1' : '/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? DEFAULT_BASE_URL
 
 // 创建 axios 实例
 const http = axios.create({
