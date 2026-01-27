@@ -236,6 +236,8 @@ jobs:
           _IMG_FE_BLOG:     ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
           _IMG_FE_ADMIN:    ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
           _GH_USER:         ${{ github.repository_owner }}
+          _GHCR_USERNAME:   ${{ github.actor }}
+          _GHCR_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
           _MYSQL_HOST:      ${{ secrets.MYSQL_HOST }}
           _MYSQL_PORT:      ${{ secrets.MYSQL_PORT }}
           _MYSQL_DBNAME:    ${{ secrets.MYSQL_DBNAME }}
@@ -256,7 +258,7 @@ jobs:
           # 关键：将上面 env 中的变量名传递给远端
           envs: >
             _IMG_BACKEND,_IMG_FE_BLOG,_IMG_FE_ADMIN,
-            _GH_USER,
+            _GH_USER,_GHCR_USERNAME,_GHCR_TOKEN,
             _MYSQL_HOST,_MYSQL_PORT,_MYSQL_DBNAME,_MYSQL_USERNAME,_MYSQL_PASSWORD,
             _REDIS_HOST,_REDIS_PORT,_REDIS_DB,_REDIS_PASSWORD,
             _JWT_SECRET,_FEISHU_APPID,_FEISHU_SECRET
@@ -297,6 +299,12 @@ jobs:
               exit 1
             fi
             sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
+
+            # 使用 GITHUB_TOKEN 登录 GHCR（仓库内私有镜像可拉取）
+            if [ -n "${_GHCR_TOKEN}" ]; then
+              DOCKER_USER="${_GHCR_USERNAME:-${_GH_USER}}"
+              echo "${_GHCR_TOKEN}" | sudo docker login ghcr.io -u "${DOCKER_USER}" --password-stdin
+            fi
 
             sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
             sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
