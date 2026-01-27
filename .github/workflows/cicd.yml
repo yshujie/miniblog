@@ -10,7 +10,7 @@ name: CI/CD (miniblog - production, linux runner)
 #   JWT_SECRET
 #
 # 可选：
-#   GHCR_TOKEN, GHCR_USERNAME   # 如果需要跨仓库/组织推送 GHCR
+#   （无）
 #   FEISHU_DOCREADER_APPID, FEISHU_DOCREADER_APPSECRET
 #
 # 说明：
@@ -57,8 +57,6 @@ jobs:
           SVRB_USER:           ${{ secrets.SVRB_USER }}
           SVRB_SSH_KEY:        ${{ secrets.SVRB_SSH_KEY }}
           SVRB_SSH_PORT:       ${{ secrets.SVRB_SSH_PORT }}
-          GHCR_TOKEN:          ${{ secrets.GHCR_TOKEN }}
-          GHCR_USERNAME:       ${{ secrets.GHCR_USERNAME }}
           MYSQL_HOST:          ${{ secrets.MYSQL_HOST }}
           MYSQL_PORT:          ${{ secrets.MYSQL_PORT }}
           MYSQL_DBNAME:        ${{ secrets.MYSQL_DBNAME }}
@@ -74,7 +72,7 @@ jobs:
         run: |
           echo "🔍 Validating required secrets (non-blocking)..."
           REQUIRED_APP=(SVRB_HOST SVRB_USER SVRB_SSH_KEY MYSQL_HOST MYSQL_DBNAME MYSQL_USERNAME MYSQL_PASSWORD REDIS_HOST REDIS_PASSWORD JWT_SECRET)
-          OPTIONAL_APP=(SVRB_SSH_PORT MYSQL_PORT REDIS_PORT REDIS_DB FEISHU_APPID FEISHU_SECRET GHCR_TOKEN GHCR_USERNAME)
+          OPTIONAL_APP=(SVRB_SSH_PORT MYSQL_PORT REDIS_PORT REDIS_DB FEISHU_APPID FEISHU_SECRET)
           FAILED=0
           ENFORCE=0
 
@@ -179,9 +177,6 @@ jobs:
           - name: frontend-admin
             context: .
             file: build/docker/miniblog/Dockerfile.prod.frontend.admin
-    env:
-      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-      GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
     steps:
       - uses: actions/checkout@v4
 
@@ -190,18 +185,7 @@ jobs:
           docker logout ghcr.io || true
           rm -f ~/.docker/config.json || true
 
-      # 优先使用 PAT（可跨仓库/组织），可选提供 GHCR_USERNAME
-      - name: Login to GHCR with PAT (if provided)
-        if: env.GHCR_TOKEN != ''
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ env.GHCR_USERNAME != '' && env.GHCR_USERNAME || github.repository_owner }}
-          password: ${{ env.GHCR_TOKEN }}
-
-      # 回落到 GITHUB_TOKEN（需与当前仓库/包归属一致）
-      - name: Login to GHCR with GITHUB_TOKEN (fallback)
-        if: env.GHCR_TOKEN == ''
+      - name: Login to GHCR with GITHUB_TOKEN
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -252,8 +236,6 @@ jobs:
           _IMG_FE_BLOG:     ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
           _IMG_FE_ADMIN:    ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
           _GH_USER:         ${{ github.repository_owner }}
-          _GH_TOKEN:        ${{ secrets.GHCR_TOKEN }}
-          _GHCR_USERNAME:   ${{ secrets.GHCR_USERNAME }}
           _MYSQL_HOST:      ${{ secrets.MYSQL_HOST }}
           _MYSQL_PORT:      ${{ secrets.MYSQL_PORT }}
           _MYSQL_DBNAME:    ${{ secrets.MYSQL_DBNAME }}
@@ -274,7 +256,7 @@ jobs:
           # 关键：将上面 env 中的变量名传递给远端
           envs: >
             _IMG_BACKEND,_IMG_FE_BLOG,_IMG_FE_ADMIN,
-            _GH_USER,_GH_TOKEN,_GHCR_USERNAME,
+            _GH_USER,
             _MYSQL_HOST,_MYSQL_PORT,_MYSQL_DBNAME,_MYSQL_USERNAME,_MYSQL_PASSWORD,
             _REDIS_HOST,_REDIS_PORT,_REDIS_DB,_REDIS_PASSWORD,
             _JWT_SECRET,_FEISHU_APPID,_FEISHU_SECRET
@@ -315,12 +297,6 @@ jobs:
               exit 1
             fi
             sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
-
-            # 使用 PAT 登录 GHCR（如提供），支持自定义 GHCR 用户名；否则跳过（compose 会尝试匿名/已有登录）
-            if [ -n "${_GH_TOKEN}" ]; then
-              DOCKER_USER="${_GHCR_USERNAME:-${_GH_USER}}"
-              echo "${_GH_TOKEN}" | sudo docker login ghcr.io -u "${DOCKER_USER}" --password-stdin
-            fi
 
             sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
             sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
