@@ -339,16 +339,26 @@ jobs:
           script: |
             set -euo pipefail
             # 重载 nginx，使 upstream 指向 ServerB 的新实例（避免 keepalive 连到旧连接）
-            if command -v docker >/dev/null 2>&1 && docker exec nginx nginx -t 2>/dev/null; then
-              docker exec nginx nginx -s reload
-              echo "Nginx reloaded on ServerA (Docker)."
-            elif sudo systemctl is-active -q nginx 2>/dev/null && sudo nginx -t 2>/dev/null; then
+            # ServerA 上 nginx 在 Docker 中，SSH 用户通常需 sudo 才能执行 docker
+            if command -v docker >/dev/null 2>&1; then
+              if sudo docker exec nginx nginx -t 2>/dev/null; then
+                sudo docker exec nginx nginx -s reload
+                echo "Nginx reloaded on ServerA (Docker)."
+                exit 0
+              fi
+              if docker exec nginx nginx -t 2>/dev/null; then
+                docker exec nginx nginx -s reload
+                echo "Nginx reloaded on ServerA (Docker, no sudo)."
+                exit 0
+              fi
+            fi
+            if sudo systemctl is-active -q nginx 2>/dev/null && sudo nginx -t 2>/dev/null; then
               sudo systemctl reload nginx
               echo "Nginx reloaded on ServerA (systemd)."
-            else
-              echo "⚠️ Nginx not found (docker exec nginx or systemctl nginx); no reload."
-              exit 1
+              exit 0
             fi
+            echo "⚠️ Nginx not found: docker exec nginx 或 systemctl nginx 均失败，请检查容器名与 sudo 权限。"
+            exit 1
 
   notify:
     name: Send Notification
