@@ -46,6 +46,7 @@ const BLOG_PAGE_BODY_CLASS = 'blog-page-body'
 
 const needHeader = computed(() => {
   const paths = ['/404']
+  if (route.path.startsWith('/blog')) return false
   return !paths.includes(route.path)
 })
 

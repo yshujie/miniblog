@@ -14,31 +14,6 @@
           class="article-iframe"
         ></iframe>
       </div>
-      
-      <!-- 右下角操作按钮组 -->
-      <div class="article-actions">
-        <!-- <button 
-          class="action-btn" 
-          @click="scrollToTop"
-          title="滚动到顶部"
-        >
-          ⬆️
-        </button> -->
-        <button 
-          class="action-btn" 
-          @click="openSidebar"
-          title="打开左侧边栏"
-        >
-          ⬅️
-        </button>
-        <button 
-          class="action-btn" 
-          @click="closeSidebar"
-          title="隐藏左侧边栏"
-        >
-          ➡️
-        </button>
-      </div>
     </div>
   </div>
 </template>
@@ -47,13 +22,8 @@ import { computed, ref, watch, onUnmounted } from 'vue'
 import { Article } from '@/types/article'
 import { fetchArticleDetail } from '@/api/blog'
 import { ElLoading } from 'element-plus'
-import { useUiStore } from '@/stores/ui'
-
 // 组件 props
 const props = defineProps<{ articleId: string|null }>()
-
-// UI Store
-const uiStore = useUiStore()
 
 // 当前文章
 const currentArticle = ref<Article | null>(null)
@@ -207,20 +177,6 @@ const scrollToTop = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-// 打开左侧边栏
-const openSidebar = () => {
-  if (!uiStore.sidebarOpen) {
-    uiStore.setSidebar(true)
-  }
-}
-
-// 隐藏左侧边栏
-const closeSidebar = () => {
-  if (uiStore.sidebarOpen) {
-    uiStore.setSidebar(false)
-  }
-}
-
 </script>
 <style scoped lang="less">
 .article-container {
@@ -279,47 +235,5 @@ const closeSidebar = () => {
     }
   }
 
-  // 右下角操作按钮组
-  .article-actions {
-    position: fixed;
-    right: 2rem;
-    bottom: 2rem;
-    z-index: 50;
-    display: flex;
-    flex-direction: inherit;
-    gap: 0.75rem;
-    opacity: 0.6;
-    transition: all 0.3s ease;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-
-  .action-btn {
-    width: 2.75rem;
-    height: 2.75rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 50%;
-    color: var(--text-secondary);
-    font-size: 1.125rem;
-    cursor: pointer;
-    box-shadow: var(--shadow-md);
-    transition: border-color 0.2s, color 0.2s, transform 0.2s;
-
-    &:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-      transform: scale(1.05);
-    }
-
-    &:active {
-      transform: scale(0.98);
-    }
-  }
 }
 </style>

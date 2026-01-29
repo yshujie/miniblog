@@ -1,6 +1,7 @@
 <template>
   <aside id="sidebar" class="sidebar-root" :class="{ 'sidebar-hidden': !sidebarOpen }">
     <div class="sidebar-content">
+      <a href="/" class="sidebar-logo">Shujie's Blog</a>
       <div class="section-list">
         <div
           v-for="section in props.sections"
@@ -126,8 +127,8 @@ function handleArticleClick(articleId: string) {
   min-height: 0; /* 允许在 flex 布局中被压缩，避免底部被裁切 */
   background: var(--zone-bg);
   border-right: 1px solid var(--border-divider);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  border-radius: 0;
+  box-shadow: none;
   transition: width 0.3s ease, opacity 0.3s ease;
 
   @media (min-width: 1280px) {
@@ -147,7 +148,7 @@ function handleArticleClick(articleId: string) {
     min-height: 0;
     overflow-y: auto;
     max-height: 100%; /* 填满侧栏高度，超出在内部滚动，避免底部被裁切 */
-    padding: 1.25rem 1rem 1.5rem;
+    padding: 1.25rem 1rem 1.5rem 1.5rem;
 
     &::-webkit-scrollbar {
       width: 5px;
@@ -158,6 +159,22 @@ function handleArticleClick(articleId: string) {
     &::-webkit-scrollbar-thumb {
       background: var(--border-color);
       border-radius: 4px;
+    }
+  }
+
+  .sidebar-logo {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-decoration: none;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: var(--accent);
     }
   }
 
