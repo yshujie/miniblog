@@ -16,7 +16,8 @@ name: CI/CD (miniblog - production, linux runner)
 # 说明：
 # - PR 只做 lint/test，不用这些 Secrets。
 # - main push / workflow_dispatch 缺必需项会直接失败。
-# - 部署只针对 ServerB（应用机），ServerA 不在 CI 管理范围。
+# - 部署只针对 ServerB（应用机）；若 nginx 在 ServerA，可配置 SVRA_* 以在部署后自动重载 nginx。
+# 可选（ServerA nginx 重载）：SVRA_HOST, SVRA_USER, SVRA_SSH_KEY, SVRA_SSH_PORT（默认 22）
 # ============================================================================
 
 on:
@@ -216,6 +217,11 @@ jobs:
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       github.event_name == 'workflow_dispatch'
+    env:
+      SVRA_HOST: ${{ secrets.SVRA_HOST }}
+      SVRA_USER: ${{ secrets.SVRA_USER }}
+      SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+      SVRA_SSH_PORT: ${{ secrets.SVRA_SSH_PORT || 22 }}
     steps:
       - uses: actions/checkout@v4
 
@@ -309,7 +315,40 @@ jobs:
             sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
             sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
+            # 等待后端就绪（便于 ServerA 上 nginx 重载后能连到新实例）
+            echo "Waiting for backend health (up to 60s)..."
+            for i in $(seq 1 30); do
+              if sudo docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null; then
+                echo "Backend healthy after $((i*2))s"
+                break
+              fi
+              sleep 2
+            done
+
             sudo docker compose ps
+
+      - name: Reload nginx on ServerA
+        if: env.SVRA_HOST != ''
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host:     ${{ env.SVRA_HOST }}
+          username: ${{ env.SVRA_USER }}
+          key:      ${{ env.SVRA_SSH_KEY }}
+          port:     ${{ env.SVRA_SSH_PORT }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            # 重载 nginx，使 upstream 指向 ServerB 的新实例（避免 keepalive 连到旧连接）
+            if command -v docker >/dev/null 2>&1 && docker exec nginx nginx -t 2>/dev/null; then
+              docker exec nginx nginx -s reload
+              echo "Nginx reloaded on ServerA (Docker)."
+            elif sudo systemctl is-active -q nginx 2>/dev/null && sudo nginx -t 2>/dev/null; then
+              sudo systemctl reload nginx
+              echo "Nginx reloaded on ServerA (systemd)."
+            else
+              echo "⚠️ Nginx not found (docker exec nginx or systemctl nginx); no reload."
+              exit 1
+            fi
 
   notify:
     name: Send Notification
