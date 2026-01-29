@@ -5,6 +5,7 @@ import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import { useModuleStore } from './stores/module'
+import './assets/base.css'
 
 // 定义 app
 const app = createApp(App)

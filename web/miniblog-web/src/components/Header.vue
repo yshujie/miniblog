@@ -118,25 +118,26 @@ const getModuleIcon = (code: string) => moduleIcons[code] || MenuIcon
   top: 0;
   z-index: 50;
   width: 100%;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid #e5e7eb;
-  padding: 1rem 1.5rem;
+  background: var(--zone-bg);
+  border-bottom: 1px solid var(--border-divider);
+  padding: 0.875rem 1.5rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .header-container {
   display: flex;
   flex-direction: row;
   align-items: center;
+  justify-content: space-between;
   width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .header-left {
-  width: 20%;
+  flex-shrink: 0;
   display: flex;
-  justify-content: left;
-  margin-bottom: 1rem;
+  align-items: center;
 }
 
 .logo-section {
@@ -159,10 +160,10 @@ const getModuleIcon = (code: string) => moduleIcons[code] || MenuIcon
 }
 
 .logo-text {
-  font-size: 1.5rem;
+  font-size: 1.375rem;
   font-weight: 700;
   letter-spacing: -0.025em;
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .logo-text-blue {
@@ -170,7 +171,7 @@ const getModuleIcon = (code: string) => moduleIcons[code] || MenuIcon
 }
 
 .header-right {
-  width: 70%;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -187,33 +188,33 @@ const getModuleIcon = (code: string) => moduleIcons[code] || MenuIcon
   padding: 0.35rem 0.6rem;
   margin-right: 0.5rem;
   background: transparent;
-  border: 1px solid #dbeafe;
+  border: 1px solid var(--border-color);
   border-radius: 0.5rem;
-  color: #2563eb;
+  color: var(--accent);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s;
+  align-items: center;
 
   &:hover {
-    background: #f3f4f6;
+    background: var(--sidebar-hover-bg);
   }
 
   &.sidebar-hidden {
-    color: #475569;
+    color: var(--text-muted);
   }
-  align-items: center;
 }
 
 .nav-link {
-  color: #4b5563;
+  color: var(--text-secondary);
   font-weight: 500;
   text-decoration: none;
-  transition: color 0.15s;
+  transition: color 0.2s;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.375rem;
 
   &:hover {
-    color: #2563eb;
+    color: var(--accent);
   }
 
   .nav-icon {
@@ -222,9 +223,9 @@ const getModuleIcon = (code: string) => moduleIcons[code] || MenuIcon
   }
 
   &.nav-link-active {
-    color: #2563eb;
+    color: var(--accent);
     font-weight: 600;
-    border-bottom: 2px solid #2563eb;
+    border-bottom: 2px solid var(--accent);
     padding-bottom: 0.125rem;
   }
 

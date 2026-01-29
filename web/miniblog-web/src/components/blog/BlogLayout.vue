@@ -19,29 +19,38 @@
   margin-right: auto;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
-  padding: 0.5rem 1.5rem;
+  gap: 1.5rem;
+  padding: 1rem 1.5rem;
+  width: 100%;
+  /* 填满父级可用高度，避免 100vh 超出有 Header 时的视口导致整页滚动、上下窜动 */
+  min-height: 100%;
   height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 
   @media (min-width: 768px) {
     flex-direction: row;
+    padding: 1.25rem 1.5rem;
+    gap: 1.5rem;
   }
 }
 
 .main-content {
   flex: 1 1 0%;
   min-width: 0;
-  background: #ffffff;
-  border-radius: 1.5rem;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  border: 1px solid #f3f4f6;
-  overflow: hidden;
-  animation: fadeIn 0.6s ease-out forwards;
+  min-height: 0;
+  background: var(--card-bg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-light);
+  overflow-y: auto;
+  overflow-x: hidden;
+  animation: fadeIn 0.4s ease-out forwards;
 
   @keyframes fadeIn {
     from {
       opacity: 0;
-      transform: translateY(10px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;

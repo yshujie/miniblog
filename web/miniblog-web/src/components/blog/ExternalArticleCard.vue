@@ -267,7 +267,7 @@ const closeSidebar = () => {
       right: 0;
       width: 50%;
       height: 40px;
-      background: #fff;
+      background: #ffffff;
     }
 
 
@@ -297,29 +297,28 @@ const closeSidebar = () => {
   }
 
   .action-btn {
-    width: 3rem;
-    height: 3rem;
+    width: 2.75rem;
+    height: 2.75rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #ffffff;
-    border: 1px solid #dbeafe;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
     border-radius: 50%;
-    color: #2563eb;
-    font-size: 1.25rem;
+    color: var(--text-secondary);
+    font-size: 1.125rem;
     cursor: pointer;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-    transition: all 0.15s;
+    box-shadow: var(--shadow-md);
+    transition: border-color 0.2s, color 0.2s, transform 0.2s;
 
     &:hover {
-      background: #eff6ff;
-      border-color: #93c5fd;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-      transform: scale(1.1);
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: scale(1.05);
     }
 
     &:active {
-      transform: scale(0.95);
+      transform: scale(0.98);
     }
   }
 }

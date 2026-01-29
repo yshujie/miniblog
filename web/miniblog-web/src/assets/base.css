@@ -36,6 +36,31 @@
   --section-gap: 160px;
 }
 
+/* blog / page theme: one source of truth for layout and accent */
+:root {
+  --page-bg: #f5f5f5;
+  --card-bg: #ffffff;
+  --zone-bg: #fafafa;
+  /* Header / Sidebar 等分区背景，与主内容区形成轻微分割 */
+  --border-color: #e5e7eb;
+  --border-light: #f3f4f6;
+  --border-divider: #eaecef;
+  /* 分区线：比 border-light 清晰，比 border-color 略轻 */
+  --text-primary: #1f2937;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --accent: rgb(250, 137, 25);
+  --accent-hover: rgb(225, 115, 15);
+  /* Sidebar 悬停/选中背景，与主题色相配 */
+  --sidebar-hover-bg: rgba(250, 137, 25, 0.08);
+  --sidebar-active-bg: rgba(250, 137, 25, 0.14);
+  --header-footer-bg: #ffffff;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --color-background: var(--vt-c-black);
@@ -83,4 +108,9 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* 博客页：禁止 body 滚动，仅文章区内滚动，避免上下窜动 */
+body.blog-page-body {
+  overflow: hidden;
 }

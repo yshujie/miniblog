@@ -1,47 +1,66 @@
 <template>
   <aside id="sidebar" class="sidebar-root" :class="{ 'sidebar-hidden': !sidebarOpen }">
     <div class="sidebar-content">
-      <div
-        v-for="item in props.sections"
-        :key="item.title"
-        :index="item.code"
-        class="section-item"
-      >
-        <div class="section-header" :class="{ 'section-header-active': isSectionActive(item) }">
-          <h2 class="section-title">{{ item.title }}</h2>
-        </div>
-        <ul class="article-list">
-          <li 
-            v-for="article in item.articles" 
-            :key="article.id"
-            class="article-item"
-            :class="{ 'article-item-active': article.id === currentArticleId }"
-            @click="handleArticleClick(article.id)"
+      <div class="section-list">
+        <div
+          v-for="section in props.sections"
+          :key="section.id"
+          class="section-item"
+        >
+          <button
+            type="button"
+            class="section-header"
+            @click="toggleSection(section.id)"
           >
-            <span v-if="article.id === currentArticleId" class="article-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24">
-                <path fill="currentColor" d="M12 2c5.523 0 10 4.477 10 10a10 10 0 0 1-20 0C2 6.477 6.477 2 12 2m-.293 6.293a1 1 0 0 0-1.414 0l-.083.094a1 1 0 0 0 .083 1.32L12.585 12l-2.292 2.293a1 1 0 0 0 1.414 1.414l3-3a1 1 0 0 0 0-1.414z"></path>
-              </svg>
-            </span>
-            <span class="article-title">{{ article.title }}</span>
-          </li>
-        </ul>
+            <span class="section-title">{{ section.title }}({{ section.articles.length }}讲)</span>
+            <svg
+              class="icon-arrow"
+              :class="{ 'icon-arrow-collapsed': !isSectionExpanded(section.id) }"
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="m18 15-6-6-6 6" />
+            </svg>
+          </button>
+          <div class="section-sep" />
+          <div v-show="isSectionExpanded(section.id)" class="article-list">
+            <button
+              v-for="article in section.articles"
+              :key="article.id"
+              type="button"
+              class="article-item"
+              :class="{ 'article-item-active': article.id === currentArticleId }"
+              @click="handleArticleClick(article.id)"
+            >
+              <span class="article-title">{{ article.title }}</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-    <!-- 侧边指示器 -->
-    <div class="sidebar-indicator"></div>
   </aside>
 </template>
+
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
-import type { Section } from '@/types/section';
+import type { Section } from '@/types/section'
 
-const props = defineProps<{ sections: Section[], moduleCode: string }>()
+const props = defineProps<{
+  sections: Section[]
+  moduleCode: string
+}>()
 
 const router = useRouter()
 const uiStore = useUiStore()
+
+const expandedSectionIds = ref<Set<string>>(new Set())
 
 // 侧边栏打开状态
 const sidebarOpen = computed(() => uiStore.sidebarOpen)
@@ -49,32 +68,71 @@ const sidebarOpen = computed(() => uiStore.sidebarOpen)
 // 当前选中的文章 ID
 const currentArticleId = computed(() => {
   const articleId = router.currentRoute.value.params.article
-  if (articleId) {
-    return String(articleId)
-  }
+  if (articleId) return String(articleId)
   return null
 })
 
-// 判断 section 是否激活（包含当前文章）
-const isSectionActive = (section: Section) => {
-  return section.articles.some(article => article.id === currentArticleId.value)
+// 是否展开某 section
+function isSectionExpanded(sectionId: string) {
+  return expandedSectionIds.value.has(sectionId)
 }
 
-// 文章点击事件
-const handleArticleClick = (articleId: string) => {
+// 切换 section 展开/收起
+function toggleSection(sectionId: string) {
+  const set = new Set(expandedSectionIds.value)
+  if (set.has(sectionId)) {
+    set.delete(sectionId)
+  } else {
+    set.add(sectionId)
+  }
+  expandedSectionIds.value = set
+}
+
+// 当 sections 变化时（如切换模块），默认全部展开
+watch(
+  () => props.sections,
+  (newSections) => {
+    if (!newSections?.length) {
+      expandedSectionIds.value = new Set()
+      return
+    }
+    expandedSectionIds.value = new Set(newSections.map(s => s.id))
+  },
+  { immediate: true }
+)
+
+// 当选中文章变化时，只确保该文章所在 section 展开，不收起其他 section
+watch(
+  currentArticleId,
+  (articleId) => {
+    if (!articleId || !props.sections.length) return
+    const section = props.sections.find(s => s.articles.some(a => a.id === articleId))
+    if (section) {
+      expandedSectionIds.value = new Set([...expandedSectionIds.value, section.id])
+    }
+  }
+)
+
+function handleArticleClick(articleId: string) {
   router.push(`/blog/${props.moduleCode}/article/${articleId}`)
 }
 </script>
+
 <style scoped lang="less">
 .sidebar-root {
   display: none;
-  width: 18rem;
+  width: 24rem;
   flex-shrink: 0;
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 0; /* 允许在 flex 布局中被压缩，避免底部被裁切 */
+  background: var(--zone-bg);
+  border-right: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: width 0.3s ease, opacity 0.3s ease;
 
   @media (min-width: 1280px) {
-    display: block;
+    display: flex;
+    flex-direction: column;
   }
 
   &.sidebar-hidden {
@@ -85,109 +143,127 @@ const handleArticleClick = (articleId: string) => {
   }
 
   .sidebar-content {
-    position: sticky;
-    top: 6rem;
+    flex: 1 1 0;
+    min-height: 0;
     overflow-y: auto;
-    max-height: calc(100vh - 120px);
-    padding-right: 1rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 100%; /* 填满侧栏高度，超出在内部滚动，避免底部被裁切 */
+    padding: 1.25rem 1rem 1.5rem;
 
-    // 隐藏滚动条
     &::-webkit-scrollbar {
-      display: none;
+      width: 5px;
     }
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 4px;
+    }
+  }
+
+  .section-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
   }
 
   .section-item {
-    margin-bottom: 2rem;
-
     .section-header {
+      width: 100%;
       display: flex;
       align-items: center;
-      color: #111827;
-      border-left: 4px solid #d1d5db;
-      padding-left: 0.75rem;
-      margin-bottom: 1rem;
+      justify-content: space-between;
+      padding: 0.75rem 0.5rem;
+      margin: 0 -0.5rem;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      background: none;
+      border: none;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      text-align: left;
+      gap: 0.5rem;
+      transition: background 0.15s ease, color 0.15s ease;
 
-      &.section-header-active {
-        border-left-color: #2563eb;
+      &:hover {
+        background: var(--sidebar-hover-bg);
+        color: var(--text-secondary);
       }
-
-      .section-title {
-        font-weight: 700;
-        font-size: 1rem;
-        margin: 0;
+      &:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
       }
     }
-
-    .article-list {
-      list-style: none;
-      padding: 0;
+    .section-title {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1.4;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .icon-arrow {
+      flex-shrink: 0;
+      color: var(--text-muted);
+      transition: transform 0.2s ease;
+      &.icon-arrow-collapsed {
+        transform: rotate(180deg);
+      }
+    }
+    .section-sep {
+      height: 1px;
+      background: var(--border-color);
       margin: 0;
+    }
+    .article-list {
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
-
-      .article-item {
-        padding: 0.5rem 0.75rem;
-        border-radius: 0.5rem;
-        cursor: pointer;
-        transition: all 0.15s;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.875rem;
-        color: #4b5563;
-
-        &:hover {
-          background: #eff6ff;
-          color: #2563eb;
-        }
-
-        &.article-item-active {
-          background: #2563eb;
-          color: #ffffff;
-          font-weight: 500;
-          box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2), 0 2px 4px -2px rgba(37, 99, 235, 0.2);
-
-          .article-icon {
-            display: flex;
-            align-items: center;
-          }
-
-          .article-title {
-            color: #ffffff;
-          }
-        }
-
-        .article-icon {
-          display: none;
-          width: 1em;
-          height: 1em;
-        }
-
-        .article-title {
-          line-height: 1.25rem;
-          transition: color 0.15s;
-        }
-      }
+      gap: 0.5rem;
+      padding: 0.5rem 0 0.75rem 1rem;
     }
   }
 
-  .sidebar-indicator {
-    position: absolute;
-    top: 0;
-    right: 0;
-    height: 100%;
-    width: 0.25rem;
-    background: #e5e7eb;
-    border-radius: 9999px;
-    transition: background-color 0.15s;
+  .article-item {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    margin: 0 -0.75rem;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease, color 0.15s ease;
 
-    .sidebar-root:hover & {
-      background: #60a5fa;
+    &:hover {
+      background: var(--sidebar-hover-bg);
+      color: var(--text-primary);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    &.article-item-active {
+      background: var(--sidebar-active-bg);
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+    .article-title {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
     }
   }
 }

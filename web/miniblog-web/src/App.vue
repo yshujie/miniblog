@@ -8,12 +8,23 @@
       ></div>
     </div>
 
-    <el-container direction="vertical" class="app-container">
+    <el-container
+      direction="vertical"
+      class="app-container"
+      :class="{ 'blog-layout-page': isBlogPage }"
+    >
       <!-- 头部导航栏 -->
       <Header class="header-bar" v-if="needHeader" />
 
       <!-- 主体内容 -->
-      <el-main class="main-content" :class="{ 'full-screen': fullScreen }">
+      <el-main
+        class="main-content"
+        :class="{
+          'full-screen': fullScreen,
+          'no-footer': !needFooter,
+          'blog-page': isBlogPage
+        }"
+      >
         <router-view />
       </el-main>
 
@@ -26,10 +37,12 @@
 <script setup lang="ts">
 import Header from './components/Header.vue'
 import Footer from './components/Footer.vue'
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
+
+const BLOG_PAGE_BODY_CLASS = 'blog-page-body'
 
 const needHeader = computed(() => {
   const paths = ['/404']
@@ -37,8 +50,7 @@ const needHeader = computed(() => {
 })
 
 const needFooter = computed(() => {
-  const paths = ['/404', '/blog']
-  return !paths.includes(route.path)
+  return route.path !== '/404' && !route.path.startsWith('/blog')
 })
 
 const fullScreen = computed(() => {
@@ -61,6 +73,19 @@ const updateReadingProgress = () => {
   readingProgress.value = Math.min(100, Math.max(0, progress))
 }
 
+// 博客页时给 body 加 overflow: hidden，避免整页滚动导致上下窜动
+watch(
+  isBlogPage,
+  (onBlog) => {
+    if (onBlog) {
+      document.body.classList.add(BLOG_PAGE_BODY_CLASS)
+    } else {
+      document.body.classList.remove(BLOG_PAGE_BODY_CLASS)
+    }
+  },
+  { immediate: true }
+)
+
 onMounted(() => {
   if (isBlogPage.value) {
     window.addEventListener('scroll', updateReadingProgress)
@@ -69,6 +94,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  document.body.classList.remove(BLOG_PAGE_BODY_CLASS)
   window.removeEventListener('scroll', updateReadingProgress)
 })
 
@@ -77,7 +103,7 @@ onUnmounted(() => {
 <style lang="less" scoped>
 .app-wrapper {
   position: relative;
-  background: #f9fafb;
+  background: var(--page-bg);
   min-height: 100vh;
 }
 
@@ -86,20 +112,28 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   width: 100%;
-  height: 0.25rem;
+  height: 3px;
   z-index: 60;
-  background: #f3f4f6;
+  background: var(--border-color);
 
   .reading-progress-bar {
     height: 100%;
-    background: #2563eb;
+    background: var(--accent);
     transition: width 0.2s ease-out;
   }
 }
 
 .app-container {
-  height: 100vh;
+  min-height: 100vh;
   background: transparent;
+  display: flex;
+  flex-direction: column;
+
+  /* 博客页：固定高度，让 main / BlogLayout 的 height:100% 有参照，避免侧栏和文章区被裁切 */
+  &.blog-layout-page {
+    height: 100vh;
+    overflow: hidden;
+  }
 }
 
 .header-bar {
@@ -107,15 +141,28 @@ onUnmounted(() => {
 }
 
 .main-content {
+  flex: 1;
   padding: 0;
   margin-top: 0;
   width: 100%;
   min-height: calc(100vh - 64px);
+  padding-bottom: 56px; /* 为固定页脚留出空间 */
   background: transparent;
+
+  &.full-screen,
+  &.no-footer {
+    padding-bottom: 0;
+  }
 
   &.full-screen {
     margin-top: 0;
-    height: 100vh;
+    min-height: 100vh;
+  }
+
+  /* 博客页：禁止外层滚动，避免与文章区内滚动叠加导致上下窜动 */
+  &.blog-page {
+    overflow: hidden;
+    min-height: 0;
   }
 }
 
@@ -128,10 +175,11 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   text-align: center;
-  height: 40px;
-  color: #888;
-  font-size: 15px;
-  background: #fff;
-  border-top: 1px solid #ececec;
+  height: 48px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  background: var(--header-footer-bg);
+  border-top: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
 }
 </style>

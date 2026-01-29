@@ -14,14 +14,14 @@
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 100;
+  z-index: 40;
   text-align: center;
-  color: #888;
-  font-size: 15px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
   height: 48px;
   line-height: 48px;
-  background: #fff;
-  border-top: 1px solid #eee;
-  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.03);
+  background: var(--header-footer-bg);
+  border-top: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
 }
 </style>
