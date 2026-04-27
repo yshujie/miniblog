@@ -5,19 +5,24 @@ name: CI/CD (miniblog - production, linux runner)
 # ----------------------------------------------------------------------------
 # 必需（main push / workflow_dispatch 才强制）：
 #   SVRD_HOST, SVRD_USERNAME, SVRD_SSH_KEY, SVRD_SSH_PORT (可选，默认 22)
-#   MYSQL_HOST, MYSQL_DBNAME, MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_PORT (可选)
-#   REDIS_HOST, REDIS_PASSWORD, REDIS_PORT (可选), REDIS_DB (可选)
+#   MYSQL_HOST, MYSQL_DBNAME, MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_PORT (可选，默认 3306)
+#   REDIS_HOST, REDIS_PASSWORD, REDIS_PORT (可选，默认 6379), REDIS_DB (可选，默认 0)
 #   JWT_SECRET
 #
 # 可选：
-#   SVRD_SUDO_PASSWORD（serverD 部署用户执行 sudo 需要密码时必须）
 #   FEISHU_DOCREADER_APPID, FEISHU_DOCREADER_APPSECRET
 #
+# 可选（ServerA nginx 重载）：
+#   SVRA_HOST, SVRA_USER, SVRA_SSH_KEY, SVRA_SSH_PORT（默认 22）
+#   SVRA_SUDO_PASSWORD（如果 ServerA 上 nginx reload 需要 sudo）
+#
 # 说明：
-# - PR 只做 lint/test，不用这些 Secrets。
+# - PR 只做 lint/test，不使用部署 Secrets。
 # - main push / workflow_dispatch 缺必需项会直接失败。
-# - 部署只针对 ServerD（应用机）；若 nginx 在 ServerA，可配置 SVRA_* 以在部署后自动重载 nginx。
-# 可选（ServerA nginx 重载）：SVRA_HOST, SVRA_USER, SVRA_SSH_KEY, SVRA_SSH_PORT（默认 22）
+# - ServerD 部署用户需要：
+#   1. 拥有 /opt/miniblog 写权限；
+#   2. 可以直接执行 docker / docker compose；
+#   3. 可以写入 /data/logs/miniblog 目录，或该目录已提前创建并授权。
 # ============================================================================
 
 on:
@@ -34,18 +39,14 @@ on:
 
 permissions:
   contents: read
-  packages: write
-
-concurrency:
-  group: miniblog-prod
-  cancel-in-progress: false
 
 env:
   GO_VERSION: "1.24"
   TAG: ${{ github.sha }}
-  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/miniblog-backend
-  FE_BLOG_IMAGE: ghcr.io/${{ github.repository_owner }}/miniblog-frontend-blog
-  FE_ADMIN_IMAGE: ghcr.io/${{ github.repository_owner }}/miniblog-frontend-admin
+
+  BACKEND_IMAGE: ghcr.io/yshujie/miniblog-backend
+  FE_BLOG_IMAGE: ghcr.io/yshujie/miniblog-frontend-blog
+  FE_ADMIN_IMAGE: ghcr.io/yshujie/miniblog-frontend-admin
 
 jobs:
   validate-secrets:
@@ -54,27 +55,64 @@ jobs:
     steps:
       - name: Check Required Secrets
         env:
-          SVRD_HOST:           ${{ secrets.SVRD_HOST }}
-          SVRD_USERNAME:       ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          SVRD_SSH_KEY:        ${{ secrets.SVRD_SSH_KEY }}
-          SVRD_SSH_PORT:       ${{ secrets.SVRD_SSH_PORT }}
-          SVRD_SUDO_PASSWORD:  ${{ secrets.SVRD_SUDO_PASSWORD }}
-          MYSQL_HOST:          ${{ secrets.MYSQL_HOST }}
-          MYSQL_PORT:          ${{ secrets.MYSQL_PORT }}
-          MYSQL_DBNAME:        ${{ secrets.MYSQL_DBNAME }}
-          MYSQL_USERNAME:      ${{ secrets.MYSQL_USERNAME }}
-          MYSQL_PASSWORD:      ${{ secrets.MYSQL_PASSWORD }}
-          REDIS_HOST:          ${{ secrets.REDIS_HOST }}
-          REDIS_PORT:          ${{ secrets.REDIS_PORT }}
-          REDIS_DB:            ${{ secrets.REDIS_DB }}
-          REDIS_PASSWORD:      ${{ secrets.REDIS_PASSWORD }}
-          JWT_SECRET:          ${{ secrets.JWT_SECRET }}
-          FEISHU_APPID:        ${{ secrets.FEISHU_DOCREADER_APPID }}
-          FEISHU_SECRET:       ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
+          SVRD_HOST:      ${{ secrets.SVRD_HOST }}
+          SVRD_USERNAME:  ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          SVRD_SSH_KEY:   ${{ secrets.SVRD_SSH_KEY }}
+          SVRD_SSH_PORT:  ${{ secrets.SVRD_SSH_PORT }}
+
+          MYSQL_HOST:     ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT:     ${{ secrets.MYSQL_PORT }}
+          MYSQL_DBNAME:   ${{ secrets.MYSQL_DBNAME }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+
+          REDIS_HOST:     ${{ secrets.REDIS_HOST }}
+          REDIS_PORT:     ${{ secrets.REDIS_PORT }}
+          REDIS_DB:       ${{ secrets.REDIS_DB }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+
+          JWT_SECRET:     ${{ secrets.JWT_SECRET }}
+
+          FEISHU_APPID:   ${{ secrets.FEISHU_DOCREADER_APPID }}
+          FEISHU_SECRET:  ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
+
+          SVRA_HOST:          ${{ secrets.SVRA_HOST }}
+          SVRA_USER:          ${{ secrets.SVRA_USER }}
+          SVRA_SSH_KEY:       ${{ secrets.SVRA_SSH_KEY }}
+          SVRA_SSH_PORT:      ${{ secrets.SVRA_SSH_PORT }}
+          SVRA_SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
         run: |
-          echo "🔍 Validating required secrets (non-blocking)..."
-          REQUIRED_APP=(SVRD_HOST SVRD_USERNAME SVRD_SSH_KEY MYSQL_HOST MYSQL_DBNAME MYSQL_USERNAME MYSQL_PASSWORD REDIS_HOST REDIS_PASSWORD JWT_SECRET)
-          OPTIONAL_APP=(SVRD_SSH_PORT SVRD_SUDO_PASSWORD MYSQL_PORT REDIS_PORT REDIS_DB FEISHU_APPID FEISHU_SECRET)
+          set -euo pipefail
+
+          echo "🔍 Validating required secrets..."
+
+          REQUIRED_APP=(
+            SVRD_HOST
+            SVRD_USERNAME
+            SVRD_SSH_KEY
+            MYSQL_HOST
+            MYSQL_DBNAME
+            MYSQL_USERNAME
+            MYSQL_PASSWORD
+            REDIS_HOST
+            REDIS_PASSWORD
+            JWT_SECRET
+          )
+
+          OPTIONAL_APP=(
+            SVRD_SSH_PORT
+            MYSQL_PORT
+            REDIS_PORT
+            REDIS_DB
+            FEISHU_APPID
+            FEISHU_SECRET
+            SVRA_HOST
+            SVRA_USER
+            SVRA_SSH_KEY
+            SVRA_SSH_PORT
+            SVRA_SUDO_PASSWORD
+          )
+
           FAILED=0
           ENFORCE=0
 
@@ -89,9 +127,9 @@ jobs:
           fi
 
           for k in "${REQUIRED_APP[@]}"; do
-            v="${!k}"
+            v="${!k:-}"
             if [ -z "$v" ]; then
-              if [ $ENFORCE -eq 1 ]; then
+              if [ "$ENFORCE" -eq 1 ]; then
                 echo "❌ $k is not set"
                 FAILED=1
               else
@@ -103,7 +141,7 @@ jobs:
           done
 
           for k in "${OPTIONAL_APP[@]}"; do
-            v="${!k}"
+            v="${!k:-}"
             if [ -z "$v" ]; then
               echo "⚠️ $k not set (optional)"
             else
@@ -111,13 +149,33 @@ jobs:
             fi
           done
 
+          if [ -n "${SVRA_HOST:-}" ]; then
+            echo
+            echo "🔍 Validating optional ServerA nginx reload secrets..."
+
+            if [ -z "${SVRA_USER:-}" ]; then
+              echo "❌ SVRA_USER is required when SVRA_HOST is set"
+              [ "$ENFORCE" -eq 1 ] && FAILED=1
+            else
+              echo "✅ SVRA_USER is set"
+            fi
+
+            if [ -z "${SVRA_SSH_KEY:-}" ]; then
+              echo "❌ SVRA_SSH_KEY is required when SVRA_HOST is set"
+              [ "$ENFORCE" -eq 1 ] && FAILED=1
+            else
+              echo "✅ SVRA_SSH_KEY is set"
+            fi
+          fi
+
           echo
-          if [ $FAILED -eq 1 ]; then
-            if [ $ENFORCE -eq 1 ]; then
+          if [ "$FAILED" -eq 1 ]; then
+            if [ "$ENFORCE" -eq 1 ]; then
               echo "❌ Secrets validation failed. Stop pipeline."
               exit 1
             fi
-            echo "⚠️ Secrets validation failed, but continuing (non-blocking for PRs)."
+
+            echo "⚠️ Secrets validation failed, but continuing because this is not a deploy event."
           else
             echo "✅ Secrets validation passed."
           fi
@@ -128,14 +186,17 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_tests != true }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+
       - name: Download deps
         run: |
           go mod download
           go mod verify
+
       - name: Run unit tests
         run: |
           go test -v ./...
@@ -145,10 +206,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+
       - name: Run go vet
         run: |
           go vet ./...
@@ -157,10 +220,14 @@ jobs:
     name: Build & Push Images (GHCR)
     runs-on: ubuntu-latest
     needs: [validate-secrets, lint, test]
+    permissions:
+      contents: read
+      packages: write
     if: |
-      always() &&
+      !cancelled() &&
+      needs.validate-secrets.result == 'success' &&
+      needs.lint.result == 'success' &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
-      (needs.lint.result == 'success' || needs.lint.result == 'skipped') &&
       (
         (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
         github.event_name == 'workflow_dispatch'
@@ -169,16 +236,24 @@ jobs:
       matrix:
         include:
           - name: backend
+            image: ghcr.io/yshujie/miniblog-backend
             context: .
             file: build/docker/miniblog/Dockerfile.prod.backend
             build_args: |
               GOPROXY=https://goproxy.cn,direct
+
           - name: frontend-blog
+            image: ghcr.io/yshujie/miniblog-frontend-blog
             context: .
             file: build/docker/miniblog/Dockerfile.prod.frontend.blog
+            build_args: ""
+
           - name: frontend-admin
+            image: ghcr.io/yshujie/miniblog-frontend-admin
             context: .
             file: build/docker/miniblog/Dockerfile.prod.frontend.admin
+            build_args: ""
+
     steps:
       - uses: actions/checkout@v4
 
@@ -191,7 +266,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Buildx
@@ -204,10 +279,10 @@ jobs:
           file: ${{ matrix.file }}
           platforms: linux/amd64
           push: true
-          build-args: ${{ matrix.build_args || '' }}
+          build-args: ${{ matrix.build_args }}
           tags: |
-            ${{ matrix.name == 'backend' && env.BACKEND_IMAGE || matrix.name == 'frontend-blog' && env.FE_BLOG_IMAGE || env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
-            ${{ matrix.name == 'backend' && env.BACKEND_IMAGE || matrix.name == 'frontend-blog' && env.FE_BLOG_IMAGE || env.FE_ADMIN_IMAGE }}:latest
+            ${{ matrix.image }}:${{ env.TAG }}
+            ${{ matrix.image }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -215,14 +290,26 @@ jobs:
     name: Deploy to ServerD (app)
     runs-on: ubuntu-latest
     needs: [build-and-push]
+    permissions:
+      contents: read
+      packages: read
+    concurrency:
+      group: miniblog-prod
+      cancel-in-progress: false
     if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.event_name == 'workflow_dispatch'
+      !cancelled() &&
+      needs.build-and-push.result == 'success' &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        github.event_name == 'workflow_dispatch'
+      )
     env:
       SVRA_HOST: ${{ secrets.SVRA_HOST }}
       SVRA_USER: ${{ secrets.SVRA_USER }}
       SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
       SVRA_SSH_PORT: ${{ secrets.SVRA_SSH_PORT || 22 }}
+      SVRA_SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -235,6 +322,8 @@ jobs:
           port:     ${{ secrets.SVRD_SSH_PORT || 22 }}
           source:   "docker-compose.yml,docker-compose.prod.yml"
           target:   "/tmp/miniblog-deploy"
+          rm: true
+          overwrite: true
 
       - name: Deploy on ServerD (docker compose)
         uses: appleboy/ssh-action@v1.0.0
@@ -242,263 +331,311 @@ jobs:
           _IMG_BACKEND:     ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
           _IMG_FE_BLOG:     ${{ env.FE_BLOG_IMAGE }}:${{ env.TAG }}
           _IMG_FE_ADMIN:    ${{ env.FE_ADMIN_IMAGE }}:${{ env.TAG }}
-          _GH_USER:         ${{ github.repository_owner }}
+
+          _GH_USER:         yshujie
           _GHCR_USERNAME:   ${{ github.actor }}
           _GHCR_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
-          SUDO_PASSWORD:    ${{ secrets.SVRD_SUDO_PASSWORD }}
+
           _MYSQL_HOST:      ${{ secrets.MYSQL_HOST }}
           _MYSQL_PORT:      ${{ secrets.MYSQL_PORT }}
           _MYSQL_DBNAME:    ${{ secrets.MYSQL_DBNAME }}
           _MYSQL_USERNAME:  ${{ secrets.MYSQL_USERNAME }}
           _MYSQL_PASSWORD:  ${{ secrets.MYSQL_PASSWORD }}
+
           _REDIS_HOST:      ${{ secrets.REDIS_HOST }}
           _REDIS_PORT:      ${{ secrets.REDIS_PORT }}
           _REDIS_DB:        ${{ secrets.REDIS_DB }}
           _REDIS_PASSWORD:  ${{ secrets.REDIS_PASSWORD }}
+
           _JWT_SECRET:      ${{ secrets.JWT_SECRET }}
+
           _FEISHU_APPID:    ${{ secrets.FEISHU_DOCREADER_APPID }}
           _FEISHU_SECRET:   ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
+
         with:
           host:     ${{ secrets.SVRD_HOST }}
           username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
           key:      ${{ secrets.SVRD_SSH_KEY }}
           port:     ${{ secrets.SVRD_SSH_PORT || 22 }}
-          # 关键：将上面 env 中的变量名传递给远端
-          envs: >
-            _IMG_BACKEND,_IMG_FE_BLOG,_IMG_FE_ADMIN,
-            _GH_USER,_GHCR_USERNAME,_GHCR_TOKEN,
-            SUDO_PASSWORD,
-            _MYSQL_HOST,_MYSQL_PORT,_MYSQL_DBNAME,_MYSQL_USERNAME,_MYSQL_PASSWORD,
-            _REDIS_HOST,_REDIS_PORT,_REDIS_DB,_REDIS_PASSWORD,
-            _JWT_SECRET,_FEISHU_APPID,_FEISHU_SECRET
+          envs: _IMG_BACKEND,_IMG_FE_BLOG,_IMG_FE_ADMIN,_GH_USER,_GHCR_USERNAME,_GHCR_TOKEN,_MYSQL_HOST,_MYSQL_PORT,_MYSQL_DBNAME,_MYSQL_USERNAME,_MYSQL_PASSWORD,_REDIS_HOST,_REDIS_PORT,_REDIS_DB,_REDIS_PASSWORD,_JWT_SECRET,_FEISHU_APPID,_FEISHU_SECRET
           script_stop: true
+          command_timeout: 15m
           script: |
             set -Eeuo pipefail
 
             APP_DIR="/opt/miniblog"
             STAGE_DIR="/tmp/miniblog-deploy"
+            COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml --env-file .env"
 
-            # 检查 sudo 权限并设置合适的 sudo 方式
-            if sudo -n true 2>/dev/null; then
-              SUDO_MODE="nopass"
-              echo "ℹ️ Using passwordless sudo."
-            else
-              if [ -z "${SUDO_PASSWORD:-}" ]; then
-                echo "❌ sudo needs password. Provide SVRD_SUDO_PASSWORD or configure NOPASSWD." >&2
-                exit 1
-              fi
-              SUDO_MODE="password"
-              
-              # 验证 sudo 密码是否正确
-              if ! echo "$SUDO_PASSWORD" | sudo -S -v >/dev/null 2>&1; then
-                echo "❌ sudo authentication failed. Check GitHub Secret SVRD_SUDO_PASSWORD for the ServerD deploy user." >&2
-                exit 1
-              fi
-              echo "ℹ️ Using sudo with password."
-            fi
+            echo "🚀 Deploying miniblog to ServerD..."
+            echo "📌 APP_DIR=${APP_DIR}"
 
-            # 清理函数
-            cleanup_auth_helpers() {
-              return 0
-            }
-            trap cleanup_auth_helpers EXIT
-
-            # 执行 sudo docker login 的特殊函数（需要 stdin 重定向）
-            sudo_docker_login() {
-              local registry="$1"
-              local username="$2"
-              local token="$3"
-              local token_file
-              
-              echo "🔐 Logging into Docker registry: $registry..."
-              token_file="$(mktemp)"
-              chmod 600 "$token_file"
-              printf '%s' "$token" >"$token_file"
-              
-              local rc=0
-              if [ "$SUDO_MODE" = "nopass" ]; then
-                # 无密码 sudo：直接使用 docker login
-                sudo sh -c "cat '$token_file' | docker login '$registry' -u '$username' --password-stdin >/dev/null 2>&1" || rc=$?
-              else
-                # 有密码 sudo：通过 bash -c 来避免 stdin 冲突
-                echo "$SUDO_PASSWORD" | sudo -S sh -c "cat '$token_file' | docker login '$registry' -u '$username' --password-stdin >/dev/null 2>&1" || rc=$?
-              fi
-              
-              if [ $rc -eq 0 ]; then
-                echo "✅ Docker login successful"
-              else
-                echo "❌ Docker login failed for registry: $registry (rc=$rc)" >&2
-              fi
-              rm -f "$token_file"
-              return $rc
-            }
-
-            # 验证必要文件
-            if [ ! -f "${STAGE_DIR}/docker-compose.yml" ] || [ ! -f "${STAGE_DIR}/docker-compose.prod.yml" ]; then
-              echo "❌ Missing uploaded compose files in ${STAGE_DIR}"
+            # ----------------------------------------------------------------
+            # 基础命令检查
+            # ----------------------------------------------------------------
+            if ! command -v docker >/dev/null 2>&1; then
+              echo "❌ docker command not found." >&2
               exit 1
             fi
 
-            # 创建应用目录并复制文件
-            echo "📁 Setting up application directory..."
-            if [ "$SUDO_MODE" = "nopass" ]; then
-              sudo mkdir -p "${APP_DIR}"
-              sudo cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
-              sudo chown -R "$(id -u):$(id -g)" "${APP_DIR}"
-            else
-              echo "$SUDO_PASSWORD" | sudo -S mkdir -p "${APP_DIR}"
-              echo "$SUDO_PASSWORD" | sudo -S cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
-              echo "$SUDO_PASSWORD" | sudo -S chown -R "$(id -u):$(id -g)" "${APP_DIR}"
+            if ! docker version >/dev/null 2>&1; then
+              echo "❌ Docker is not available for current deploy user."
+              echo "   请确认当前 SSH 用户已加入 docker 组，并且重新登录后生效。"
+              exit 1
             fi
+
+            if ! docker compose version >/dev/null 2>&1; then
+              echo "❌ docker compose plugin is not available." >&2
+              exit 1
+            fi
+
+            # ----------------------------------------------------------------
+            # 校验 compose 文件
+            # ----------------------------------------------------------------
+            if [ ! -f "${STAGE_DIR}/docker-compose.yml" ] || [ ! -f "${STAGE_DIR}/docker-compose.prod.yml" ]; then
+              echo "❌ Missing uploaded compose files in ${STAGE_DIR}" >&2
+              echo "📋 STAGE_DIR content:"
+              ls -la "${STAGE_DIR}" || true
+              exit 1
+            fi
+
+            # ----------------------------------------------------------------
+            # 创建应用目录并复制 compose 文件
+            # deploy 用户已拥有 APP_DIR 权限，所以这里不使用 sudo。
+            # ----------------------------------------------------------------
+            echo "📁 Setting up application directory..."
+
+            mkdir -p "${APP_DIR}"
+            cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
             rm -rf "${STAGE_DIR}"
 
             cd "${APP_DIR}"
 
-            # 生成 .env 文件（使用 envsubst 处理变量）
+            # ----------------------------------------------------------------
+            # 默认值
+            # ----------------------------------------------------------------
+            : "${_MYSQL_PORT:=3306}"
+            : "${_REDIS_PORT:=6379}"
+            : "${_REDIS_DB:=0}"
+
+            # ----------------------------------------------------------------
+            # 生成 .env 文件
+            # 注意：不依赖 envsubst，避免服务器未安装 gettext-base。
+            # ----------------------------------------------------------------
             echo "⚙️ Creating .env file..."
-            cat > .env.template <<EOF
-            BACKEND_IMAGE_TAG=\$_IMG_BACKEND
-            FRONTEND_BLOG_IMAGE_TAG=\$_IMG_FE_BLOG
-            FRONTEND_ADMIN_IMAGE_TAG=\$_IMG_FE_ADMIN
+
+            cat > .env <<EOF
+            BACKEND_IMAGE_TAG=${_IMG_BACKEND}
+            FRONTEND_BLOG_IMAGE_TAG=${_IMG_FE_BLOG}
+            FRONTEND_ADMIN_IMAGE_TAG=${_IMG_FE_ADMIN}
 
             GIN_MODE=release
 
-            MYSQL_HOST=\$_MYSQL_HOST
-            MYSQL_PORT=\$_MYSQL_PORT
-            MYSQL_DATABASE=\$_MYSQL_DBNAME
-            MYSQL_USERNAME=\$_MYSQL_USERNAME
-            MYSQL_PASSWORD=\$_MYSQL_PASSWORD
+            MYSQL_HOST=${_MYSQL_HOST}
+            MYSQL_PORT=${_MYSQL_PORT}
+            MYSQL_DATABASE=${_MYSQL_DBNAME}
+            MYSQL_USERNAME=${_MYSQL_USERNAME}
+            MYSQL_PASSWORD=${_MYSQL_PASSWORD}
 
-            REDIS_HOST=\$_REDIS_HOST
-            REDIS_PORT=\$_REDIS_PORT
-            REDIS_DB=\$_REDIS_DB
-            REDIS_PASSWORD=\$_REDIS_PASSWORD
+            REDIS_HOST=${_REDIS_HOST}
+            REDIS_PORT=${_REDIS_PORT}
+            REDIS_DB=${_REDIS_DB}
+            REDIS_PASSWORD=${_REDIS_PASSWORD}
 
-            JWT_SECRET=\$_JWT_SECRET
+            JWT_SECRET=${_JWT_SECRET}
 
-            FEISHU_DOCREADER_APPID=\$_FEISHU_APPID
-            FEISHU_DOCREADER_APPSECRET=\$_FEISHU_SECRET
+            FEISHU_DOCREADER_APPID=${_FEISHU_APPID}
+            FEISHU_DOCREADER_APPSECRET=${_FEISHU_SECRET}
             EOF
-            
-            # 导出环境变量并使用 envsubst 生成 .env
-            export _IMG_BACKEND _IMG_FE_BLOG _IMG_FE_ADMIN _MYSQL_HOST _MYSQL_PORT _MYSQL_DBNAME _MYSQL_USERNAME _MYSQL_PASSWORD _REDIS_HOST _REDIS_PORT _REDIS_DB _REDIS_PASSWORD _JWT_SECRET _FEISHU_APPID _FEISHU_SECRET
-            envsubst < .env.template > .env
-            rm -f .env.template
-            
-            echo "✅ .env file created"
+
             chmod 600 .env
-            echo "✅ .env file permissions set"
+            echo "✅ .env file created."
 
-            # 创建业务网络（miniblog），infra-network 由基础设施预创建
+            # ----------------------------------------------------------------
+            # Docker 网络与日志目录
+            # deploy 用户已经可以执行 docker，所以不使用 sudo。
+            # 如果 /data/logs/miniblog 没有权限，请提前在服务器上创建并授权。
+            # ----------------------------------------------------------------
             echo "🌐 Ensuring Docker networks..."
-            if [ "$SUDO_MODE" = "nopass" ]; then
-              sudo docker network inspect miniblog-network >/dev/null 2>&1 || sudo docker network create miniblog-network
-              if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
-                echo "⚠️ infra-network 不存在，请先在基础设施侧创建（overlay/attachable）"
-                exit 1
-              fi
-              sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
-            else
-              echo "$SUDO_PASSWORD" | sudo -S docker network inspect miniblog-network >/dev/null 2>&1 || echo "$SUDO_PASSWORD" | sudo -S docker network create miniblog-network
-              if ! echo "$SUDO_PASSWORD" | sudo -S docker network inspect infra-network >/dev/null 2>&1; then
-                echo "⚠️ infra-network 不存在，请先在基础设施侧创建（overlay/attachable）"
-                exit 1
-              fi
-              echo "$SUDO_PASSWORD" | sudo -S mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
+
+            docker network inspect miniblog-network >/dev/null 2>&1 || docker network create miniblog-network
+
+            if ! docker network inspect infra-network >/dev/null 2>&1; then
+              echo "❌ infra-network 不存在。"
+              echo "   请先在基础设施侧创建 infra-network，或修改 docker-compose.prod.yml 移除 external infra-network 依赖。"
+              exit 1
             fi
 
-            # 使用 GITHUB_TOKEN 登录 GHCR（仓库内私有镜像可拉取）
-            if [ -n "${_GHCR_TOKEN}" ]; then
-              DOCKER_USER="${_GHCR_USERNAME:-${_GH_USER}}"
-              if ! sudo_docker_login ghcr.io "${DOCKER_USER}" "${_GHCR_TOKEN}"; then
-                echo "❌ Failed to login to GHCR. Check credentials and network." >&2
-                exit 1
-              fi
-            fi
+            mkdir -p \
+              /data/logs/miniblog/backend \
+              /data/logs/miniblog/frontend-blog \
+              /data/logs/miniblog/frontend-admin
 
-            # 拉取镜像并启动容器
-            echo "📦 Pulling images..."
-            if [ "$SUDO_MODE" = "nopass" ]; then
-              sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env pull || {
-                echo "❌ Failed to pull images" >&2
-                exit 1
-              }
-            else
-              echo "$SUDO_PASSWORD" | sudo -S docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env pull || {
-                echo "❌ Failed to pull images" >&2
-                exit 1
-              }
-            fi
-            
-            echo "🚀 Starting containers..."
-            if [ "$SUDO_MODE" = "nopass" ]; then
-              sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d || {
-                echo "❌ Failed to start containers" >&2
-                exit 1
-              }
-            else
-              echo "$SUDO_PASSWORD" | sudo -S docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d || {
-                echo "❌ Failed to start containers" >&2
-                exit 1
-              }
-            fi
+            # ----------------------------------------------------------------
+            # GHCR 登录
+            # ----------------------------------------------------------------
+            docker_login() {
+              local registry="$1"
+              local username="$2"
+              local token="$3"
+              local token_file
+              local rc=0
 
-            # 等待后端就绪（便于 ServerA 上 nginx 重载后能连到 ServerD 新实例）
-            echo "⏳ Waiting for backend health (up to 60s)..."
-            BACKEND_HEALTHY=false
-            for i in $(seq 1 30); do
-              if [ "$SUDO_MODE" = "nopass" ]; then
-                sudo docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null && BACKEND_HEALTHY=true && break
+              echo "🔐 Logging into Docker registry: ${registry}..."
+
+              token_file="$(mktemp)"
+              chmod 600 "$token_file"
+              printf '%s' "$token" > "$token_file"
+
+              if cat "$token_file" | docker login "$registry" -u "$username" --password-stdin >/dev/null 2>&1; then
+                echo "✅ Docker login successful."
               else
-                echo "$SUDO_PASSWORD" | sudo -S docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null && BACKEND_HEALTHY=true && break
+                rc=$?
+                echo "❌ Docker login failed for registry: ${registry} (rc=${rc})." >&2
               fi
+
+              rm -f "$token_file"
+              return "$rc"
+            }
+
+            if [ -n "${_GHCR_TOKEN:-}" ]; then
+              DOCKER_USER="${_GHCR_USERNAME:-${_GH_USER}}"
+              docker_login ghcr.io "${DOCKER_USER}" "${_GHCR_TOKEN}"
+            else
+              echo "❌ _GHCR_TOKEN is empty. Cannot login to GHCR." >&2
+              exit 1
+            fi
+
+            # ----------------------------------------------------------------
+            # 拉取镜像
+            # ----------------------------------------------------------------
+            echo "📦 Pulling images..."
+
+            if ! docker compose ${COMPOSE_FILES} pull; then
+              echo "❌ Failed to pull images." >&2
+              echo "📋 Compose config:"
+              docker compose ${COMPOSE_FILES} config || true
+              exit 1
+            fi
+
+            # ----------------------------------------------------------------
+            # 启动容器
+            # ----------------------------------------------------------------
+            echo "🚀 Starting containers..."
+
+            if ! docker compose ${COMPOSE_FILES} up -d; then
+              echo "❌ Failed to start containers." >&2
+              docker compose ${COMPOSE_FILES} ps || true
+              docker compose ${COMPOSE_FILES} logs --tail=200 || true
+              exit 1
+            fi
+
+            # ----------------------------------------------------------------
+            # 后端健康检查
+            # 前提：docker-compose.prod.yml 中后端容器名为 miniblog-backend。
+            # ----------------------------------------------------------------
+            echo "⏳ Waiting for backend health (up to 60s)..."
+
+            BACKEND_HEALTHY=false
+
+            for i in $(seq 1 30); do
+              if docker exec miniblog-backend sh -c '
+                if command -v wget >/dev/null 2>&1; then
+                  wget --spider -q http://localhost:8080/health
+                elif command -v curl >/dev/null 2>&1; then
+                  curl -fsS http://localhost:8080/health >/dev/null
+                else
+                  echo "neither wget nor curl exists in container" >&2
+                  exit 127
+                fi
+              ' >/dev/null 2>&1; then
+                BACKEND_HEALTHY=true
+                break
+              fi
+
               sleep 2
             done
-            
+
             if [ "$BACKEND_HEALTHY" = true ]; then
-              echo "✅ Backend healthy after $((i*2))s"
+              echo "✅ Backend healthy after $((i * 2))s."
             else
-              echo "⚠️ Backend health check timed out. Proceeding anyway..."
+              echo "❌ Backend health check timed out." >&2
+
+              echo "📋 Container status:"
+              docker compose ${COMPOSE_FILES} ps || true
+
+              echo "📋 Recent logs:"
+              docker compose ${COMPOSE_FILES} logs --tail=200 || true
+
+              exit 1
             fi
 
+            # ----------------------------------------------------------------
+            # 最终状态
+            # ----------------------------------------------------------------
             echo "📋 Final container status:"
-            if [ "$SUDO_MODE" = "nopass" ]; then
-              sudo docker compose ps
-            else
-              echo "$SUDO_PASSWORD" | sudo -S docker compose ps
-            fi
+            docker compose ${COMPOSE_FILES} ps
 
       - name: Reload nginx on ServerA
-        if: env.SVRA_HOST != ''
+        if: ${{ env.SVRA_HOST != '' && env.SVRA_USER != '' && env.SVRA_SSH_KEY != '' }}
         uses: appleboy/ssh-action@v1.0.0
+        env:
+          SUDO_PASSWORD: ${{ env.SVRA_SUDO_PASSWORD }}
         with:
           host:     ${{ env.SVRA_HOST }}
           username: ${{ env.SVRA_USER }}
           key:      ${{ env.SVRA_SSH_KEY }}
           port:     ${{ env.SVRA_SSH_PORT }}
+          envs: SUDO_PASSWORD
           script_stop: true
+          command_timeout: 5m
           script: |
-            set -euo pipefail
-            # 重载 nginx，使 upstream 指向 ServerD 的新实例（避免 keepalive 连到旧连接）
-            # ServerA 上 nginx 在 Docker 中，SSH 用户通常需 sudo 才能执行 docker
+            set -Eeuo pipefail
+
+            if [ -n "${SUDO_PASSWORD:-}" ]; then
+              echo "ℹ️ ServerA: using sudo with password."
+
+              if ! printf '%s\n' "$SUDO_PASSWORD" | sudo -S -v >/dev/null 2>&1; then
+                echo "❌ ServerA sudo authentication failed. Check SVRA_SUDO_PASSWORD." >&2
+                exit 1
+              fi
+
+              run_sudo() {
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S "$@"
+              }
+            else
+              run_sudo() {
+                sudo -n "$@"
+              }
+            fi
+
+            echo "🔄 Reloading nginx on ServerA..."
+
+            # 优先处理 Docker 里的 nginx，不带 sudo。
             if command -v docker >/dev/null 2>&1; then
-              if sudo docker exec nginx nginx -t 2>/dev/null; then
-                sudo docker exec nginx nginx -s reload
-                echo "Nginx reloaded on ServerA (Docker)."
-                exit 0
-              fi
-              if docker exec nginx nginx -t 2>/dev/null; then
+              if docker exec nginx nginx -t >/dev/null 2>&1; then
                 docker exec nginx nginx -s reload
-                echo "Nginx reloaded on ServerA (Docker, no sudo)."
+                echo "✅ Nginx reloaded on ServerA (Docker, no sudo)."
+                exit 0
+              fi
+
+              if run_sudo docker exec nginx nginx -t >/dev/null 2>&1; then
+                run_sudo docker exec nginx nginx -s reload
+                echo "✅ Nginx reloaded on ServerA (Docker, sudo)."
                 exit 0
               fi
             fi
-            if sudo systemctl is-active -q nginx 2>/dev/null && sudo nginx -t 2>/dev/null; then
-              sudo systemctl reload nginx
-              echo "Nginx reloaded on ServerA (systemd)."
-              exit 0
+
+            # 其次处理 systemd nginx。
+            if command -v systemctl >/dev/null 2>&1; then
+              if run_sudo systemctl is-active -q nginx && run_sudo nginx -t >/dev/null 2>&1; then
+                run_sudo systemctl reload nginx
+                echo "✅ Nginx reloaded on ServerA (systemd)."
+                exit 0
+              fi
             fi
-            echo "⚠️ Nginx not found: docker exec nginx 或 systemctl nginx 均失败，请检查容器名与 sudo 权限。"
+
+            echo "❌ Nginx reload failed. Check nginx container name, systemd nginx status, or sudo permission." >&2
             exit 1
 
   notify:
@@ -519,10 +656,10 @@ jobs:
           echo "App deploy: $APP_STATUS"
 
           if [ "$APP_STATUS" = "success" ]; then
-            echo "✅ Deployment to production succeeded"
+            echo "✅ Deployment to production succeeded."
           elif [ "$APP_STATUS" = "skipped" ]; then
-            echo "ℹ️ App deployment skipped (non-main push)"
+            echo "ℹ️ App deployment skipped."
           else
-            echo "❌ Deployment failed"
+            echo "❌ Deployment failed."
             exit 1
           fi
