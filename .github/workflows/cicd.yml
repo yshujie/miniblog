@@ -233,7 +233,7 @@ jobs:
           key:      ${{ secrets.SVRD_SSH_KEY }}
           port:     ${{ secrets.SVRD_SSH_PORT || 22 }}
           source:   "docker-compose.yml,docker-compose.prod.yml"
-          target:   "/opt/miniblog"
+          target:   "/tmp/miniblog-deploy"
 
       - name: Deploy on ServerD (docker compose)
         uses: appleboy/ssh-action@v1.0.0
@@ -271,7 +271,21 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            cd /opt/miniblog
+
+            APP_DIR="/opt/miniblog"
+            STAGE_DIR="/tmp/miniblog-deploy"
+
+            if [ ! -f "${STAGE_DIR}/docker-compose.yml" ] || [ ! -f "${STAGE_DIR}/docker-compose.prod.yml" ]; then
+              echo "❌ Missing uploaded compose files in ${STAGE_DIR}"
+              exit 1
+            fi
+
+            sudo mkdir -p "${APP_DIR}"
+            sudo cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
+            sudo chown -R "$(id -u):$(id -g)" "${APP_DIR}"
+            rm -rf "${STAGE_DIR}"
+
+            cd "${APP_DIR}"
 
             cat > .env <<EOF
             BACKEND_IMAGE_TAG=${_IMG_BACKEND}
