@@ -10,7 +10,7 @@ name: CI/CD (miniblog - production, linux runner)
 #   JWT_SECRET
 #
 # 可选：
-#   （无）
+#   SVRD_SUDO_PASSWORD（serverD 部署用户执行 sudo 需要密码时必须）
 #   FEISHU_DOCREADER_APPID, FEISHU_DOCREADER_APPSECRET
 #
 # 说明：
@@ -58,6 +58,7 @@ jobs:
           SVRD_USERNAME:       ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
           SVRD_SSH_KEY:        ${{ secrets.SVRD_SSH_KEY }}
           SVRD_SSH_PORT:       ${{ secrets.SVRD_SSH_PORT }}
+          SVRD_SUDO_PASSWORD:  ${{ secrets.SVRD_SUDO_PASSWORD }}
           MYSQL_HOST:          ${{ secrets.MYSQL_HOST }}
           MYSQL_PORT:          ${{ secrets.MYSQL_PORT }}
           MYSQL_DBNAME:        ${{ secrets.MYSQL_DBNAME }}
@@ -73,7 +74,7 @@ jobs:
         run: |
           echo "🔍 Validating required secrets (non-blocking)..."
           REQUIRED_APP=(SVRD_HOST SVRD_USERNAME SVRD_SSH_KEY MYSQL_HOST MYSQL_DBNAME MYSQL_USERNAME MYSQL_PASSWORD REDIS_HOST REDIS_PASSWORD JWT_SECRET)
-          OPTIONAL_APP=(SVRD_SSH_PORT MYSQL_PORT REDIS_PORT REDIS_DB FEISHU_APPID FEISHU_SECRET)
+          OPTIONAL_APP=(SVRD_SSH_PORT SVRD_SUDO_PASSWORD MYSQL_PORT REDIS_PORT REDIS_DB FEISHU_APPID FEISHU_SECRET)
           FAILED=0
           ENFORCE=0
 
@@ -244,6 +245,7 @@ jobs:
           _GH_USER:         ${{ github.repository_owner }}
           _GHCR_USERNAME:   ${{ github.actor }}
           _GHCR_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
+          _SUDO_PASSWORD:   ${{ secrets.SVRD_SUDO_PASSWORD }}
           _MYSQL_HOST:      ${{ secrets.MYSQL_HOST }}
           _MYSQL_PORT:      ${{ secrets.MYSQL_PORT }}
           _MYSQL_DBNAME:    ${{ secrets.MYSQL_DBNAME }}
@@ -265,6 +267,7 @@ jobs:
           envs: >
             _IMG_BACKEND,_IMG_FE_BLOG,_IMG_FE_ADMIN,
             _GH_USER,_GHCR_USERNAME,_GHCR_TOKEN,
+            _SUDO_PASSWORD,
             _MYSQL_HOST,_MYSQL_PORT,_MYSQL_DBNAME,_MYSQL_USERNAME,_MYSQL_PASSWORD,
             _REDIS_HOST,_REDIS_PORT,_REDIS_DB,_REDIS_PASSWORD,
             _JWT_SECRET,_FEISHU_APPID,_FEISHU_SECRET
@@ -275,14 +278,24 @@ jobs:
             APP_DIR="/opt/miniblog"
             STAGE_DIR="/tmp/miniblog-deploy"
 
+            if sudo -n true 2>/dev/null; then
+              SUDO=(sudo -n)
+            elif [ -n "${_SUDO_PASSWORD:-}" ]; then
+              printf '%s\n' "${_SUDO_PASSWORD}" | sudo -S -p '' -v
+              SUDO=(sudo -n)
+            else
+              echo "❌ sudo password is required. Set GitHub Secret SVRD_SUDO_PASSWORD or configure NOPASSWD sudo for the deploy user."
+              exit 1
+            fi
+
             if [ ! -f "${STAGE_DIR}/docker-compose.yml" ] || [ ! -f "${STAGE_DIR}/docker-compose.prod.yml" ]; then
               echo "❌ Missing uploaded compose files in ${STAGE_DIR}"
               exit 1
             fi
 
-            sudo mkdir -p "${APP_DIR}"
-            sudo cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
-            sudo chown -R "$(id -u):$(id -g)" "${APP_DIR}"
+            "${SUDO[@]}" mkdir -p "${APP_DIR}"
+            "${SUDO[@]}" cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
+            "${SUDO[@]}" chown -R "$(id -u):$(id -g)" "${APP_DIR}"
             rm -rf "${STAGE_DIR}"
 
             cd "${APP_DIR}"
@@ -310,36 +323,36 @@ jobs:
             FEISHU_DOCREADER_APPID=${_FEISHU_APPID}
             FEISHU_DOCREADER_APPSECRET=${_FEISHU_SECRET}
             EOF
-            sudo chmod 600 .env
+            "${SUDO[@]}" chmod 600 .env
 
             # 创建业务网络（miniblog），infra-network 由基础设施预创建
-            sudo docker network inspect miniblog-network >/dev/null 2>&1 || sudo docker network create miniblog-network
-            if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
+            "${SUDO[@]}" docker network inspect miniblog-network >/dev/null 2>&1 || "${SUDO[@]}" docker network create miniblog-network
+            if ! "${SUDO[@]}" docker network inspect infra-network >/dev/null 2>&1; then
               echo "⚠️ infra-network 不存在，请先在基础设施侧创建（overlay/attachable）"
               exit 1
             fi
-            sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
+            "${SUDO[@]}" mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
 
             # 使用 GITHUB_TOKEN 登录 GHCR（仓库内私有镜像可拉取）
             if [ -n "${_GHCR_TOKEN}" ]; then
               DOCKER_USER="${_GHCR_USERNAME:-${_GH_USER}}"
-              echo "${_GHCR_TOKEN}" | sudo docker login ghcr.io -u "${DOCKER_USER}" --password-stdin
+              echo "${_GHCR_TOKEN}" | "${SUDO[@]}" docker login ghcr.io -u "${DOCKER_USER}" --password-stdin
             fi
 
-            sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-            sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            "${SUDO[@]}" docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            "${SUDO[@]}" docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
             # 等待后端就绪（便于 ServerA 上 nginx 重载后能连到 ServerD 新实例）
             echo "Waiting for backend health (up to 60s)..."
             for i in $(seq 1 30); do
-              if sudo docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null; then
+              if "${SUDO[@]}" docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null; then
                 echo "Backend healthy after $((i*2))s"
                 break
               fi
               sleep 2
             done
 
-            sudo docker compose ps
+            "${SUDO[@]}" docker compose ps
 
       - name: Reload nginx on ServerA
         if: env.SVRA_HOST != ''
