@@ -245,7 +245,7 @@ jobs:
           _GH_USER:         ${{ github.repository_owner }}
           _GHCR_USERNAME:   ${{ github.actor }}
           _GHCR_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
-          _SUDO_PASSWORD:   ${{ secrets.SVRD_SUDO_PASSWORD }}
+          SUDO_PASSWORD:    ${{ secrets.SVRD_SUDO_PASSWORD }}
           _MYSQL_HOST:      ${{ secrets.MYSQL_HOST }}
           _MYSQL_PORT:      ${{ secrets.MYSQL_PORT }}
           _MYSQL_DBNAME:    ${{ secrets.MYSQL_DBNAME }}
@@ -267,35 +267,98 @@ jobs:
           envs: >
             _IMG_BACKEND,_IMG_FE_BLOG,_IMG_FE_ADMIN,
             _GH_USER,_GHCR_USERNAME,_GHCR_TOKEN,
-            _SUDO_PASSWORD,
+            SUDO_PASSWORD,
             _MYSQL_HOST,_MYSQL_PORT,_MYSQL_DBNAME,_MYSQL_USERNAME,_MYSQL_PASSWORD,
             _REDIS_HOST,_REDIS_PORT,_REDIS_DB,_REDIS_PASSWORD,
             _JWT_SECRET,_FEISHU_APPID,_FEISHU_SECRET
           script_stop: true
           script: |
-            set -euo pipefail
+            set -Eeuo pipefail
 
             APP_DIR="/opt/miniblog"
             STAGE_DIR="/tmp/miniblog-deploy"
 
             if sudo -n true 2>/dev/null; then
-              SUDO=(sudo -n)
-            elif [ -n "${_SUDO_PASSWORD:-}" ]; then
-              printf '%s\n' "${_SUDO_PASSWORD}" | sudo -S -p '' -v
-              SUDO=(sudo -n)
+              SUDO="sudo"
+              echo "ℹ️ Using passwordless sudo."
             else
-              echo "❌ sudo password is required. Set GitHub Secret SVRD_SUDO_PASSWORD or configure NOPASSWD sudo for the deploy user."
-              exit 1
+              if [ -z "${SUDO_PASSWORD:-}" ]; then
+                echo "❌ sudo needs password. Provide SVRD_SUDO_PASSWORD or configure NOPASSWD." >&2
+                exit 1
+              fi
+              sudo_pw() { sudo -S "$@" <<<"$SUDO_PASSWORD"; }
+              export -f sudo_pw
+              SUDO="sudo_pw"
+              if ! $SUDO -v; then
+                echo "❌ sudo authentication failed. Check GitHub Secret SVRD_SUDO_PASSWORD for the ServerD deploy user." >&2
+                exit 1
+              fi
+              echo "ℹ️ Using sudo with password."
             fi
+
+            if [ "$SUDO" = "sudo_pw" ]; then
+              SUDO_ASKPASS_SCRIPT="$(mktemp)"
+              printf '%s\n' '#!/bin/sh' 'printf '\''%s\n'\'' "$SUDO_PASSWORD"' >"$SUDO_ASKPASS_SCRIPT"
+              chmod 700 "$SUDO_ASKPASS_SCRIPT"
+            fi
+
+            cleanup_auth_helpers() {
+              if [ -n "${SUDO_ASKPASS_SCRIPT:-}" ]; then
+                rm -f "$SUDO_ASKPASS_SCRIPT"
+              fi
+            }
+            trap cleanup_auth_helpers EXIT
+
+            docker_login_with_token() {
+              local username="$1"
+              local token="$2"
+              local registry="${3:-}"
+              local token_file rc
+              token_file="$(mktemp)"
+              chmod 600 "$token_file"
+              printf '%s' "$token" >"$token_file"
+              rc=1
+              if [ "$SUDO" = "sudo_pw" ]; then
+                if [ -n "$registry" ]; then
+                  if SUDO_ASKPASS="$SUDO_ASKPASS_SCRIPT" sudo -A docker login "$registry" -u "$username" --password-stdin <"$token_file" >/dev/null; then
+                    rc=0
+                  else
+                    rc=$?
+                  fi
+                else
+                  if SUDO_ASKPASS="$SUDO_ASKPASS_SCRIPT" sudo -A docker login -u "$username" --password-stdin <"$token_file" >/dev/null; then
+                    rc=0
+                  else
+                    rc=$?
+                  fi
+                fi
+              else
+                if [ -n "$registry" ]; then
+                  if $SUDO docker login "$registry" -u "$username" --password-stdin <"$token_file" >/dev/null; then
+                    rc=0
+                  else
+                    rc=$?
+                  fi
+                else
+                  if $SUDO docker login -u "$username" --password-stdin <"$token_file" >/dev/null; then
+                    rc=0
+                  else
+                    rc=$?
+                  fi
+                fi
+              fi
+              rm -f "$token_file"
+              return "$rc"
+            }
 
             if [ ! -f "${STAGE_DIR}/docker-compose.yml" ] || [ ! -f "${STAGE_DIR}/docker-compose.prod.yml" ]; then
               echo "❌ Missing uploaded compose files in ${STAGE_DIR}"
               exit 1
             fi
 
-            "${SUDO[@]}" mkdir -p "${APP_DIR}"
-            "${SUDO[@]}" cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
-            "${SUDO[@]}" chown -R "$(id -u):$(id -g)" "${APP_DIR}"
+            $SUDO mkdir -p "${APP_DIR}"
+            $SUDO cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
+            $SUDO chown -R "$(id -u):$(id -g)" "${APP_DIR}"
             rm -rf "${STAGE_DIR}"
 
             cd "${APP_DIR}"
@@ -323,36 +386,36 @@ jobs:
             FEISHU_DOCREADER_APPID=${_FEISHU_APPID}
             FEISHU_DOCREADER_APPSECRET=${_FEISHU_SECRET}
             EOF
-            "${SUDO[@]}" chmod 600 .env
+            $SUDO chmod 600 .env
 
             # 创建业务网络（miniblog），infra-network 由基础设施预创建
-            "${SUDO[@]}" docker network inspect miniblog-network >/dev/null 2>&1 || "${SUDO[@]}" docker network create miniblog-network
-            if ! "${SUDO[@]}" docker network inspect infra-network >/dev/null 2>&1; then
+            $SUDO docker network inspect miniblog-network >/dev/null 2>&1 || $SUDO docker network create miniblog-network
+            if ! $SUDO docker network inspect infra-network >/dev/null 2>&1; then
               echo "⚠️ infra-network 不存在，请先在基础设施侧创建（overlay/attachable）"
               exit 1
             fi
-            "${SUDO[@]}" mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
+            $SUDO mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
 
             # 使用 GITHUB_TOKEN 登录 GHCR（仓库内私有镜像可拉取）
             if [ -n "${_GHCR_TOKEN}" ]; then
               DOCKER_USER="${_GHCR_USERNAME:-${_GH_USER}}"
-              echo "${_GHCR_TOKEN}" | "${SUDO[@]}" docker login ghcr.io -u "${DOCKER_USER}" --password-stdin
+              docker_login_with_token "${DOCKER_USER}" "${_GHCR_TOKEN}" ghcr.io
             fi
 
-            "${SUDO[@]}" docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-            "${SUDO[@]}" docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            $SUDO docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            $SUDO docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
             # 等待后端就绪（便于 ServerA 上 nginx 重载后能连到 ServerD 新实例）
             echo "Waiting for backend health (up to 60s)..."
             for i in $(seq 1 30); do
-              if "${SUDO[@]}" docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null; then
+              if $SUDO docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null; then
                 echo "Backend healthy after $((i*2))s"
                 break
               fi
               sleep 2
             done
 
-            "${SUDO[@]}" docker compose ps
+            $SUDO docker compose ps
 
       - name: Reload nginx on ServerA
         if: env.SVRA_HOST != ''
