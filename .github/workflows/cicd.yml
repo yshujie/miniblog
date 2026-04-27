@@ -4,7 +4,7 @@ name: CI/CD (miniblog - production, linux runner)
 # GitHub Secrets 配置指引
 # ----------------------------------------------------------------------------
 # 必需（main push / workflow_dispatch 才强制）：
-#   SVRB_HOST, SVRB_USER, SVRB_SSH_KEY, SVRB_SSH_PORT (可选，默认 22)
+#   SVRD_HOST, SVRD_USERNAME, SVRD_SSH_KEY, SVRD_SSH_PORT (可选，默认 22)
 #   MYSQL_HOST, MYSQL_DBNAME, MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_PORT (可选)
 #   REDIS_HOST, REDIS_PASSWORD, REDIS_PORT (可选), REDIS_DB (可选)
 #   JWT_SECRET
@@ -16,7 +16,7 @@ name: CI/CD (miniblog - production, linux runner)
 # 说明：
 # - PR 只做 lint/test，不用这些 Secrets。
 # - main push / workflow_dispatch 缺必需项会直接失败。
-# - 部署只针对 ServerB（应用机）；若 nginx 在 ServerA，可配置 SVRA_* 以在部署后自动重载 nginx。
+# - 部署只针对 ServerD（应用机）；若 nginx 在 ServerA，可配置 SVRA_* 以在部署后自动重载 nginx。
 # 可选（ServerA nginx 重载）：SVRA_HOST, SVRA_USER, SVRA_SSH_KEY, SVRA_SSH_PORT（默认 22）
 # ============================================================================
 
@@ -54,10 +54,10 @@ jobs:
     steps:
       - name: Check Required Secrets
         env:
-          SVRB_HOST:           ${{ secrets.SVRB_HOST }}
-          SVRB_USER:           ${{ secrets.SVRB_USER }}
-          SVRB_SSH_KEY:        ${{ secrets.SVRB_SSH_KEY }}
-          SVRB_SSH_PORT:       ${{ secrets.SVRB_SSH_PORT }}
+          SVRD_HOST:           ${{ secrets.SVRD_HOST }}
+          SVRD_USERNAME:       ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          SVRD_SSH_KEY:        ${{ secrets.SVRD_SSH_KEY }}
+          SVRD_SSH_PORT:       ${{ secrets.SVRD_SSH_PORT }}
           MYSQL_HOST:          ${{ secrets.MYSQL_HOST }}
           MYSQL_PORT:          ${{ secrets.MYSQL_PORT }}
           MYSQL_DBNAME:        ${{ secrets.MYSQL_DBNAME }}
@@ -72,8 +72,8 @@ jobs:
           FEISHU_SECRET:       ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
         run: |
           echo "🔍 Validating required secrets (non-blocking)..."
-          REQUIRED_APP=(SVRB_HOST SVRB_USER SVRB_SSH_KEY MYSQL_HOST MYSQL_DBNAME MYSQL_USERNAME MYSQL_PASSWORD REDIS_HOST REDIS_PASSWORD JWT_SECRET)
-          OPTIONAL_APP=(SVRB_SSH_PORT MYSQL_PORT REDIS_PORT REDIS_DB FEISHU_APPID FEISHU_SECRET)
+          REQUIRED_APP=(SVRD_HOST SVRD_USERNAME SVRD_SSH_KEY MYSQL_HOST MYSQL_DBNAME MYSQL_USERNAME MYSQL_PASSWORD REDIS_HOST REDIS_PASSWORD JWT_SECRET)
+          OPTIONAL_APP=(SVRD_SSH_PORT MYSQL_PORT REDIS_PORT REDIS_DB FEISHU_APPID FEISHU_SECRET)
           FAILED=0
           ENFORCE=0
 
@@ -211,7 +211,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy-app:
-    name: Deploy to ServerB (app)
+    name: Deploy to ServerD (app)
     runs-on: ubuntu-latest
     needs: [build-and-push]
     if: |
@@ -228,14 +228,14 @@ jobs:
       - name: Upload compose files
         uses: appleboy/scp-action@v0.1.7
         with:
-          host:     ${{ secrets.SVRB_HOST }}
-          username: ${{ secrets.SVRB_USER }}
-          key:      ${{ secrets.SVRB_SSH_KEY }}
-          port:     ${{ secrets.SVRB_SSH_PORT || 22 }}
+          host:     ${{ secrets.SVRD_HOST }}
+          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          key:      ${{ secrets.SVRD_SSH_KEY }}
+          port:     ${{ secrets.SVRD_SSH_PORT || 22 }}
           source:   "docker-compose.yml,docker-compose.prod.yml"
           target:   "/opt/miniblog"
 
-      - name: Deploy on ServerB (docker compose)
+      - name: Deploy on ServerD (docker compose)
         uses: appleboy/ssh-action@v1.0.0
         env:
           _IMG_BACKEND:     ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
@@ -257,10 +257,10 @@ jobs:
           _FEISHU_APPID:    ${{ secrets.FEISHU_DOCREADER_APPID }}
           _FEISHU_SECRET:   ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
         with:
-          host:     ${{ secrets.SVRB_HOST }}
-          username: ${{ secrets.SVRB_USER }}
-          key:      ${{ secrets.SVRB_SSH_KEY }}
-          port:     ${{ secrets.SVRB_SSH_PORT || 22 }}
+          host:     ${{ secrets.SVRD_HOST }}
+          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          key:      ${{ secrets.SVRD_SSH_KEY }}
+          port:     ${{ secrets.SVRD_SSH_PORT || 22 }}
           # 关键：将上面 env 中的变量名传递给远端
           envs: >
             _IMG_BACKEND,_IMG_FE_BLOG,_IMG_FE_ADMIN,
@@ -315,7 +315,7 @@ jobs:
             sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
             sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
-            # 等待后端就绪（便于 ServerA 上 nginx 重载后能连到新实例）
+            # 等待后端就绪（便于 ServerA 上 nginx 重载后能连到 ServerD 新实例）
             echo "Waiting for backend health (up to 60s)..."
             for i in $(seq 1 30); do
               if sudo docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null; then
@@ -338,7 +338,7 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            # 重载 nginx，使 upstream 指向 ServerB 的新实例（避免 keepalive 连到旧连接）
+            # 重载 nginx，使 upstream 指向 ServerD 的新实例（避免 keepalive 连到旧连接）
             # ServerA 上 nginx 在 Docker 中，SSH 用户通常需 sudo 才能执行 docker
             if command -v docker >/dev/null 2>&1; then
               if sudo docker exec nginx nginx -t 2>/dev/null; then
