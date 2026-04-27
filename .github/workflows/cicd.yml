@@ -303,15 +303,6 @@ jobs:
             }
             trap cleanup_auth_helpers EXIT
 
-            # 执行 sudo 命令的统一函数（普通命令）
-            run_sudo() {
-              if [ "$SUDO_MODE" = "nopass" ]; then
-                sudo "$@"
-              else
-                echo "$SUDO_PASSWORD" | sudo -S "$@"
-              fi
-            }
-
             # 执行 sudo docker login 的特殊函数（需要 stdin 重定向）
             sudo_docker_login() {
               local registry="$1"
@@ -350,37 +341,43 @@ jobs:
 
             # 创建应用目录并复制文件
             echo "📁 Setting up application directory..."
-            run_sudo mkdir -p "${APP_DIR}"
-            run_sudo cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
-            run_sudo chown -R "$(id -u):$(id -g)" "${APP_DIR}"
+            if [ "$SUDO_MODE" = "nopass" ]; then
+              sudo mkdir -p "${APP_DIR}"
+              sudo cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
+              sudo chown -R "$(id -u):$(id -g)" "${APP_DIR}"
+            else
+              echo "$SUDO_PASSWORD" | sudo -S mkdir -p "${APP_DIR}"
+              echo "$SUDO_PASSWORD" | sudo -S cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
+              echo "$SUDO_PASSWORD" | sudo -S chown -R "$(id -u):$(id -g)" "${APP_DIR}"
+            fi
             rm -rf "${STAGE_DIR}"
 
             cd "${APP_DIR}"
 
             # 生成 .env 文件（使用 envsubst 处理变量）
             echo "⚙️ Creating .env file..."
-            cat > .env.template <<'EOF'
-            BACKEND_IMAGE_TAG=$_IMG_BACKEND
-            FRONTEND_BLOG_IMAGE_TAG=$_IMG_FE_BLOG
-            FRONTEND_ADMIN_IMAGE_TAG=$_IMG_FE_ADMIN
+            cat > .env.template <<EOF
+            BACKEND_IMAGE_TAG=\$_IMG_BACKEND
+            FRONTEND_BLOG_IMAGE_TAG=\$_IMG_FE_BLOG
+            FRONTEND_ADMIN_IMAGE_TAG=\$_IMG_FE_ADMIN
 
             GIN_MODE=release
 
-            MYSQL_HOST=$_MYSQL_HOST
-            MYSQL_PORT=$_MYSQL_PORT
-            MYSQL_DATABASE=$_MYSQL_DBNAME
-            MYSQL_USERNAME=$_MYSQL_USERNAME
-            MYSQL_PASSWORD=$_MYSQL_PASSWORD
+            MYSQL_HOST=\$_MYSQL_HOST
+            MYSQL_PORT=\$_MYSQL_PORT
+            MYSQL_DATABASE=\$_MYSQL_DBNAME
+            MYSQL_USERNAME=\$_MYSQL_USERNAME
+            MYSQL_PASSWORD=\$_MYSQL_PASSWORD
 
-            REDIS_HOST=$_REDIS_HOST
-            REDIS_PORT=$_REDIS_PORT
-            REDIS_DB=$_REDIS_DB
-            REDIS_PASSWORD=$_REDIS_PASSWORD
+            REDIS_HOST=\$_REDIS_HOST
+            REDIS_PORT=\$_REDIS_PORT
+            REDIS_DB=\$_REDIS_DB
+            REDIS_PASSWORD=\$_REDIS_PASSWORD
 
-            JWT_SECRET=$_JWT_SECRET
+            JWT_SECRET=\$_JWT_SECRET
 
-            FEISHU_DOCREADER_APPID=$_FEISHU_APPID
-            FEISHU_DOCREADER_APPSECRET=$_FEISHU_SECRET
+            FEISHU_DOCREADER_APPID=\$_FEISHU_APPID
+            FEISHU_DOCREADER_APPSECRET=\$_FEISHU_SECRET
             EOF
             
             # 导出环境变量并使用 envsubst 生成 .env
@@ -394,14 +391,21 @@ jobs:
 
             # 创建业务网络（miniblog），infra-network 由基础设施预创建
             echo "🌐 Ensuring Docker networks..."
-            run_sudo docker network inspect miniblog-network >/dev/null 2>&1 || run_sudo docker network create miniblog-network
-            if ! run_sudo docker network inspect infra-network >/dev/null 2>&1; then
-              echo "⚠️ infra-network 不存在，请先在基础设施侧创建（overlay/attachable）"
-              exit 1
+            if [ "$SUDO_MODE" = "nopass" ]; then
+              sudo docker network inspect miniblog-network >/dev/null 2>&1 || sudo docker network create miniblog-network
+              if ! sudo docker network inspect infra-network >/dev/null 2>&1; then
+                echo "⚠️ infra-network 不存在，请先在基础设施侧创建（overlay/attachable）"
+                exit 1
+              fi
+              sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
+            else
+              echo "$SUDO_PASSWORD" | sudo -S docker network inspect miniblog-network >/dev/null 2>&1 || echo "$SUDO_PASSWORD" | sudo -S docker network create miniblog-network
+              if ! echo "$SUDO_PASSWORD" | sudo -S docker network inspect infra-network >/dev/null 2>&1; then
+                echo "⚠️ infra-network 不存在，请先在基础设施侧创建（overlay/attachable）"
+                exit 1
+              fi
+              echo "$SUDO_PASSWORD" | sudo -S mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
             fi
-            
-            # 创建日志目录
-            run_sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
 
             # 使用 GITHUB_TOKEN 登录 GHCR（仓库内私有镜像可拉取）
             if [ -n "${_GHCR_TOKEN}" ]; then
@@ -414,35 +418,55 @@ jobs:
 
             # 拉取镜像并启动容器
             echo "📦 Pulling images..."
-            run_sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull || {
-              echo "❌ Failed to pull images" >&2
-              exit 1
-            }
+            if [ "$SUDO_MODE" = "nopass" ]; then
+              sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env pull || {
+                echo "❌ Failed to pull images" >&2
+                exit 1
+              }
+            else
+              echo "$SUDO_PASSWORD" | sudo -S docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env pull || {
+                echo "❌ Failed to pull images" >&2
+                exit 1
+              }
+            fi
             
             echo "🚀 Starting containers..."
-            run_sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d || {
-              echo "❌ Failed to start containers" >&2
-              exit 1
-            }
+            if [ "$SUDO_MODE" = "nopass" ]; then
+              sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d || {
+                echo "❌ Failed to start containers" >&2
+                exit 1
+              }
+            else
+              echo "$SUDO_PASSWORD" | sudo -S docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d || {
+                echo "❌ Failed to start containers" >&2
+                exit 1
+              }
+            fi
 
             # 等待后端就绪（便于 ServerA 上 nginx 重载后能连到 ServerD 新实例）
             echo "⏳ Waiting for backend health (up to 60s)..."
             BACKEND_HEALTHY=false
             for i in $(seq 1 30); do
-              if run_sudo docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null; then
-                echo "✅ Backend healthy after $((i*2))s"
-                BACKEND_HEALTHY=true
-                break
+              if [ "$SUDO_MODE" = "nopass" ]; then
+                sudo docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null && BACKEND_HEALTHY=true && break
+              else
+                echo "$SUDO_PASSWORD" | sudo -S docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null && BACKEND_HEALTHY=true && break
               fi
               sleep 2
             done
             
-            if [ "$BACKEND_HEALTHY" = false ]; then
+            if [ "$BACKEND_HEALTHY" = true ]; then
+              echo "✅ Backend healthy after $((i*2))s"
+            else
               echo "⚠️ Backend health check timed out. Proceeding anyway..."
             fi
 
             echo "📋 Final container status:"
-            run_sudo docker compose ps
+            if [ "$SUDO_MODE" = "nopass" ]; then
+              sudo docker compose ps
+            else
+              echo "$SUDO_PASSWORD" | sudo -S docker compose ps
+            fi
 
       - name: Reload nginx on ServerA
         if: env.SVRA_HOST != ''
