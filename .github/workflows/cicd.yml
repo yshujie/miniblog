@@ -277,92 +277,90 @@ jobs:
 
             APP_DIR="/opt/miniblog"
             STAGE_DIR="/tmp/miniblog-deploy"
+            SUDO_ASKPASS_SCRIPT=""
 
+            # 检查 sudo 权限并设置合适的 sudo 方式
             if sudo -n true 2>/dev/null; then
-              SUDO="sudo"
+              SUDO_MODE="nopass"
               echo "ℹ️ Using passwordless sudo."
             else
               if [ -z "${SUDO_PASSWORD:-}" ]; then
                 echo "❌ sudo needs password. Provide SVRD_SUDO_PASSWORD or configure NOPASSWD." >&2
                 exit 1
               fi
-              sudo_pw() { sudo -S "$@" <<<"$SUDO_PASSWORD"; }
-              export -f sudo_pw
-              SUDO="sudo_pw"
-              if ! $SUDO -v; then
+              SUDO_MODE="password"
+              
+              # 创建 sudo 密码助手脚本
+              SUDO_ASKPASS_SCRIPT="$(mktemp)"
+              printf '%s\n' '#!/bin/sh' 'printf '\''%s\n'\'' "$SUDO_PASSWORD"' >"$SUDO_ASKPASS_SCRIPT"
+              chmod 700 "$SUDO_ASKPASS_SCRIPT"
+              export SUDO_ASKPASS="$SUDO_ASKPASS_SCRIPT"
+              
+              # 验证 sudo 密码是否正确
+              if ! echo "$SUDO_PASSWORD" | sudo -S -v >/dev/null 2>&1; then
                 echo "❌ sudo authentication failed. Check GitHub Secret SVRD_SUDO_PASSWORD for the ServerD deploy user." >&2
                 exit 1
               fi
               echo "ℹ️ Using sudo with password."
             fi
 
-            if [ "$SUDO" = "sudo_pw" ]; then
-              SUDO_ASKPASS_SCRIPT="$(mktemp)"
-              printf '%s\n' '#!/bin/sh' 'printf '\''%s\n'\'' "$SUDO_PASSWORD"' >"$SUDO_ASKPASS_SCRIPT"
-              chmod 700 "$SUDO_ASKPASS_SCRIPT"
-            fi
-
+            # 清理函数
             cleanup_auth_helpers() {
-              if [ -n "${SUDO_ASKPASS_SCRIPT:-}" ]; then
+              if [ -n "${SUDO_ASKPASS_SCRIPT:-}" ] && [ -f "$SUDO_ASKPASS_SCRIPT" ]; then
                 rm -f "$SUDO_ASKPASS_SCRIPT"
               fi
             }
             trap cleanup_auth_helpers EXIT
 
+            # 执行 sudo 命令的统一函数
+            run_sudo() {
+              if [ "$SUDO_MODE" = "nopass" ]; then
+                sudo "$@"
+              else
+                sudo -A "$@"
+              fi
+            }
+
+            # Docker 登录函数
             docker_login_with_token() {
               local username="$1"
               local token="$2"
-              local registry="${3:-}"
-              local token_file rc
+              local registry="${3:-ghcr.io}"
+              local token_file
+              
+              echo "🔐 Logging into Docker registry: $registry..."
               token_file="$(mktemp)"
               chmod 600 "$token_file"
               printf '%s' "$token" >"$token_file"
-              rc=1
-              if [ "$SUDO" = "sudo_pw" ]; then
-                if [ -n "$registry" ]; then
-                  if SUDO_ASKPASS="$SUDO_ASKPASS_SCRIPT" sudo -A docker login "$registry" -u "$username" --password-stdin <"$token_file" >/dev/null; then
-                    rc=0
-                  else
-                    rc=$?
-                  fi
-                else
-                  if SUDO_ASKPASS="$SUDO_ASKPASS_SCRIPT" sudo -A docker login -u "$username" --password-stdin <"$token_file" >/dev/null; then
-                    rc=0
-                  else
-                    rc=$?
-                  fi
-                fi
+              
+              if run_sudo docker login "$registry" -u "$username" --password-stdin <"$token_file" >/dev/null 2>&1; then
+                echo "✅ Docker login successful"
               else
-                if [ -n "$registry" ]; then
-                  if $SUDO docker login "$registry" -u "$username" --password-stdin <"$token_file" >/dev/null; then
-                    rc=0
-                  else
-                    rc=$?
-                  fi
-                else
-                  if $SUDO docker login -u "$username" --password-stdin <"$token_file" >/dev/null; then
-                    rc=0
-                  else
-                    rc=$?
-                  fi
-                fi
+                echo "❌ Docker login failed for registry: $registry" >&2
+                rm -f "$token_file"
+                return 1
               fi
               rm -f "$token_file"
-              return "$rc"
+              return 0
             }
 
+            # 验证必要文件
             if [ ! -f "${STAGE_DIR}/docker-compose.yml" ] || [ ! -f "${STAGE_DIR}/docker-compose.prod.yml" ]; then
               echo "❌ Missing uploaded compose files in ${STAGE_DIR}"
               exit 1
             fi
 
-            $SUDO mkdir -p "${APP_DIR}"
-            $SUDO cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
-            $SUDO chown -R "$(id -u):$(id -g)" "${APP_DIR}"
+            # 创建应用目录并复制文件
+            echo "📁 Setting up application directory..."
+            run_sudo mkdir -p "${APP_DIR}"
+            run_sudo cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
+            run_sudo chown -R "$(id -u):$(id -g)" "${APP_DIR}"
             rm -rf "${STAGE_DIR}"
 
             cd "${APP_DIR}"
 
+            # 生成 .env 文件
+            echo "⚙️ Creating .env file..."
             cat > .env <<EOF
             BACKEND_IMAGE_TAG=${_IMG_BACKEND}
             FRONTEND_BLOG_IMAGE_TAG=${_IMG_FE_BLOG}
@@ -386,36 +384,59 @@ jobs:
             FEISHU_DOCREADER_APPID=${_FEISHU_APPID}
             FEISHU_DOCREADER_APPSECRET=${_FEISHU_SECRET}
             EOF
-            $SUDO chmod 600 .env
+            run_sudo chmod 600 .env
 
             # 创建业务网络（miniblog），infra-network 由基础设施预创建
-            $SUDO docker network inspect miniblog-network >/dev/null 2>&1 || $SUDO docker network create miniblog-network
-            if ! $SUDO docker network inspect infra-network >/dev/null 2>&1; then
+            echo "🌐 Ensuring Docker networks..."
+            run_sudo docker network inspect miniblog-network >/dev/null 2>&1 || run_sudo docker network create miniblog-network
+            if ! run_sudo docker network inspect infra-network >/dev/null 2>&1; then
               echo "⚠️ infra-network 不存在，请先在基础设施侧创建（overlay/attachable）"
               exit 1
             fi
-            $SUDO mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
+            
+            # 创建日志目录
+            run_sudo mkdir -p /data/logs/miniblog/backend /data/logs/miniblog/frontend-blog /data/logs/miniblog/frontend-admin
 
             # 使用 GITHUB_TOKEN 登录 GHCR（仓库内私有镜像可拉取）
             if [ -n "${_GHCR_TOKEN}" ]; then
               DOCKER_USER="${_GHCR_USERNAME:-${_GH_USER}}"
-              docker_login_with_token "${DOCKER_USER}" "${_GHCR_TOKEN}" ghcr.io
+              if ! docker_login_with_token "${DOCKER_USER}" "${_GHCR_TOKEN}" ghcr.io; then
+                echo "❌ Failed to login to GHCR. Check credentials and network." >&2
+                exit 1
+              fi
             fi
 
-            $SUDO docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-            $SUDO docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            # 拉取镜像并启动容器
+            echo "📦 Pulling images..."
+            run_sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml pull || {
+              echo "❌ Failed to pull images" >&2
+              exit 1
+            }
+            
+            echo "🚀 Starting containers..."
+            run_sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d || {
+              echo "❌ Failed to start containers" >&2
+              exit 1
+            }
 
             # 等待后端就绪（便于 ServerA 上 nginx 重载后能连到 ServerD 新实例）
-            echo "Waiting for backend health (up to 60s)..."
+            echo "⏳ Waiting for backend health (up to 60s)..."
+            BACKEND_HEALTHY=false
             for i in $(seq 1 30); do
-              if $SUDO docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null; then
-                echo "Backend healthy after $((i*2))s"
+              if run_sudo docker exec miniblog-backend wget --spider -q http://localhost:8080/health 2>/dev/null; then
+                echo "✅ Backend healthy after $((i*2))s"
+                BACKEND_HEALTHY=true
                 break
               fi
               sleep 2
             done
+            
+            if [ "$BACKEND_HEALTHY" = false ]; then
+              echo "⚠️ Backend health check timed out. Proceeding anyway..."
+            fi
 
-            $SUDO docker compose ps
+            echo "📋 Final container status:"
+            run_sudo docker compose ps
 
       - name: Reload nginx on ServerA
         if: env.SVRA_HOST != ''
