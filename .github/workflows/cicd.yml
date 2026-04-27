@@ -277,7 +277,6 @@ jobs:
 
             APP_DIR="/opt/miniblog"
             STAGE_DIR="/tmp/miniblog-deploy"
-            SUDO_ASKPASS_SCRIPT=""
 
             # 检查 sudo 权限并设置合适的 sudo 方式
             if sudo -n true 2>/dev/null; then
@@ -290,12 +289,6 @@ jobs:
               fi
               SUDO_MODE="password"
               
-              # 创建 sudo 密码助手脚本
-              SUDO_ASKPASS_SCRIPT="$(mktemp)"
-              printf '%s\n' '#!/bin/sh' 'printf '\''%s\n'\'' "$SUDO_PASSWORD"' >"$SUDO_ASKPASS_SCRIPT"
-              chmod 700 "$SUDO_ASKPASS_SCRIPT"
-              export SUDO_ASKPASS="$SUDO_ASKPASS_SCRIPT"
-              
               # 验证 sudo 密码是否正确
               if ! echo "$SUDO_PASSWORD" | sudo -S -v >/dev/null 2>&1; then
                 echo "❌ sudo authentication failed. Check GitHub Secret SVRD_SUDO_PASSWORD for the ServerD deploy user." >&2
@@ -306,26 +299,24 @@ jobs:
 
             # 清理函数
             cleanup_auth_helpers() {
-              if [ -n "${SUDO_ASKPASS_SCRIPT:-}" ] && [ -f "$SUDO_ASKPASS_SCRIPT" ]; then
-                rm -f "$SUDO_ASKPASS_SCRIPT"
-              fi
+              return 0
             }
             trap cleanup_auth_helpers EXIT
 
-            # 执行 sudo 命令的统一函数
+            # 执行 sudo 命令的统一函数（普通命令）
             run_sudo() {
               if [ "$SUDO_MODE" = "nopass" ]; then
                 sudo "$@"
               else
-                sudo -A "$@"
+                echo "$SUDO_PASSWORD" | sudo -S "$@"
               fi
             }
 
-            # Docker 登录函数
-            docker_login_with_token() {
-              local username="$1"
-              local token="$2"
-              local registry="${3:-ghcr.io}"
+            # 执行 sudo docker login 的特殊函数（需要 stdin 重定向）
+            sudo_docker_login() {
+              local registry="$1"
+              local username="$2"
+              local token="$3"
               local token_file
               
               echo "🔐 Logging into Docker registry: $registry..."
@@ -333,15 +324,22 @@ jobs:
               chmod 600 "$token_file"
               printf '%s' "$token" >"$token_file"
               
-              if run_sudo docker login "$registry" -u "$username" --password-stdin <"$token_file" >/dev/null 2>&1; then
+              local rc=0
+              if [ "$SUDO_MODE" = "nopass" ]; then
+                # 无密码 sudo：直接使用 docker login
+                sudo sh -c "cat '$token_file' | docker login '$registry' -u '$username' --password-stdin >/dev/null 2>&1" || rc=$?
+              else
+                # 有密码 sudo：通过 bash -c 来避免 stdin 冲突
+                echo "$SUDO_PASSWORD" | sudo -S sh -c "cat '$token_file' | docker login '$registry' -u '$username' --password-stdin >/dev/null 2>&1" || rc=$?
+              fi
+              
+              if [ $rc -eq 0 ]; then
                 echo "✅ Docker login successful"
               else
-                echo "❌ Docker login failed for registry: $registry" >&2
-                rm -f "$token_file"
-                return 1
+                echo "❌ Docker login failed for registry: $registry (rc=$rc)" >&2
               fi
               rm -f "$token_file"
-              return 0
+              return $rc
             }
 
             # 验证必要文件
@@ -359,32 +357,40 @@ jobs:
 
             cd "${APP_DIR}"
 
-            # 生成 .env 文件
+            # 生成 .env 文件（使用 envsubst 处理变量）
             echo "⚙️ Creating .env file..."
-            cat > .env <<EOF
-            BACKEND_IMAGE_TAG=${_IMG_BACKEND}
-            FRONTEND_BLOG_IMAGE_TAG=${_IMG_FE_BLOG}
-            FRONTEND_ADMIN_IMAGE_TAG=${_IMG_FE_ADMIN}
+            cat > .env.template <<'EOF'
+BACKEND_IMAGE_TAG=$_IMG_BACKEND
+FRONTEND_BLOG_IMAGE_TAG=$_IMG_FE_BLOG
+FRONTEND_ADMIN_IMAGE_TAG=$_IMG_FE_ADMIN
 
-            GIN_MODE=release
+GIN_MODE=release
 
-            MYSQL_HOST=${_MYSQL_HOST}
-            MYSQL_PORT=${_MYSQL_PORT}
-            MYSQL_DATABASE=${_MYSQL_DBNAME}
-            MYSQL_USERNAME=${_MYSQL_USERNAME}
-            MYSQL_PASSWORD=${_MYSQL_PASSWORD}
+MYSQL_HOST=$_MYSQL_HOST
+MYSQL_PORT=$_MYSQL_PORT
+MYSQL_DATABASE=$_MYSQL_DBNAME
+MYSQL_USERNAME=$_MYSQL_USERNAME
+MYSQL_PASSWORD=$_MYSQL_PASSWORD
 
-            REDIS_HOST=${_REDIS_HOST}
-            REDIS_PORT=${_REDIS_PORT}
-            REDIS_DB=${_REDIS_DB}
-            REDIS_PASSWORD=${_REDIS_PASSWORD}
+REDIS_HOST=$_REDIS_HOST
+REDIS_PORT=$_REDIS_PORT
+REDIS_DB=$_REDIS_DB
+REDIS_PASSWORD=$_REDIS_PASSWORD
 
-            JWT_SECRET=${_JWT_SECRET}
+JWT_SECRET=$_JWT_SECRET
 
-            FEISHU_DOCREADER_APPID=${_FEISHU_APPID}
-            FEISHU_DOCREADER_APPSECRET=${_FEISHU_SECRET}
-            EOF
-            run_sudo chmod 600 .env
+FEISHU_DOCREADER_APPID=$_FEISHU_APPID
+FEISHU_DOCREADER_APPSECRET=$_FEISHU_SECRET
+EOF
+            
+            # 导出环境变量并使用 envsubst 生成 .env
+            export _IMG_BACKEND _IMG_FE_BLOG _IMG_FE_ADMIN _MYSQL_HOST _MYSQL_PORT _MYSQL_DBNAME _MYSQL_USERNAME _MYSQL_PASSWORD _REDIS_HOST _REDIS_PORT _REDIS_DB _REDIS_PASSWORD _JWT_SECRET _FEISHU_APPID _FEISHU_SECRET
+            envsubst < .env.template > .env
+            rm -f .env.template
+            
+            echo "✅ .env file created"
+            chmod 600 .env
+            echo "✅ .env file permissions set"
 
             # 创建业务网络（miniblog），infra-network 由基础设施预创建
             echo "🌐 Ensuring Docker networks..."
@@ -400,7 +406,7 @@ jobs:
             # 使用 GITHUB_TOKEN 登录 GHCR（仓库内私有镜像可拉取）
             if [ -n "${_GHCR_TOKEN}" ]; then
               DOCKER_USER="${_GHCR_USERNAME:-${_GH_USER}}"
-              if ! docker_login_with_token "${DOCKER_USER}" "${_GHCR_TOKEN}" ghcr.io; then
+              if ! sudo_docker_login ghcr.io "${DOCKER_USER}" "${_GHCR_TOKEN}"; then
                 echo "❌ Failed to login to GHCR. Check credentials and network." >&2
                 exit 1
               fi
