@@ -1,28 +1,23 @@
 import type { Article } from './article'
-import type { Subsection } from './subsection'
 
-// Section 章节
-export class Section {
-  moduleCode: string
+export class Subsection {
   id: string
+  sectionCode: string
   title: string
   code: string
-  subsections: Subsection[]
   articles: Article[]
 
   constructor(data: {
-    moduleCode: string
     id: string
+    sectionCode: string
     title: string
     code: string
-    subsections?: Subsection[]
     articles?: Article[]
   }) {
-    this.moduleCode = data.moduleCode
     this.id = data.id
+    this.sectionCode = data.sectionCode
     this.title = data.title
     this.code = data.code
-    this.subsections = data.subsections || []
     this.articles = data.articles || []
   }
 }

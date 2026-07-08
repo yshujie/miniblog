@@ -174,6 +174,15 @@ func (b *sectionBiz) Delete(ctx context.Context, code string) error {
 		return errno.ErrSectionNotFound
 	}
 
+	// 检查是否存在关联的 subsections
+	subsections, err := b.ds.Subsections().GetSubsections(code)
+	if err != nil {
+		return err
+	}
+	if len(subsections) > 0 {
+		return errno.ErrSectionHasSubsections
+	}
+
 	// 检查是否存在关联的 articles
 	filter := map[string]interface{}{"section_code": code}
 	articles, err := b.ds.Articles().GetList(filter, 1, 1)

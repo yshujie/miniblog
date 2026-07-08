@@ -19,7 +19,7 @@
   <!-- 正常内容 -->
   <BlogLayout v-else>
     <template #sidebar>
-      <Sidebar :sections="sections" :moduleCode="moduleCode" />
+      <Sidebar :sections="sections" :moduleCode="moduleCode" :moduleTitle="moduleTitle" />
     </template>
     <template #main>
       <ExternalArticleCard :articleId="chosenArticleId" />
@@ -56,6 +56,10 @@ const moduleCode = computed(() => {
   return moduleStore.currentModule?.code || ''
 })
 
+const moduleTitle = computed(() => {
+  return moduleStore.currentModule?.title || ''
+})
+
 // 计算属性 chosenArticleId
 const chosenArticleId = computed(() => {
   return queryArticleId()
@@ -86,7 +90,6 @@ async function setCurrentModule(moduleCode: string) {
     
     // 先确保模块列表已加载
     if (moduleStore.modules.length === 0) {
-      console.log('⏳ 加载模块列表...')
       await moduleStore.loadModules()
     }
     
@@ -101,13 +104,11 @@ async function setCurrentModule(moduleCode: string) {
     
     // 如果模块存在但没有详细信息，加载详细信息
     if (!module.sections || module.sections.length === 0) {
-      console.log(`⏳ 加载模块 "${moduleCode}" 的详细信息...`)
       await moduleStore.loadModuleDetail(moduleCode)
       module = moduleStore.getModuleByCode(moduleCode)!
     }
-    
+
     moduleStore.setCurrentModule(module)
-    console.log(`✅ 成功设置当前模块: ${module.title} (${module.code})`)
     isLoading.value = false
   } catch (error) {
     console.error(`❌ 设置模块失败:`, error)
@@ -129,7 +130,6 @@ function queryModuleCode() {
 function queryArticleId(): string | null {
   const articleId = route.params.article as string
   if (!articleId) {
-    console.log('articleId is not found')
     return null
   }
   return articleId
@@ -138,19 +138,13 @@ function queryArticleId(): string | null {
 </script>
 
 <style scoped>
-.loading-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  background-color: #f5f5f5;
-}
-
+.loading-container,
 .error-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  background-color: #f5f5f5;
+  height: 100%;
+  min-height: 320px;
+  background-color: var(--card-bg);
 }
 </style>

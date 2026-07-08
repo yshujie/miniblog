@@ -63,4 +63,16 @@ var (
 
 	// ErrSectionHasArticles 章节下存在关联的 article，不能删除
 	ErrSectionHasArticles = &Errno{HTTP: 400, Code: "ErrSectionHasArticles", Message: "章节下存在文章，不能删除"}
+
+	// ErrSubsectionAlreadyExists subsection 已存在
+	ErrSubsectionAlreadyExists = &Errno{HTTP: 400, Code: "ErrSubsectionAlreadyExists", Message: "子章节已存在"}
+
+	// ErrSubsectionNotFound subsection 不存在
+	ErrSubsectionNotFound = &Errno{HTTP: 404, Code: "ErrSubsectionNotFound", Message: "子章节不存在"}
+
+	// ErrSectionHasSubsections 章节下存在子章节，不能删除
+	ErrSectionHasSubsections = &Errno{HTTP: 400, Code: "ErrSectionHasSubsections", Message: "章节下存在子章节，不能删除"}
+
+	// ErrSubsectionHasArticles 子章节下存在文章，不能删除
+	ErrSubsectionHasArticles = &Errno{HTTP: 400, Code: "ErrSubsectionHasArticles", Message: "子章节下存在文章，不能删除"}
 )

@@ -38,7 +38,7 @@
 
 /* blog / page theme: one source of truth for layout and accent */
 :root {
-  --page-bg: #f5f5f5;
+  --page-bg: #ffffff;
   --card-bg: #ffffff;
   --zone-bg: #fafafa;
   /* Header / Sidebar 等分区背景，与主内容区形成轻微分割 */
@@ -51,10 +51,22 @@
   --text-muted: #9ca3af;
   --accent: rgb(250, 137, 25);
   --accent-hover: rgb(225, 115, 15);
-  /* Sidebar 悬停/选中背景，与主题色相配 */
-  --sidebar-hover-bg: rgba(250, 137, 25, 0.08);
-  --sidebar-active-bg: rgba(250, 137, 25, 0.14);
+  /* Sidebar：文档式极简导航 */
+  --sidebar-bg: #f7f8fa;
+  --sidebar-width: 18.5rem;
+  --sidebar-divider: #e8eaed;
+  --sidebar-text: #646a73;
+  --sidebar-text-hover: #1f2329;
+  --sidebar-section-text: #1f2329;
+  --sidebar-active-color: #00b894;
+  --sidebar-hover-bg: rgba(0, 0, 0, 0.04);
+  --sidebar-active-bg: transparent;
   --header-footer-bg: #ffffff;
+  --blog-header-height: 3.5rem;
+  --blog-header-bg: #ffffff;
+  --blog-header-border: #eef0f3;
+  --blog-header-text: #646a73;
+  --blog-header-active: #00b894;
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
   --radius-md: 0.75rem;

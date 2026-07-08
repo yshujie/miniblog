@@ -56,12 +56,30 @@
           placeholder="选择章节"
           class="section-select"
           :disabled="!sections.length"
+          @change="handleSectionChange"
         >
           <el-option
             v-for="section in sections"
             :key="section.code"
             :label="section.title"
             :value="section.code"
+          />
+        </el-select>
+      </el-form-item>
+
+      <el-form-item label="所属子章节" prop="subsection_code">
+        <el-select
+          v-model="postForm.subsection_code"
+          placeholder="可选，不选则直接挂在章节下"
+          class="subsection-select"
+          clearable
+          :disabled="!postForm.section_code"
+        >
+          <el-option
+            v-for="subsection in subsections"
+            :key="subsection.code"
+            :label="subsection.title"
+            :value="subsection.code"
           />
         </el-select>
       </el-form-item>
@@ -95,6 +113,7 @@ import { fetchArticle, createArticle, updateArticle, publishArticle, unpublishAr
 import useModuleStore from '@/store/modules/module';
 import type { ModuleItem } from '@/store/modules/module';
 import useSectionStore, { type SectionItem } from '@/store/modules/section';
+import useSubsectionStore, { type SubsectionItem } from '@/store/modules/subsection';
 
 interface ArticleFormState {
   id: string | number;
@@ -103,6 +122,7 @@ interface ArticleFormState {
   author: string;
   module_code: string;
   section_code: string;
+  subsection_code: string;
   tags: string[];
   external_link: string;
   content: string;
@@ -128,11 +148,13 @@ const router = useRouter();
 
 const moduleStore = useModuleStore();
 const sectionStore = useSectionStore();
+const subsectionStore = useSubsectionStore();
 
 const formRef = ref<FormInstance>();
 const loading = ref(false);
 const modules = computed<ModuleItem[]>(() => moduleStore.modules);
 const sections = computed<SectionItem[]>(() => sectionStore.getSectionsByModule(postForm.module_code));
+const subsections = computed<SubsectionItem[]>(() => subsectionStore.getSubsectionsBySection(postForm.section_code));
 
 const postForm = reactive<ArticleFormState>({
   id: '',
@@ -141,6 +163,7 @@ const postForm = reactive<ArticleFormState>({
   author: '',
   module_code: '',
   section_code: '',
+  subsection_code: '',
   tags: [],
   external_link: '',
   content: ''
@@ -205,9 +228,23 @@ const loadModules = async () => {
   }
 };
 
+const loadSubsections = async (sectionCode: string) => {
+  if (!sectionCode) {
+    postForm.subsection_code = '';
+    return;
+  }
+  try {
+    await subsectionStore.fetchSubsections(sectionCode);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '加载子章节失败';
+    ElMessage.error(message);
+  }
+};
+
 const loadSections = async (moduleCode: string) => {
   if (!moduleCode) {
     postForm.section_code = '';
+    postForm.subsection_code = '';
     return;
   }
   try {
@@ -243,9 +280,13 @@ const loadArticle = async () => {
     postForm.content = article.content || '';
     postForm.module_code = article.module?.code || '';
     postForm.section_code = article.section?.code || '';
+    postForm.subsection_code = article.subsection?.code || '';
 
     if (postForm.module_code) {
       await loadSections(postForm.module_code);
+    }
+    if (postForm.section_code) {
+      await loadSubsections(postForm.section_code);
     }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '加载文章详情失败';
@@ -256,6 +297,12 @@ const loadArticle = async () => {
 const handleModuleChange = async (moduleCode: string) => {
   await loadSections(moduleCode);
   postForm.section_code = '';
+  postForm.subsection_code = '';
+};
+
+const handleSectionChange = async (sectionCode: string) => {
+  postForm.subsection_code = '';
+  await loadSubsections(sectionCode);
 };
 
 const submit = async (handler: () => Promise<void>) => {
@@ -344,7 +391,8 @@ onMounted(async () => {
 
 .tag-select,
 .module-select,
-.section-select {
+.section-select,
+.subsection-select {
   width: 320px;
 }
 

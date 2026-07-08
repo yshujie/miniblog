@@ -13,8 +13,9 @@ type Article struct {
 	Title        string    `json:"title"`
 	Content      string    `json:"content"`
 	ExternalLink string    `json:"external_link"`
-	SectionCode  string    `json:"section_code"`
-	Author       string    `json:"author"`
+	SectionCode    string    `json:"section_code"`
+	SubsectionCode string    `json:"subsection_code"`
+	Author         string    `json:"author"`
 	Tags         string    `json:"tags"`
 	Pos          int       `json:"pos"`
 	Status       int       `json:"status"`

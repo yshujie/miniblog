@@ -1,45 +1,58 @@
 import http from '@/util/http'
 import { Module } from '../types/module'
 import { Article } from '../types/article'
+import { Section } from '../types/section'
+import { Subsection } from '../types/subsection'
+
+function mapArticle(article: any): Article {
+  return new Article({
+    id: String(article.id),
+    sectionCode: article.section_code,
+    subsectionCode: article.subsection_code,
+    title: article.title,
+    author: article.author,
+    content: article.content,
+    externalLink: article.external_link,
+    tags: article.tags,
+    pos: article.pos || 0,
+    createdAt: article.created_at,
+    updatedAt: article.updated_at,
+  })
+}
+
+function mapSubsection(subsection: any): Subsection {
+  return new Subsection({
+    id: String(subsection.id),
+    sectionCode: subsection.section_code,
+    title: subsection.title,
+    code: subsection.code,
+    articles: subsection.articles?.map(mapArticle) || [],
+  })
+}
+
+function mapSection(section: any): Section {
+  return new Section({
+    id: String(section.id),
+    moduleCode: section.module_code,
+    title: section.title,
+    code: section.code,
+    subsections: section.subsections?.map(mapSubsection) || [],
+    articles: section.articles?.map(mapArticle) || [],
+  })
+}
 
 // fetchModuleDetail 获取模块详情
 export async function fetchModuleDetail(moduleCode: string): Promise<Module> {
-  console.log('fetchModuleDetail', moduleCode)
   const { payload } = await http.get<{ module_detail: any }>(`/blog/moduleDetail?module_code=${moduleCode}`)
-  console.log('payload', payload)
-  const module = new Module({
+  return new Module({
     ...payload.module_detail,
     id: String(payload.module_detail.id),
-    sections: payload.module_detail.sections?.map((section: any) => ({
-      ...section,
-      id: String(section.id),
-      articles: section.articles?.map((article: any) => ({
-        ...article,
-        id: String(article.id),
-        pos: article.pos || 0
-      }))
-    }))
+    sections: payload.module_detail.sections?.map(mapSection) || [],
   })
-
-  console.log('module', module)
-  return module
 }
 
 // fetchArticleDetail 获取文章详情
 export async function fetchArticleDetail(articleID: string): Promise<Article> {
-  console.log('fetchArticleDetail', articleID)
   const { payload } = await http.get<{ article_detail: any }>(`/blog/articleDetail?article_id=${articleID}`)
-  console.log('payload', payload)
-  return new Article({
-    id: String(payload.article_detail.id),
-    sectionCode: payload.article_detail.section_code,
-    title: payload.article_detail.title,
-    author: payload.article_detail.author,
-    content: payload.article_detail.content,
-    externalLink: payload.article_detail.external_link,
-    tags: payload.article_detail.tags,
-    pos: payload.article_detail.pos,
-    createdAt: payload.article_detail.created_at,
-    updatedAt: payload.article_detail.updated_at,
-  })
+  return mapArticle(payload.article_detail)
 }

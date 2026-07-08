@@ -1,7 +1,7 @@
 <template>
-  <div class="article-container">
+  <div ref="containerRef" class="article-container">
     <div v-show="!hasArticle" class="no-article-card">
-      <el-empty description=" " />
+      <el-empty description="请选择一篇文章" />
     </div>
 
     <div v-show="hasArticle" class="article-card">
@@ -9,90 +9,62 @@
         <iframe
           :key="currentArticle?.externalLink"
           :src="currentArticle?.externalLink"
-          ref="articleFrame"
           frameborder="0"
           class="article-iframe"
-        ></iframe>
+          title="文章内容"
+        />
       </div>
     </div>
   </div>
 </template>
+
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted } from 'vue'
+import { computed, ref, watch, onUnmounted, nextTick } from 'vue'
 import { Article } from '@/types/article'
 import { fetchArticleDetail } from '@/api/blog'
 import { ElLoading } from 'element-plus'
-// 组件 props
-const props = defineProps<{ articleId: string|null }>()
 
-// 当前文章
+const props = defineProps<{ articleId: string | null }>()
+
+const containerRef = ref<HTMLElement | null>(null)
 const currentArticle = ref<Article | null>(null)
 
-// loading 实例
-let loadingInstance: any = null
+let loadingInstance: ReturnType<typeof ElLoading.service> | null = null
 
-// 计算属性：hasArticle
 const hasArticle = computed(() => {
-  const hasData = currentArticle.value !== null && 
-                  currentArticle.value?.externalLink && 
-                  currentArticle.value.externalLink.trim() !== ''
-  console.log('🔍 hasArticle 计算:', { 
-    currentArticle: currentArticle.value, 
-    hasData,
-    externalLink: currentArticle.value?.externalLink 
-  })
-  return hasData
+  return Boolean(
+    currentArticle.value?.externalLink &&
+    currentArticle.value.externalLink.trim() !== ''
+  )
 })
 
-// iframe 引用
-const articleFrame = ref<HTMLIFrameElement | null>(null)
-
-// 监听外部链接变化
-watch(() => currentArticle.value?.externalLink, (val) => {
-  console.log('watch currentArticle.value?.externalLink: ', val)
-  if (val && articleFrame.value) {
-    articleFrame.value.onload = () => {
-      console.log('✅ iframe 加载成功')
+watch(
+  () => props.articleId,
+  async (newId) => {
+    if (newId !== currentArticle.value?.id) {
+      await fetchCurrentArticle(newId)
     }
-  }
-})
+  },
+  { immediate: true }
+)
 
-watch(() => props.articleId, async (newId, oldId) => {
-  console.log('👀 watch articleId 变化:', { newId, oldId, currentId: currentArticle.value?.id })
-  if (newId !== currentArticle.value?.id) {
-    await fetchCurrentArticle(newId)
-  }
-}, { immediate: true })
-
-// 组件卸载时清理 loading
 onUnmounted(() => {
   hideLoading()
 })
 
-// 获取文章详情
 async function fetchCurrentArticle(articleId: string | null) {
   try {
+    await nextTick()
     showLoading()
-    
+
     if (!articleId) {
-      console.log('📝 articleId 为空，清空当前文章')
       currentArticle.value = null
       return
     }
 
-    console.log('🔄 开始获取文章详情，articleId:', articleId)
     const article = await fetchArticleDetail(articleId)
-    
-    if (!article) {
-      console.log('❌ 获取文章详情失败')
-      currentArticle.value = null
-      return
-    }
-
-    console.log('✅ 获取文章详情成功:', article)
-    currentArticle.value = article
-  } catch (error) {
-    console.error('❌ 获取文章详情异常:', error)
+    currentArticle.value = article ?? null
+  } catch {
     currentArticle.value = null
   } finally {
     hideLoading()
@@ -100,113 +72,49 @@ async function fetchCurrentArticle(articleId: string | null) {
 }
 
 function showLoading() {
-  // 如果已有 loading 实例，先关闭
   if (loadingInstance) {
     loadingInstance.close()
   }
-  
+
   loadingInstance = ElLoading.service({
-    lock: true,
+    target: containerRef.value ?? undefined,
     text: '正在加载文章内容...',
   })
 }
 
 function hideLoading() {
-  if (loadingInstance) {
-    loadingInstance.close()
-    loadingInstance = null
-  }
+  loadingInstance?.close()
+  loadingInstance = null
 }
-
-// 滚动到顶部
-// 注意：由于跨域限制，无法直接控制 iframe 内部滚动
-// 我们尝试多种方法，如果都失败则滚动主窗口
-const scrollToTop = () => {
-  if (!articleFrame.value) {
-    return
-  }
-
-  // 方法1: 尝试使用 postMessage 与 iframe 通信（适用于跨域场景）
-  // 注意：这需要 iframe 内容支持监听 message 事件
-  try {
-    const iframeWindow = articleFrame.value.contentWindow
-    if (iframeWindow) {
-      iframeWindow.postMessage({ 
-        type: 'scrollToTop',
-        behavior: 'smooth'
-      }, '*')
-    }
-  } catch (e) {
-    // postMessage 失败，静默处理
-  }
-
-  // 方法2: 尝试直接访问 iframe 内部（仅同源时可用）
-  // 使用安全的访问方式，避免抛出未捕获的错误
-  let canAccessIframe = false
-  try {
-    const iframeWindow = articleFrame.value.contentWindow
-    if (iframeWindow) {
-      // 尝试访问 contentDocument，跨域时会返回 null 或抛出错误
-      const iframeDoc = articleFrame.value.contentDocument
-      if (iframeDoc) {
-        canAccessIframe = true
-        // 同源，可以直接控制滚动
-        if (iframeWindow.scrollTo) {
-          iframeWindow.scrollTo({ top: 0, behavior: 'smooth' })
-          return
-        }
-        
-        // 备用方法：直接设置 scrollTop
-        const iframeHtml = iframeDoc.documentElement
-        const iframeBody = iframeDoc.body
-        if (iframeHtml) iframeHtml.scrollTop = 0
-        if (iframeBody) iframeBody.scrollTop = 0
-        if (iframeWindow.scroll) iframeWindow.scroll(0, 0)
-        return
-      }
-    }
-  } catch (e) {
-    // 跨域限制，无法访问 iframe 内部
-    // 这是预期的行为，不需要处理
-    canAccessIframe = false
-  }
-
-  // 方法3: 作为备选，滚动主窗口
-  // 对于跨域 iframe，这是唯一可行的方式
-  // 虽然不能滚动 iframe 内部，但至少可以滚动页面本身
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
 </script>
+
 <style scoped lang="less">
 .article-container {
   width: 100%;
   height: 100%;
+  min-height: 0;
 }
 
 .no-article-card {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 400px;
-  padding: 2rem;
+  height: 100%;
+  min-height: 320px;
 }
 
 .article-card {
   height: 100%;
-  padding: 2rem;
-
-  @media (min-width: 768px) {
-    padding: 1rem 2em;
-  }
+  padding: 0;
 
   .article-card-content {
     width: 100%;
     height: 100%;
     position: relative;
     overflow: hidden;
+    background: var(--card-bg);
 
-    // 增加 40px 高的遮蔽，用于防止
+    // 遮挡 Notion 嵌入页右上角操作按钮
     &::before {
       content: '';
       position: absolute;
@@ -214,8 +122,11 @@ const scrollToTop = () => {
       left: 0;
       width: 50%;
       height: 40px;
-      background: rgba(0, 0, 0, 0);
+      background: transparent;
+      z-index: 1;
+      pointer-events: none;
     }
+
     &::after {
       content: '';
       position: absolute;
@@ -223,9 +134,10 @@ const scrollToTop = () => {
       right: 0;
       width: 50%;
       height: 40px;
-      background: #ffffff;
+      background: var(--card-bg);
+      z-index: 1;
+      pointer-events: none;
     }
-
 
     .article-iframe {
       width: 100%;
@@ -234,6 +146,5 @@ const scrollToTop = () => {
       display: block;
     }
   }
-
 }
 </style>

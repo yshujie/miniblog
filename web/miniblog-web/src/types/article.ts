@@ -2,6 +2,7 @@
 export class Article {
   id: string
   sectionCode: string
+  subsectionCode: string
   title: string
   content: string
   externalLink: string
@@ -14,6 +15,7 @@ export class Article {
   constructor(data: {
     id: string
     sectionCode: string
+    subsectionCode?: string
     title: string
     externalLink: string
     author: string
@@ -25,6 +27,7 @@ export class Article {
   }) {
     this.id = data.id
     this.sectionCode = data.sectionCode
+    this.subsectionCode = data.subsectionCode || ''
     this.title = data.title
     this.author = data.author
     this.externalLink = data.externalLink

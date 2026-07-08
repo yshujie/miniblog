@@ -55,8 +55,9 @@ type fakeArticleBizStore struct {
 func (f *fakeArticleBizStore) DB() *gorm.DB                 { return nil }
 func (f *fakeArticleBizStore) Users() store.UserStore       { return nil }
 func (f *fakeArticleBizStore) Modules() store.ModuleStore   { return nil }
-func (f *fakeArticleBizStore) Sections() store.SectionStore { return nil }
-func (f *fakeArticleBizStore) Articles() store.ArticleStore { return f.articles }
+func (f *fakeArticleBizStore) Sections() store.SectionStore     { return nil }
+func (f *fakeArticleBizStore) Subsections() store.SubsectionStore { return nil }
+func (f *fakeArticleBizStore) Articles() store.ArticleStore   { return f.articles }
 
 func TestArticleBizPublish(t *testing.T) {
 	fakeStore := &fakeArticleBizStore{articles: newFakeArticleStore()}

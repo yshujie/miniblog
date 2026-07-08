@@ -32,12 +32,23 @@ type ModuleDetail struct {
 
 // SectionDetail 章节详情
 type SectionDetail struct {
-	ID         uint64           `json:"id,string"`
-	Code       string           `json:"code"`
-	Title      string           `json:"title"`
-	Sort       int              `json:"sort"`
-	ModuleCode string           `json:"module_code"`
-	Articles   []*ArticleDetail `json:"articles"`
+	ID          uint64              `json:"id,string"`
+	Code        string              `json:"code"`
+	Title       string              `json:"title"`
+	Sort        int                 `json:"sort"`
+	ModuleCode  string              `json:"module_code"`
+	Subsections []*SubsectionDetail `json:"subsections"`
+	Articles    []*ArticleDetail    `json:"articles"`
+}
+
+// SubsectionDetail 子章节详情
+type SubsectionDetail struct {
+	ID          uint64           `json:"id,string"`
+	Code        string           `json:"code"`
+	Title       string           `json:"title"`
+	Sort        int              `json:"sort"`
+	SectionCode string           `json:"section_code"`
+	Articles    []*ArticleDetail `json:"articles"`
 }
 
 // ArticleDetail 文章详情
@@ -45,9 +56,10 @@ type ArticleDetail struct {
 	ID           uint64    `json:"id,string"`
 	Title        string    `json:"title"`
 	Content      string    `json:"content"`
-	ExternalLink string    `json:"external_link"`
-	SectionCode  string    `json:"section_code"`
-	Author       string    `json:"author"`
+	ExternalLink   string    `json:"external_link"`
+	SectionCode    string    `json:"section_code"`
+	SubsectionCode string    `json:"subsection_code"`
+	Author         string    `json:"author"`
 	Tags         []string  `json:"tags"`
 	Pos          int       `json:"pos"`
 	CreatedAt    time.Time `json:"created_at"`

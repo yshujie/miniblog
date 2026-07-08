@@ -46,11 +46,9 @@ func (b *blogBiz) GetModuleList() (*v1.GetModuleListResponse, error) {
 	return response, nil
 }
 
-// Create 创建用户
 func (b *blogBiz) GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModuleDetailResponse, error) {
 	log.Infow("start to get module detail in biz layer", "moduleCode", req.ModuleCode)
 
-	// 获取模块
 	module, _ := b.ds.Modules().GetByCode(req.ModuleCode)
 	moduleDetail := &v1.ModuleDetail{
 		ID:    module.ID,
@@ -58,7 +56,6 @@ func (b *blogBiz) GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModule
 		Title: module.Title,
 	}
 
-	// 获取章节列表
 	sections, _ := b.ds.Sections().GetNormalSections(req.ModuleCode)
 	for _, section := range sections {
 		sectionDetail := &v1.SectionDetail{
@@ -69,26 +66,44 @@ func (b *blogBiz) GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModule
 			Title:      section.Title,
 		}
 
-		// 获取文章列表
-		filter := map[string]interface{}{
+		subsections, _ := b.ds.Subsections().GetNormalSubsections(section.Code)
+		for _, subsection := range subsections {
+			subsectionDetail := &v1.SubsectionDetail{
+				ID:          subsection.ID,
+				Code:        subsection.Code,
+				Sort:        subsection.Sort,
+				SectionCode: subsection.SectionCode,
+				Title:       subsection.Title,
+			}
+
+			filter := map[string]interface{}{
+				"section_code":    section.Code,
+				"subsection_code": subsection.Code,
+				"status":          model.ArticleStatusPublished,
+			}
+			articles, _ := b.ds.Articles().GetList(filter, 1, 100)
+			for _, article := range articles {
+				subsectionDetail.Articles = append(subsectionDetail.Articles, toBlogArticleDetail(article))
+			}
+
+			sectionDetail.Subsections = append(sectionDetail.Subsections, subsectionDetail)
+		}
+
+		sectionFilter := map[string]interface{}{
 			"section_code": section.Code,
 			"status":       model.ArticleStatusPublished,
 		}
-		articles, _ := b.ds.Articles().GetList(filter, 1, 100)
-		for _, article := range articles {
-			articleDetail := &v1.ArticleDetail{
-				ID:          article.ID,
-				Title:       article.Title,
-				SectionCode: article.SectionCode,
-				Author:      article.Author,
+		sectionArticles, _ := b.ds.Articles().GetList(sectionFilter, 1, 100)
+		for _, article := range sectionArticles {
+			if article.SubsectionCode != "" {
+				continue
 			}
-			sectionDetail.Articles = append(sectionDetail.Articles, articleDetail)
+			sectionDetail.Articles = append(sectionDetail.Articles, toBlogArticleDetail(article))
 		}
 
 		moduleDetail.Sections = append(moduleDetail.Sections, sectionDetail)
 	}
 
-	// 返回模块详情
 	return &v1.GetModuleDetailResponse{
 		ModuleDetail: moduleDetail,
 	}, nil
@@ -97,22 +112,32 @@ func (b *blogBiz) GetModuleDetail(req *v1.GetModuleDetailRequest) (*v1.GetModule
 func (b *blogBiz) GetArticleDetail(req *v1.GetArticleDetailRequest) (*v1.GetArticleDetailResponse, error) {
 	log.Infow("start to get article detail in biz layer", "articleID", req.ArticleID)
 
-	// 获取文章
 	article, _ := b.ds.Articles().GetOne(uint64(req.ArticleID))
 	articleDetail := &v1.ArticleDetail{
-		ID:           article.ID,
-		Title:        article.Title,
-		Content:      article.Content,
-		ExternalLink: article.ExternalLink,
-		SectionCode:  article.SectionCode,
-		Author:       article.Author,
-		Tags:         strings.Split(article.Tags, ","),
-		Pos:          article.Pos,
-		CreatedAt:    article.CreatedAt,
-		UpdatedAt:    article.UpdatedAt,
+		ID:             article.ID,
+		Title:          article.Title,
+		Content:        article.Content,
+		ExternalLink:   article.ExternalLink,
+		SectionCode:    article.SectionCode,
+		SubsectionCode: article.SubsectionCode,
+		Author:         article.Author,
+		Tags:           strings.Split(article.Tags, ","),
+		Pos:            article.Pos,
+		CreatedAt:      article.CreatedAt,
+		UpdatedAt:      article.UpdatedAt,
 	}
 
 	return &v1.GetArticleDetailResponse{
 		ArticleDetail: articleDetail,
 	}, nil
+}
+
+func toBlogArticleDetail(article *model.Article) *v1.ArticleDetail {
+	return &v1.ArticleDetail{
+		ID:             article.ID,
+		Title:          article.Title,
+		SectionCode:    article.SectionCode,
+		SubsectionCode: article.SubsectionCode,
+		Author:         article.Author,
+	}
 }

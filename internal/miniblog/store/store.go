@@ -18,6 +18,7 @@ type IStore interface {
 	Users() UserStore
 	Modules() ModuleStore
 	Sections() SectionStore
+	Subsections() SubsectionStore
 	Articles() ArticleStore
 }
 
@@ -54,6 +55,10 @@ func (s *datastore) Modules() ModuleStore {
 // Section 返回一个实现了 SectionStore 接口的实例
 func (s *datastore) Sections() SectionStore {
 	return newSections(s.db)
+}
+
+func (s *datastore) Subsections() SubsectionStore {
+	return newSubsections(s.db)
 }
 
 // Article 返回一个实现了 ArticleStore 接口的实例

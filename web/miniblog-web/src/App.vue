@@ -14,7 +14,8 @@
       :class="{ 'blog-layout-page': isBlogPage }"
     >
       <!-- 头部导航栏 -->
-      <Header class="header-bar" v-if="needHeader" />
+      <BlogHeader v-if="isBlogPage" class="header-bar" />
+      <Header v-else-if="needHeader" class="header-bar" />
 
       <!-- 主体内容 -->
       <el-main
@@ -36,6 +37,7 @@
 
 <script setup lang="ts">
 import Header from './components/Header.vue'
+import BlogHeader from './components/blog/BlogHeader.vue'
 import Footer from './components/Footer.vue'
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
@@ -55,12 +57,12 @@ const needFooter = computed(() => {
 })
 
 const fullScreen = computed(() => {
+  if (isBlogPage.value) return false
   return !needHeader.value && !needFooter.value
 })
 
-// 判断是否是博客页面
 const isBlogPage = computed(() => {
-  return route.path.startsWith('/blog/')
+  return route.path.startsWith('/blog')
 })
 
 // 阅读进度
@@ -119,7 +121,7 @@ onUnmounted(() => {
 
   .reading-progress-bar {
     height: 100%;
-    background: var(--accent);
+    background: var(--blog-header-active);
     transition: width 0.2s ease-out;
   }
 }

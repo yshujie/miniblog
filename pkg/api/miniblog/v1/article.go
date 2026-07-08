@@ -4,8 +4,9 @@ package v1
 type CreateArticleRequest struct {
 	Title        string   `json:"title" valid:"required,stringlength(1|255)"`
 	ModuleCode   string   `json:"module_code" valid:"required,stringlength(1|255)"`
-	SectionCode  string   `json:"section_code" valid:"required,stringlength(1|255)"`
-	Author       string   `json:"author" valid:"required,stringlength(1|255)"`
+	SectionCode    string   `json:"section_code" valid:"required,stringlength(1|255)"`
+	SubsectionCode string   `json:"subsection_code" valid:"optional,stringlength(1|128)"`
+	Author         string   `json:"author" valid:"required,stringlength(1|255)"`
 	Tags         []string `json:"tags" valid:"required"`
 	ExternalLink string   `json:"external_link" valid:"required"`
 }
@@ -17,16 +18,18 @@ type UpdateArticleRequest struct {
 	Author       string   `json:"author" valid:"required,stringlength(1|255)"`
 	Tags         []string `json:"tags" valid:"required"`
 	ModuleCode   string   `json:"module_code" valid:"required"`
-	SectionCode  string   `json:"section_code" valid:"required"`
-	Content      string   `json:"content" valid:"required"`
-	ExternalLink string   `json:"external_link" valid:"required"`
+	SectionCode    string   `json:"section_code" valid:"required"`
+	Content        string   `json:"content" valid:"required"`
+	ExternalLink   string   `json:"external_link" valid:"required"`
+	SubsectionCode string   `json:"subsection_code" valid:"optional"`
 }
 
 // ArticleListRequest 文章列表请求
 type ArticleListRequest struct {
 	ModuleCode  string `form:"module_code" valid:"required,stringlength(1|255)"`
-	SectionCode string `form:"section_code" valid:"required,stringlength(1|255)"`
-	Page        int    `form:"page" valid:"required,numeric"`
+	SectionCode    string   `form:"section_code" valid:"required,stringlength(1|255)"`
+	SubsectionCode string   `form:"subsection_code" valid:"optional,stringlength(1|128)"`
+	Page           int      `form:"page" valid:"required,numeric"`
 	Limit       int    `form:"limit" valid:"required,numeric"`
 }
 
@@ -53,8 +56,9 @@ type ArticleInfo struct {
 	Content      string      `json:"content"`
 	ExternalLink string      `json:"external_link"`
 	Module       ModuleInfo  `json:"module"`
-	Section      SectionInfo `json:"section"`
-	Author       string      `json:"author"`
+	Section      SectionInfo    `json:"section"`
+	Subsection   *SubsectionInfo `json:"subsection,omitempty"`
+	Author       string         `json:"author"`
 	Tags         []string    `json:"tags"`
 	Pos          int         `json:"pos"`
 	Status       string      `json:"status"`

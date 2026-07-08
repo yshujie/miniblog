@@ -7,6 +7,7 @@ import (
 	blogCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/blog"
 	moduleCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/module"
 	sectionCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/section"
+	subsectionCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/subsection"
 	userCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/user"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/core"
@@ -42,6 +43,7 @@ func installRouters(g *gin.Engine) error {
 	uc := userCtrl.New(store.S, authz)
 	mc := moduleCtrl.New(store.S)
 	sc := sectionCtrl.New(store.S)
+	ssc := subsectionCtrl.New(store.S)
 	arCtrl := articleCtrl.New(store.S)
 
 	// 创建 v1 路由组
@@ -100,6 +102,18 @@ func installRouters(g *gin.Engine) error {
 				sectionsv1.PUT(":code/publish", sc.Publish)     // 上架章节
 				sectionsv1.PUT(":code/unpublish", sc.Unpublish) // 下架章节
 				sectionsv1.DELETE(":code", sc.Delete)           // 删除章节（物理删除）
+			}
+
+			// subsections 路由分组
+			subsectionsv1 := adminv1.Group("/subsections")
+			{
+				subsectionsv1.POST("", ssc.Create)
+				subsectionsv1.GET(":section_code", ssc.GetList)
+				subsectionsv1.GET(":section_code/:code", ssc.GetOne)
+				subsectionsv1.PUT(":code", ssc.Update)
+				subsectionsv1.PUT(":code/publish", ssc.Publish)
+				subsectionsv1.PUT(":code/unpublish", ssc.Unpublish)
+				subsectionsv1.DELETE(":code", ssc.Delete)
 			}
 
 			// articles 路由分组

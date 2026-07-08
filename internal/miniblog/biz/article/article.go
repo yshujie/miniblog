@@ -46,15 +46,22 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 		return nil, errno.ErrSectionNotFound
 	}
 
+	if err := b.validateSubsection(r.SectionCode, r.SubsectionCode); err != nil {
+		return nil, err
+	}
+
 	// 读取 article 内容
 	content, err := loadArticleContent(r.ExternalLink, ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// 获取当前 section 下的文章列表，计算下一个 pos 值
+	// 获取当前分组下的文章列表，计算下一个 pos 值
 	filter := map[string]interface{}{
 		"section_code": r.SectionCode,
+	}
+	if r.SubsectionCode != "" {
+		filter["subsection_code"] = r.SubsectionCode
 	}
 	existingArticles, err := b.ds.Articles().GetList(filter, 1, 1000) // 获取所有文章
 	if err != nil {
@@ -75,13 +82,14 @@ func (b *articleBiz) Create(ctx context.Context, r *v1.CreateArticleRequest) (*v
 
 	// 创建文章
 	article := &model.Article{
-		Title:        r.Title,
-		Content:      content,
-		ExternalLink: r.ExternalLink,
-		SectionCode:  r.SectionCode,
-		Author:       r.Author,
-		Tags:         strings.Join(r.Tags, ","),
-		Pos:          nextPos,
+		Title:          r.Title,
+		Content:        content,
+		ExternalLink:   r.ExternalLink,
+		SectionCode:    r.SectionCode,
+		SubsectionCode: r.SubsectionCode,
+		Author:         r.Author,
+		Tags:           strings.Join(r.Tags, ","),
+		Pos:            nextPos,
 	}
 	// 存草稿
 	article.SaveDraft()
@@ -112,11 +120,16 @@ func (b *articleBiz) Update(ctx context.Context, r *v1.UpdateArticleRequest) (*v
 	}
 
 	// 更新文章
+	if err := b.validateSubsection(r.SectionCode, r.SubsectionCode); err != nil {
+		return nil, err
+	}
+
 	article.Title = r.Title
 	article.Author = r.Author
 	article.Tags = strings.Join(r.Tags, ",")
 	article.ExternalLink = r.ExternalLink
 	article.SectionCode = r.SectionCode
+	article.SubsectionCode = r.SubsectionCode
 	article.Content = r.Content
 	// 注意：更新时不修改 pos 字段，保持原有排序
 
@@ -194,6 +207,9 @@ func (b *articleBiz) GetList(ctx context.Context, r *v1.ArticleListRequest) (*v1
 	if r.SectionCode != "" {
 		filter["section_code"] = r.SectionCode
 	}
+	if r.SubsectionCode != "" {
+		filter["subsection_code"] = r.SubsectionCode
+	}
 
 	log.Infow("GetList", "filter", filter, "page", r.Page, "limit", r.Limit)
 	articles, err := b.ds.Articles().GetList(filter, r.Page, r.Limit)
@@ -263,6 +279,22 @@ func (b *articleBiz) transformArticleInfo(article *model.Article, isSimple bool)
 		ExternalLink: article.ExternalLink,
 	}
 
+	if article.SubsectionCode != "" {
+		subsection, err := b.ds.Subsections().GetByCode(article.SubsectionCode)
+		if err != nil {
+			return nil, err
+		}
+		if subsection != nil {
+			articleInfo.Subsection = &v1.SubsectionInfo{
+				Code:        subsection.Code,
+				Title:       subsection.Title,
+				SectionCode: subsection.SectionCode,
+				Sort:        subsection.Sort,
+				Status:      subsection.Status,
+			}
+		}
+	}
+
 	if isSimple {
 		return articleInfo, nil
 	}
@@ -287,4 +319,22 @@ func (b *articleBiz) queryArticleModuleAndSection(article *model.Article) (*mode
 	}
 
 	return module, section, nil
+}
+
+func (b *articleBiz) validateSubsection(sectionCode, subsectionCode string) error {
+	if subsectionCode == "" {
+		return nil
+	}
+
+	subsection, err := b.ds.Subsections().GetByCode(subsectionCode)
+	if err != nil {
+		return err
+	}
+	if subsection == nil {
+		return errno.ErrSubsectionNotFound
+	}
+	if subsection.SectionCode != sectionCode {
+		return errno.ErrInvalidParameter.SetMessage("子章节不属于当前章节")
+	}
+	return nil
 }

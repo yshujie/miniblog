@@ -2,7 +2,7 @@
   <main class="blog-layout">
     <div class="blog-body">
       <slot name="sidebar" />
-      <article class="main-content">
+      <article class="main-content" :class="{ 'main-content-expanded': !sidebarOpen }">
         <slot name="main" />
         <div
           class="sidebar-toggle-trigger"
@@ -62,15 +62,15 @@ const toggleSidebar = () => {
   min-width: 0;
   min-height: 0;
   background: var(--card-bg);
-  border-radius: 0;
-  box-shadow: none;
-  border: none;
-  overflow-y: auto;
-  overflow-x: hidden;
-  animation: fadeIn 0.4s ease-out forwards;
+  overflow: hidden;
+  border-left: 1px solid var(--blog-header-border);
+  transition: border-color 0.25s ease;
+
+  &.main-content-expanded {
+    border-left-color: transparent;
+  }
 }
 
-/* 文章区左侧悬停显隐侧边栏按钮（大屏显示，无间隙） */
 .sidebar-toggle-trigger {
   display: none;
   position: absolute;
@@ -78,85 +78,55 @@ const toggleSidebar = () => {
   top: 50%;
   transform: translateY(-50%);
   z-index: 50;
-  pointer-events: auto;
-  width: 40px;
-  height: 80px;
+  width: 28px;
+  height: 56px;
   align-items: center;
   justify-content: center;
-  background: var(--zone-bg);
-  border: 1px solid var(--border-divider);
+  background: var(--card-bg);
+  border: 1px solid var(--sidebar-divider);
   border-left: none;
-  border-radius: 0 12px 12px 0;
+  border-radius: 0 8px 8px 0;
   cursor: pointer;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
-  opacity: 0.7;
-  transition: width 0.25s ease, opacity 0.25s ease, background 0.2s ease, box-shadow 0.25s ease;
-
-  &:hover {
-    width: 80px;
-    opacity: 1;
-    background: var(--card-bg);
-    box-shadow: 2px 0 14px rgba(0, 0, 0, 0.12);
-  }
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.04);
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.2s ease;
 
   .sidebar-toggle-icon {
-    display: block;
-    width: 100%;
-    text-align: center;
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 600;
-    color: var(--text-muted);
-    transition: color 0.2s ease;
-    white-space: nowrap;
-    overflow: hidden;
-    opacity: 0;
-    transition: opacity 0.2s ease;
+    color: var(--sidebar-text);
+    line-height: 1;
   }
 
-  &:hover .sidebar-toggle-icon {
-    opacity: 1;
-    color: var(--accent);
-  }
-
-  /* 侧栏隐藏时：按钮更醒目，方便用户点回 */
+  .main-content:hover &,
   &.sidebar-closed {
-    width: 60px;
     opacity: 1;
-    background: var(--card-bg);
-    border-color: var(--border-divider);
-    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(250, 137, 25, 0.2);
-    border-left: 3px solid var(--accent);
+  }
+
+  &:hover {
+    background: var(--sidebar-bg);
 
     .sidebar-toggle-icon {
-      opacity: 1;
-      color: var(--accent);
-      font-size: 1.625rem;
+      color: var(--blog-header-active);
     }
+  }
 
-    &:hover {
-      width: 80px;
-      box-shadow: 2px 0 16px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(250, 137, 25, 0.3);
+  &.sidebar-closed {
+    border-left: 1px solid var(--sidebar-divider);
+
+    .sidebar-toggle-icon {
+      color: var(--blog-header-active);
     }
   }
 
   &:focus-visible {
-    outline: 2px solid var(--accent);
+    opacity: 1;
+    outline: 2px solid var(--blog-header-active);
     outline-offset: 2px;
   }
 
   @media (min-width: 1280px) {
     display: flex;
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
   }
 }
 </style>

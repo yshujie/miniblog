@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import type { Module } from '@/types/module'
 import { fetchModules } from '@/api/module'
 import { Section } from '@/types/section'
+import { Subsection } from '@/types/subsection'
 import { fetchModuleDetail } from '@/api/blog'
 import { Article } from '@/types/article'
 
@@ -40,7 +41,6 @@ export const useModuleStore = defineStore('module', {
 
     // 加载所有模块详情
     async loadAllModuleDetail() {
-      console.log('in loadAllModuleDetail')
       for (const module of this.modules) {
         this.loadModuleDetail(module.code)
       }
@@ -54,6 +54,10 @@ export const useModuleStore = defineStore('module', {
         module.title = moduleDetail.title
         module.sections = moduleDetail.sections.map(section => new Section(section))
         module.sections.forEach(section => {
+          section.subsections = section.subsections.map(subsection => new Subsection(subsection))
+          section.subsections.forEach(subsection => {
+            subsection.articles = subsection.articles.map(article => new Article(article))
+          })
           section.articles = section.articles.map(article => new Article(article))
         })
       }

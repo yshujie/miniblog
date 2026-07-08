@@ -66,6 +66,21 @@ export const asyncRoutes: RouteRecordRaw[] = [
     ]
   },
   {
+    path: '/subsection',
+    component: Layout,
+    redirect: '/subsection/list',
+    name: 'Subsection',
+    meta: { title: '子章节管理', icon: 'list', roles: ['admin'] },
+    children: [
+      {
+        path: 'list',
+        component: () => import('@/views/subsection/index.vue'),
+        name: 'SubsectionList',
+        meta: { title: '子章节列表', icon: 'list' }
+      }
+    ]
+  },
+  {
     path: '/article',
     component: Layout,
     redirect: '/article/list',
@@ -94,7 +109,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
   }
 ];
 
-const dynamicRouteNames = ['Article', 'ArticleList', 'CreateArticle', 'EditArticle', 'Module', 'ModuleList', 'Section', 'SectionList'];
+const dynamicRouteNames = ['Article', 'ArticleList', 'CreateArticle', 'EditArticle', 'Module', 'ModuleList', 'Section', 'SectionList', 'Subsection', 'SubsectionList'];
 
 const createTheRouter = (): Router => createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
