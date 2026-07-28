@@ -103,12 +103,14 @@ if ($http_origin ~* "^https://(www|admin)\.yangshujie\.com$") {
 
 ## 🔄 部署步骤
 
-### 方法 1：通过 Jenkins 自动部署（推荐）
+### 方法 1：通过 GitHub Actions 发布应用
 
 1. 提交代码到 Git
-2. Jenkins 自动构建
-3. Nginx 配置文件自动更新到服务器
-4. 重启 Nginx
+2. `.github/workflows/cicd.yml` 自动构建并部署到 ServerD
+3. workflow 在部署成功后重新加载 ServerA 上已有的 Nginx 配置
+
+注意：当前 workflow 不会上传新的 Nginx 配置文件。修改 Nginx 配置时，仍需先按下面的
+手动步骤将配置部署到 ServerA，并在 reload 前执行 `nginx -t`。
 
 ### 方法 2：手动部署
 

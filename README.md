@@ -253,7 +253,7 @@ make logs-infra          # 查看基础设施日志
 
 更多 API 详情请参考 `api/openapi/openapi.yaml` 文档。
 
-数据库维护、批量文章导入、密码重置以及 Jenkins 兼容脚本的执行方式见
+数据库维护、批量文章导入、密码重置以及 GitHub Actions 数据库操作的执行方式见
 [`scripts/README.md`](scripts/README.md)。
 
 ## 如何贡献

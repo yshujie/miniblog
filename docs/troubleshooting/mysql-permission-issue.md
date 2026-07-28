@@ -2,7 +2,7 @@
 
 ## 问题描述
 
-在 Jenkins CI/CD 流程中执行 DB Init 时，遇到以下错误：
+执行 GitHub Actions `DB Operations (manual)` 的 DB Init 时，曾遇到以下错误：
 
 ```
 ERROR 3680 (HY000) at line 6: Failed to create schema directory 'miniblog' (errno: 13 - Permission denied)
@@ -110,9 +110,9 @@ chown -R 999:999 /var/lib/docker/volumes/infra_mysql_data/_data
 **验证结果：**
 
 ```bash
-docker exec mysql mysql -uroot -p'dE7ke5Eq2THc' -e "
+docker exec mysql mysql -uroot -p'<root-password>' -e "
 CREATE DATABASE IF NOT EXISTS miniblog DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-CREATE USER IF NOT EXISTS 'miniblog'@'%' IDENTIFIED BY '2gy0dCwG';
+CREATE USER IF NOT EXISTS 'miniblog'@'%' IDENTIFIED BY '<app-password>';
 GRANT ALL PRIVILEGES ON miniblog.* TO 'miniblog'@'%';
 FLUSH PRIVILEGES;
 SHOW DATABASES;
@@ -179,7 +179,7 @@ healthcheck:
 
 1. 使用 Docker Compose 时明确指定 `user` 参数
 2. 创建数据卷时预设正确的权限
-3. 在 CI/CD 脚本中添加权限验证步骤
+3. 在数据库操作 workflow 中添加权限验证步骤
 
 ## 参考资料
 

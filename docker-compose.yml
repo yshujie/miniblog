@@ -43,7 +43,7 @@ services:
       - miniblog-network     # 业务网
       - infra-network        # 访问基础设施
     ports:
-      - "8090:8080"  # 映射到 8090,避免与 Jenkins 的 8080 冲突
+      - "8090:8080"  # 对 ServerA 反向代理发布后端端口
     healthcheck:
       test: ["CMD", "wget", "--spider", "-S", "http://localhost:8080/health"]
       interval: 30s

@@ -1,50 +1,58 @@
-#!/bin/bash
-# scripts/load-seed-data.sh
-# Load seed data into database
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -e
-
-# Source environment variables if available
-if [ -f "${PIPELINE_ENV_FILE}" ]; then
+if [[ -n "${PIPELINE_ENV_FILE:-}" && -f "${PIPELINE_ENV_FILE}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
   source "${PIPELINE_ENV_FILE}"
+  set +a
 fi
 
-# Safety guard: only load seed data when explicitly enabled. Set ENABLE_DB_SEED=true to run.
-if [ "${ENABLE_DB_SEED:-false}" != "true" ]; then
-    echo "[load-seed-data] Skipping seed load because ENABLE_DB_SEED != true"
-    exit 0
+if [[ "${ENABLE_DB_SEED:-false}" != "true" ]]; then
+  echo "[load-seed-data] Skipping seed load because ENABLE_DB_SEED != true"
+  exit 0
 fi
 
-# Database connection parameters
-DB_HOST="${DB_HOST:-${MYSQL_HOST:-mysql}}"
-DB_PORT="${DB_PORT:-${MYSQL_PORT:-3306}}"
-DB_USER="${DB_USER:-${MYSQL_USERNAME:-miniblog}}"
-DB_PASSWORD="${DB_PASSWORD:-${MYSQL_PASSWORD:-miniblog123}}"
-DB_NAME="${DB_NAME:-${MYSQL_DBNAME:-${MYSQL_DATABASE:-miniblog}}}"
+db_host="${DB_HOST:-${MYSQL_HOST:-mysql}}"
+db_port="${DB_PORT:-${MYSQL_PORT:-3306}}"
+db_user="${DB_USER:-${MYSQL_USERNAME:-miniblog}}"
+db_password="${DB_PASSWORD:-${MYSQL_PASSWORD:-miniblog123}}"
+db_name="${DB_NAME:-${MYSQL_DBNAME:-${MYSQL_DATABASE:-miniblog}}}"
+docker_network="${DOCKER_NETWORK:-infra-network}"
+seed_data_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../db/migrations/sql" && pwd)"
+mysql_args=(-h "${db_host}" -P "${db_port}" -u "${db_user}" "${db_name}")
 
-SEED_DATA_DIR="$(cd "$(dirname "$0")/../db/migrations/sql" && pwd)"
+echo "[load-seed-data] Loading seed data into database: ${db_name}"
+echo "[load-seed-data] Using DB_HOST=${db_host}, DB_PORT=${db_port}, DB_USER=${db_user}"
 
-echo "[load-seed-data] Loading seed data into database: ${DB_NAME}"
-echo "[load-seed-data] Using DB_HOST=${DB_HOST}, DB_PORT=${DB_PORT}, DB_USER=${DB_USER}"
-
-# Check if running in Docker or local
-if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q "^mysql$"; then
-    echo "-> Using docker exec to load data"
-    MYSQL_CMD="docker exec -i mysql mysql -h${DB_HOST} -P${DB_PORT} -u${DB_USER} -p${DB_PASSWORD} ${DB_NAME}"
+if command -v mysql >/dev/null 2>&1; then
+  echo "-> Using local mysql client"
+  run_mysql() {
+    MYSQL_PWD="${db_password}" mysql "${mysql_args[@]}"
+  }
 else
-    echo "-> Using local mysql client"
-    MYSQL_CMD="mysql -h${DB_HOST} -P${DB_PORT} -u${DB_USER} -p${DB_PASSWORD} ${DB_NAME}"
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "❌ mysql client and docker are both unavailable" >&2
+    exit 1
+  fi
+
+  echo "-> Local mysql client not found, using mysql:8.0 on ${docker_network}"
+  run_mysql() {
+    MYSQL_PWD="${db_password}" docker run --rm -i --network "${docker_network}" \
+      -e MYSQL_PWD mysql:8.0 \
+      mysql "${mysql_args[@]}"
+  }
 fi
 
-# Load data files in order
 for sql_file in user.sql module.sql section.sql article.sql casbin_rule.sql; do
-    if [ -f "${SEED_DATA_DIR}/${sql_file}" ]; then
-        echo "Loading ${sql_file}..."
-        $MYSQL_CMD < "${SEED_DATA_DIR}/${sql_file}"
-        echo "✓ ${sql_file} loaded successfully"
-    else
-        echo "⚠ ${sql_file} not found, skipping..."
-    fi
+  sql_path="${seed_data_dir}/${sql_file}"
+  if [[ -f "${sql_path}" ]]; then
+    echo "Loading ${sql_file}..."
+    run_mysql < "${sql_path}"
+    echo "✓ ${sql_file} loaded successfully"
+  else
+    echo "⚠ ${sql_file} not found, skipping..."
+  fi
 done
 
 echo "✅ All seed data loaded successfully!"

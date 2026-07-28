@@ -5,12 +5,12 @@
 `scripts/` 只保留两类脚本：
 
 - 人工运维工具：批量导入文章、重置用户密码。
-- Jenkins/Makefile 兼容入口：推送镜像、Compose 部署、数据库初始化、迁移和种子数据加载。
+- 数据库运维入口：数据库初始化、迁移和种子数据加载。
 
 当前生产 CI/CD 的主要编排在 `.github/workflows/cicd.yml`，使用 GitHub 托管 Runner，
-不会调用本目录中的 Docker 代理、Buildx 安装或网络迁移脚本。仓库中仍有少量手动
-workflow 使用自托管 Runner，它们的诊断步骤保留在 workflow 内。基础设施网络由独立的
-infra 配置维护，本目录不负责修改宿主机 Docker 网络拓扑。
+数据库操作由 `.github/workflows/db-ops.yml` 手动触发。镜像构建、推送和生产部署均在
+workflow 内编排，不再保留重复的 Shell 包装脚本。基础设施网络由独立的 infra 配置维护，
+本目录不负责修改宿主机 Docker 网络拓扑。
 
 ## 脚本清单
 
@@ -18,11 +18,9 @@ infra 配置维护，本目录不负责修改宿主机 Docker 网络拓扑。
 | --- | --- | --- | --- |
 | `batch-upsert-articles.sh` | 按 JSON 批量新增或更新文章 | 人工执行 | 是，写业务数据库 |
 | `reset-user-password.sh` | 按用户 ID 重置密码 | 人工执行 | 是，写业务数据库 |
-| `db-init.sh` | 创建数据库、应用用户和基础表 | Jenkins 或人工执行 | 是，需要管理员权限 |
-| `db-migrate.sh` | 执行数据库 `up` 迁移 | Jenkins 或人工执行 | 是，修改数据库结构/数据 |
-| `load-seed-data.sh` | 按顺序加载种子 SQL | `make db-seed` | 是，写业务数据库 |
-| `deploy.sh` | 包装 `make compose-up` | Jenkins 或人工执行 | 是，更新容器 |
-| `push-images.sh` | 推送本次构建产生的镜像 | Jenkins | 是，写镜像仓库 |
+| `db-init.sh` | 创建数据库、应用用户和基础表 | `db-ops.yml` 或人工执行 | 是，需要管理员权限 |
+| `db-migrate.sh` | 执行数据库 `up` 迁移 | `db-ops.yml` 或人工执行 | 是，修改数据库结构/数据 |
+| `load-seed-data.sh` | 按顺序加载种子 SQL | `db-ops.yml`、`make db-seed` 或人工执行 | 是，写业务数据库 |
 
 ## 通用准备
 
@@ -56,7 +54,7 @@ docker network inspect infra-network >/dev/null
 
 ### 2. 准备环境变量
 
-数据库和 Jenkins 兼容脚本可通过受限权限的环境文件读取配置：
+数据库脚本可通过受限权限的环境文件读取配置：
 
 ```bash
 export PIPELINE_ENV_FILE=/secure/path/miniblog.env
@@ -171,6 +169,9 @@ unset DB_ROOT_PASSWORD ENABLE_DB_INIT
 失败处理：保留完整错误信息，确认管理员账号、网络和 `db/migrations/mysql/init_db.sql`
 后再决定是否重试。不要在不清楚已执行到哪一步时手工拼接 SQL。
 
+脚本优先使用本机 `mysql` 客户端；未安装时使用 `mysql:8.0` 临时容器，并加入
+`DOCKER_NETWORK` 指定的网络（默认 `infra-network`）。
+
 ### 执行数据库迁移
 
 先查看迁移状态（本机已安装 `migrate` 时）：
@@ -215,71 +216,33 @@ unset ENABLE_DB_SEED
 也可以使用 `make db-seed`，两者都会依次尝试加载 `user.sql`、`module.sql`、
 `section.sql`、`article.sql` 和 `casbin_rule.sql`。
 
+脚本优先使用本机 `mysql` 客户端；未安装时使用 `mysql:8.0` 临时容器。数据库密码通过
+`MYSQL_PWD` 环境变量传递，不会出现在 mysql 命令行参数中。
+
 如果输出 `Skipping seed load`，表示保护机制阻止了写入。若中途失败，前面已成功加载的
 文件不会自动回滚；应先核对各表状态和 SQL 的幂等性，再决定从哪里继续。
 
-## Jenkins/发布兼容脚本
+## GitHub Actions 数据库操作
 
-### Compose 部署
+生产数据库操作通过 GitHub 仓库的 **Actions → DB Operations (manual)** 手动触发。
+三个输入默认全部跳过，只有明确取消对应的 `skip_*` 选项才会在 ServerD 执行：
 
-`deploy.sh` 仍由 `Jenkinsfile` 调用。GitHub Actions 的生产部署直接在 workflow 中编排，
-不会调用该脚本。
+- `skip_db_init=false`：执行数据库和应用账号初始化，需要 `MYSQL_ROOT_PASSWORD` secret。
+- `skip_db_migrate=false`：执行所有尚未应用的 `up` 迁移。
+- `skip_db_seed=false`：加载种子数据；仅应在确认目标数据允许覆盖时使用。
 
-预检 Compose 配置：
+workflow 使用与生产部署相同的 `SVRD_HOST`、`SVRD_USERNAME`（或 `SVRD_USER`）、
+`SVRD_SSH_KEY`、`SVRD_SSH_PORT`。它会把当前 Git 提交中的 Makefile、数据库脚本和迁移文件
+上传到本次运行专属的 ServerD 临时目录，读取 `/opt/miniblog/.env` 后执行，并在结束时删除
+临时目录。触发前仍需完成本 README 的目标确认与备份检查。三个操作共享 concurrency
+group，不会并发执行多次。
 
-```bash
-export DEPLOY_COMPOSE_FILES='docker-compose.yml docker-compose.prod.yml'
-docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
-docker network inspect miniblog-network >/dev/null
-docker network inspect infra-network >/dev/null
-```
-
-确认后执行：
-
-```bash
-export PULL_IMAGES=true
-scripts/deploy.sh
-```
-
-成功后检查：
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=100
-```
-
-失败时使用同一组 Compose 文件查看容器状态和日志。不要通过创建旧的
-`infra_shared`、`qs_net` 或 `jenkins_net` 网络来绕过错误；当前 Compose 契约是
-`miniblog-network` 和 `infra-network`。
-
-### 推送镜像
-
-`push-images.sh` 根据 Jenkins 设置的构建标志选择镜像：
-
-- `RUN_FRONTEND_BUILD=true` 时读取 `FRONTEND_BLOG_IMAGE_TAG` 和
-  `FRONTEND_ADMIN_IMAGE_TAG`。
-- `RUN_BACKEND_BUILD=true` 时读取 `BACKEND_IMAGE_TAG`。
-
-人工预检示例：
-
-```bash
-docker login ghcr.io
-docker image inspect "$BACKEND_IMAGE_TAG" >/dev/null
-```
-
-然后执行：
-
-```bash
-scripts/push-images.sh
-```
-
-输出 `Images were not built in this run, skipping push.` 且退出码为 0，表示没有任何
-构建标志与镜像标签组成有效推送任务。推送失败时先检查登录状态、标签是否存在和仓库权限，
-不要重新构建或覆盖标签，除非已经确认流水线产物不正确。
+执行结果以对应 GitHub Actions step 的退出状态为准。失败后先检查远程日志和数据库版本，
+不要通过立即重跑来掩盖部分成功状态。
 
 ## 维护规则
 
 - 新脚本必须说明调用方、输入、写入范围、保护开关、成功判据和失败恢复方式。
 - 能放在 Makefile 或 GitHub Actions 中清晰表达的流水线逻辑，不再复制为一次性脚本。
 - 宿主机 Docker 代理、Runner 安装和基础设施网络迁移由对应基础设施仓库维护。
-- 删除脚本前必须先检查 `Jenkinsfile`、Makefile、workflow 和文档引用。
+- 删除脚本前必须先检查 Makefile、GitHub workflow 和文档引用。

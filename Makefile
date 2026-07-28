@@ -281,7 +281,7 @@ db-migrate: ## 运行数据库迁移（优先使用本地 migrate 二进制，�
 		migrate -path "$$MIGRATIONS_DIR" -database "$$DB_URL" up; \
 	else \
 		echo "-> Local migrate binary not found, using dockerized migrate image"; \
-		DOCKER_NET=$${DOCKER_NETWORK:-miniblog_net}; \
+		DOCKER_NET=$${DOCKER_NETWORK:-infra-network}; \
 		docker run --rm --network "$$DOCKER_NET" -v "$$MIGRATIONS_DIR:/migrations:ro" migrate/migrate -path /migrations -database "$$DB_URL" up; \
 	fi
 
@@ -309,13 +309,17 @@ db-init: ## 初始化数据库（执行初始 SQL 脚本，幂等）。需要有
 		sed -e "s/\$${APP_DB_NAME}/$$APP_DB_NAME/g" \
 		    -e "s/\$${APP_DB_USER}/$$APP_DB_USER/g" \
 		    -e "s/\$${APP_DB_PASSWORD}/$$APP_DB_PASSWORD/g" \
-		    $$SCRIPT | mysql -h "$$DB_HOST" -P "$$DB_PORT" -u "$$DB_ROOT_USER" -p"$$DB_ROOT_PASSWORD"; \
+		    "$$SCRIPT" | MYSQL_PWD="$$DB_ROOT_PASSWORD" mysql -h "$$DB_HOST" -P "$$DB_PORT" -u "$$DB_ROOT_USER"; \
 	else \
-		echo "-> Using docker exec to run SQL inside MySQL container"; \
+		command -v docker >/dev/null 2>&1 || { echo "❌ mysql client and docker are both unavailable"; exit 1; }; \
+		DOCKER_NET=$${DOCKER_NETWORK:-infra-network}; \
+		echo "-> Local mysql client not found, using mysql:8.0 on $$DOCKER_NET"; \
 		sed -e "s/\$${APP_DB_NAME}/$$APP_DB_NAME/g" \
 		    -e "s/\$${APP_DB_USER}/$$APP_DB_USER/g" \
 		    -e "s/\$${APP_DB_PASSWORD}/$$APP_DB_PASSWORD/g" \
-		    $$SCRIPT | docker exec -i "$$DB_HOST" mysql -u "$$DB_ROOT_USER" -p"$$DB_ROOT_PASSWORD"; \
+		    "$$SCRIPT" | MYSQL_PWD="$$DB_ROOT_PASSWORD" docker run --rm -i --network "$$DOCKER_NET" \
+		      -e MYSQL_PWD mysql:8.0 \
+		      mysql -h "$$DB_HOST" -P "$$DB_PORT" -u "$$DB_ROOT_USER"; \
 	fi
 
 .PHONY: down
@@ -351,7 +355,7 @@ clean: ## 清理构建产物
 
 .PHONY: docker-network-ensure
 docker-network-ensure: ## 确保 Docker 网络存在，需要传入 NETWORK
-	@if [ -z "$(NETWORK)" ]; then echo "❌ 缺少 NETWORK 变量，例如 NETWORK=miniblog_net"; exit 1; fi
+	@if [ -z "$(NETWORK)" ]; then echo "❌ 缺少 NETWORK 变量，例如 NETWORK=miniblog-network"; exit 1; fi
 	@if ! docker network ls --format '{{.Name}}' | grep -w "$(NETWORK)" >/dev/null 2>&1; then \
 		echo "创建 Docker 网络 $(NETWORK)..."; \
 		docker network create "$(NETWORK)"; \

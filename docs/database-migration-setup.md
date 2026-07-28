@@ -14,11 +14,11 @@
 - 新增 `db-seed` target：执行种子数据加载
 - 位置：在 `db-migrate` 之后
 
-### 3. 更新了 Jenkinsfile
+### 3. 提供 GitHub Actions 手动数据库 workflow
 
-- 新增 `DB Seed` 阶段：在 DB Migrate 之后执行
-- 新增参数 `SKIP_DB_SEED`（默认 true，避免重复加载）
-- 新增环境变量 `RUN_DB_SEED` 控制执行
+- `.github/workflows/db-ops.yml` 可分别执行 DB Init、DB Migrate 和 DB Seed
+- 三个 `skip_*` 输入默认都是 `true`，避免误写生产数据库
+- workflow 通过 `SVRD_*` 凭据在 ServerD 执行，并读取 `/opt/miniblog/.env`
 
 ### 4. 创建了示例迁移文件
 
@@ -34,12 +34,12 @@
 make db-seed
 ```
 
-### 方法 2：通过 Jenkins
+### 方法 2：通过 GitHub Actions
 
-在 Jenkins 构建时：
+进入 **Actions → DB Operations (manual) → Run workflow**：
 
-1. 勾选 `SKIP_DB_SEED` = **false**（首次部署）
-2. 之后保持 `SKIP_DB_SEED` = **true**（避免重复加载）
+1. 首次需要种子数据时，将 `skip_db_seed` 设为 `false`
+2. 日常保持 `skip_db_seed=true`，避免重复加载
 
 ### 方法 3：直接执行脚本
 
@@ -83,8 +83,8 @@ db/migrations/sql/000003_add_new_feature.down.sql
 ## ⚠️ 重要提示
 
 1. **种子数据只在首次部署时加载**：
-   - 首次：`SKIP_DB_SEED=false`
-   - 之后：`SKIP_DB_SEED=true`
+   - 首次：`skip_db_seed=false`
+   - 之后：`skip_db_seed=true`
 
 2. **迁移文件自动执行**：
    - 所有 `{version}_{desc}.up.sql` 文件会按版本号顺序执行
@@ -99,6 +99,6 @@ db/migrations/sql/000003_add_new_feature.down.sql
 现在你可以：
 
 1. 提交这些更改到 Git
-2. 在 Jenkins 中触发构建
-3. 勾选 `SKIP_DB_SEED=false` 来加载种子数据
-4. 之后的构建保持 `SKIP_DB_SEED=true`
+2. 在 GitHub Actions 中手动触发 `DB Operations (manual)`
+3. 将 `skip_db_seed=false` 来加载种子数据
+4. 后续运行保持 `skip_db_seed=true`

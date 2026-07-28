@@ -521,6 +521,6 @@ docker compose up -d
 
 ## 相关文档
 
-- [网络架构说明](./infrastructure/network-architecture.md)
+- [网络架构快速参考](./infrastructure/network-quick-reference.md)
 - [数据库迁移指南](./database-migration-setup.md)
-- [Jenkins 配置指南](./jenkins-db-init-guide.md)
+- [脚本与数据库操作指南](../scripts/README.md)

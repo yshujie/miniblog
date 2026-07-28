@@ -20,7 +20,7 @@ services:
       restart_policy:
         condition: unless-stopped
         delay: 5s
-    # 映射到 8090,避免与 Jenkins 的 8080 冲突
+    # 对 ServerA 反向代理发布后端端口
     ports:
       - "8090:8080"
 

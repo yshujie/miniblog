@@ -27,7 +27,8 @@ db/migrations/sql/
 make db-init
 ```
 
-对应 Jenkins 参数：`SKIP_DB_INIT`（默认 false，即执行）
+对应 GitHub Actions `DB Operations (manual)` 输入：`skip_db_init`。默认 `true`，
+只有明确改为 `false` 才执行。
 
 ### 2. DB Migrate（Schema 迁移）
 
@@ -37,7 +38,7 @@ make db-init
 make db-migrate
 ```
 
-对应 Jenkins 参数：`SKIP_DB_MIGRATE`（默认 false，即执行）
+对应 GitHub Actions 输入：`skip_db_migrate`。默认 `true`，只有明确改为 `false` 才执行。
 
 ### 3. DB Seed（种子数据加载）
 
@@ -47,7 +48,7 @@ make db-migrate
 make db-seed
 ```
 
-对应 Jenkins 参数：`SKIP_DB_SEED`（默认 **true**，即跳过）
+对应 GitHub Actions 输入：`skip_db_seed`。默认 `true`，只有明确改为 `false` 才执行。
 
 ## 📝 如何添加新的迁移
 
@@ -102,25 +103,26 @@ for sql_file in user.sql module.sql section.sql article.sql casbin_rule.sql comm
 done
 ```
 
-## 🚀 Jenkins 构建配置
+## 🚀 GitHub Actions 手动操作
+
+进入仓库的 **Actions → DB Operations (manual) → Run workflow**。所有操作默认跳过，
+触发前必须确认 ServerD 的 `/opt/miniblog/.env` 指向目标数据库，并完成备份。
 
 ### 首次部署（全新环境）
 
-1. ✅ `SKIP_DB_INIT` = false（创建数据库）
-2. ✅ `SKIP_DB_MIGRATE` = false（创建表）
-3. ✅ `SKIP_DB_SEED` = **false**（加载初始数据）
+1. `skip_db_init` = false（创建数据库）
+2. `skip_db_migrate` = false（创建表）
+3. `skip_db_seed` = false（加载初始数据）
 
 ### 日常更新（已有环境）
 
-1. ✅ `SKIP_DB_INIT` = true（数据库已存在）
-2. ✅ `SKIP_DB_MIGRATE` = false（执行新迁移）
-3. ✅ `SKIP_DB_SEED` = true（不重复加载数据）
+1. `skip_db_init` = true（数据库已存在）
+2. `skip_db_migrate` = false（执行新迁移）
+3. `skip_db_seed` = true（不重复加载数据）
 
 ### 仅部署代码（无数据库变更）
 
-1. ✅ `SKIP_DB_INIT` = true
-2. ✅ `SKIP_DB_MIGRATE` = true
-3. ✅ `SKIP_DB_SEED` = true
+数据库 workflow 不需要运行；主发布由 `.github/workflows/cicd.yml` 完成。
 
 ## 🛠️ 本地开发使用
 
@@ -155,7 +157,7 @@ make db-seed
    - 注意外键依赖关系
 
 4. **生产环境建议**：
-   - 首次部署后，将 `SKIP_DB_SEED` 设为 true
+   - 首次部署后保持 `skip_db_seed=true`
    - 新数据通过应用程序添加，而不是重复执行 seed 脚本
    - 定期备份数据库
 

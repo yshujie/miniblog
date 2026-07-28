@@ -93,15 +93,12 @@ make db-seed
 docker exec -it mysql mysql -uminiblog -p miniblog -e "SELECT COUNT(*) FROM user;"
 ```
 
-### 2. Jenkins 构建
+### 2. GitHub Actions 手动数据库操作
 
-下次 Jenkins 构建时，DB Seed 阶段应该成功：
+在 **Actions → DB Operations (manual)** 中设置 `skip_db_seed=false` 后，
+`Load seed data on ServerD` 步骤应该成功：
 
 ```
-[Pipeline] stage
-[Pipeline] { (DB Seed)
-[Pipeline] sh
-+ make db-seed
 Loading user.sql...
 ✓ user.sql loaded successfully
 Loading module.sql...
@@ -209,4 +206,4 @@ docker exec mysql mysql -uminiblog -p"$DB_PASSWORD" -e "
 - ✅ 不会因为数据已存在而失败
 - ✅ 确保数据与 SQL 文件保持一致
 
-下次 Jenkins 构建时，DB Seed 阶段将会成功！🚀
+后续可通过 GitHub Actions 的手动数据库 workflow 执行 DB Seed。

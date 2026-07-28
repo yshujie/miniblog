@@ -4,87 +4,117 @@ on:
   workflow_dispatch:
     inputs:
       skip_db_init:
-        description: 'Skip database initialization'
+        description: Skip database initialization
         type: boolean
         default: true
       skip_db_migrate:
-        description: 'Skip database migration'
+        description: Skip database migration
         type: boolean
         default: true
       skip_db_seed:
-        description: 'Skip database seed data'
+        description: Skip database seed data
         type: boolean
         default: true
 
 permissions:
   contents: read
 
+concurrency:
+  group: miniblog-db-operations
+  cancel-in-progress: false
+
+env:
+  DB_OPS_DIR: /tmp/miniblog-db-ops-${{ github.run_id }}-${{ github.run_attempt }}
+
 jobs:
   db-ops:
-    runs-on: [self-hosted, macmini, prod]
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: No database operation selected
+        if: ${{ inputs.skip_db_init && inputs.skip_db_migrate && inputs.skip_db_seed }}
+        run: echo "All database operations were skipped; no remote command was executed."
 
-      - name: Setup SSH key
-        run: |
-          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
+      - name: Check out current revision
+        if: ${{ !inputs.skip_db_init || !inputs.skip_db_migrate || !inputs.skip_db_seed }}
+        uses: actions/checkout@v4
 
-      # DB Init (optional)
-      - name: DB Init
+      - name: Upload database operation files to ServerD
+        if: ${{ !inputs.skip_db_init || !inputs.skip_db_migrate || !inputs.skip_db_seed }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SVRD_HOST }}
+          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          key: ${{ secrets.SVRD_SSH_KEY }}
+          port: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          source: Makefile,scripts/db-init.sh,scripts/db-migrate.sh,scripts/load-seed-data.sh,db/migrations
+          target: ${{ env.DB_OPS_DIR }}
+
+      - name: Initialize database on ServerD
         if: ${{ !inputs.skip_db_init }}
-        run: |
-          ssh -F /dev/null \
-            -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
-            'bash -s' <<'ENDSSH'
-          set -euo pipefail
-          cd /opt/miniblog
-          export $(cat .env | grep -v '^#' | xargs)
-          export DB_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}"
-          export ENABLE_DB_INIT=true
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          DB_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+        with:
+          host: ${{ secrets.SVRD_HOST }}
+          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          key: ${{ secrets.SVRD_SSH_KEY }}
+          port: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          envs: DB_ROOT_PASSWORD
+          command_timeout: 10m
+          script: |
+            set -Eeuo pipefail
+            cd "${{ env.DB_OPS_DIR }}"
+            test -f /opt/miniblog/.env
 
-          ./scripts/db-init.sh
-          ENDSSH
+            export PIPELINE_ENV_FILE=/opt/miniblog/.env
+            export ENABLE_DB_INIT=true
+            ./scripts/db-init.sh
 
-      # DB Migrate (optional)
-      - name: DB Migrate
+      - name: Migrate database on ServerD
         if: ${{ !inputs.skip_db_migrate }}
-        run: |
-          ssh -F /dev/null \
-            -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
-            'bash -s' <<'ENDSSH'
-          set -euo pipefail
-          cd /opt/miniblog
-          export $(cat .env | grep -v '^#' | xargs)
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRD_HOST }}
+          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          key: ${{ secrets.SVRD_SSH_KEY }}
+          port: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          command_timeout: 10m
+          script: |
+            set -Eeuo pipefail
+            cd "${{ env.DB_OPS_DIR }}"
+            test -f /opt/miniblog/.env
 
-          ./scripts/db-migrate.sh
-          ENDSSH
+            export PIPELINE_ENV_FILE=/opt/miniblog/.env
+            export DOCKER_NETWORK=infra-network
+            ./scripts/db-migrate.sh
 
-      # DB Seed (optional)
-      - name: DB Seed
+      - name: Load seed data on ServerD
         if: ${{ !inputs.skip_db_seed }}
-        run: |
-          ssh -F /dev/null \
-            -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            ${{ secrets.SVRA_USER }}@${{ secrets.SVRA_HOST }} \
-            'bash -s' <<'ENDSSH'
-          set -euo pipefail
-          cd /opt/miniblog
-          export $(cat .env | grep -v '^#' | xargs)
-          export ENABLE_DB_SEED=true
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRD_HOST }}
+          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          key: ${{ secrets.SVRD_SSH_KEY }}
+          port: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          command_timeout: 20m
+          script: |
+            set -Eeuo pipefail
+            cd "${{ env.DB_OPS_DIR }}"
+            test -f /opt/miniblog/.env
 
-          make db-seed
-          ENDSSH
+            export PIPELINE_ENV_FILE=/opt/miniblog/.env
+            export ENABLE_DB_SEED=true
+            ./scripts/load-seed-data.sh
 
-      - name: Cleanup SSH key
-        if: always()
-        run: |
-          rm -f ~/.ssh/deploy_key
+      - name: Remove database operation files from ServerD
+        if: ${{ always() && (!inputs.skip_db_init || !inputs.skip_db_migrate || !inputs.skip_db_seed) }}
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRD_HOST }}
+          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          key: ${{ secrets.SVRD_SSH_KEY }}
+          port: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          command_timeout: 2m
+          script: |
+            set -Eeuo pipefail
+            rm -rf -- "${{ env.DB_OPS_DIR }}"
