@@ -1,5 +1,10 @@
 # MiniBlog CI/CD 流程文档
 
+> 历史流程文档：本文主体描述旧的自托管 Mac Runner 流程。当前主 CI/CD 使用
+> GitHub 托管的 `ubuntu-latest` Runner，并通过 SSH 部署到 ServerD；请以
+> `.github/workflows/cicd.yml` 为准。`db-ops.yml` 等少量手动 workflow 仍使用
+> 自托管 Runner。
+
 ## 概述
 
 MiniBlog 项目采用 GitHub Actions 实现完全自动化的 CI/CD 流程。主要包括：

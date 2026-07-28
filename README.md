@@ -17,7 +17,8 @@ MiniBlog 采用微服务架构，依赖外部基础设施项目提供共享服�
 
 **网络通信**
 
-应用通过 `infra_shared` Docker 网络与外部服务通信，实现：
+应用容器通过 `miniblog-network` 进行业务通信，并通过 `infra-network` 访问外部
+基础设施服务，实现：
 
 - 资源共享：多个应用项目共用基础设施
 - 服务解耦：应用专注业务逻辑，基础设施独立管理
@@ -251,6 +252,9 @@ make logs-infra          # 查看基础设施日志
 ```
 
 更多 API 详情请参考 `api/openapi/openapi.yaml` 文档。
+
+数据库维护、批量文章导入、密码重置以及 Jenkins 兼容脚本的执行方式见
+[`scripts/README.md`](scripts/README.md)。
 
 ## 如何贡献
 

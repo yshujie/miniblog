@@ -1,5 +1,10 @@
 # 网络架构设计文档
 
+> 历史设计文档：本文记录的 `infra_shared`、`miniblog_net`、`qs_net` 和
+> `jenkins_net` 方案不是 MiniBlog 当前部署契约，请勿执行文中的创建、桥接或迁移命令。
+> 当前配置以 `docker-compose.yml`、`.github/workflows/cicd.yml` 和
+> `docs/infrastructure/network-quick-reference.md` 为准。
+
 ## 概述
 
 本文档描述了服务器基础设施的网络架构设计，采用分层隔离的方式确保安全性和可维护性。

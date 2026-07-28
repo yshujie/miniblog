@@ -1,161 +1,66 @@
 # 网络架构快速参考
 
-## 当前网络配置
+> 本文档曾记录 `infra_shared`、`qs_net` 和 `jenkins_net` 的旧迁移方案。
+> 该方案已经失效，相关迁移脚本已删除，请勿继续执行历史命令。
 
-### 已完成的配置
+## 当前网络契约
 
-```bash
-# ✅ 已将 MySQL 桥接到 infra_shared
-docker network connect infra_shared mysql
+MiniBlog 的当前 `docker-compose.yml` 使用两个外部网络：
 
-# ⏳ 待执行: 桥接 Redis 和 Nginx
-docker network connect infra_shared redis
-docker network connect infra_shared nginx
-```
+| 网络 | 责任 |
+| --- | --- |
+| `miniblog-network` | MiniBlog 后端、博客前端和管理后台之间的业务通信 |
+| `infra-network` | MiniBlog 服务访问由基础设施侧提供的依赖 |
 
-### 网络映射表（简化版）
+GitHub Actions 部署会在 ServerD 上按需创建 `miniblog-network`，但要求
+`infra-network` 已经由基础设施侧创建。仓库内不再提供修改基础设施网络拓扑的一键脚本。
 
-| 服务 | 主网络 | 桥接网络 | 说明 |
-|-----|--------|---------|------|
-| nginx | infra-frontend | infra-backend, infra_shared | 反向代理，需访问所有应用 |
-| mysql | infra-backend | infra_shared | 被 MiniBlog 使用 |
-| redis | infra-backend | infra_shared | 被 MiniBlog 使用 |
-| mongo | infra-backend | - | MiniBlog 不使用 |
-| jenkins | infra-backend | jenkins_net (可选) | CI/CD 独立网络 |
-
-## 立即执行的命令
-
-### 方案 A：最小改动（推荐用于快速修复）
+## 部署前检查
 
 ```bash
-# 1. 桥接必要的服务
-docker network connect infra_shared redis
-docker network connect infra_shared nginx
+docker network inspect miniblog-network >/dev/null 2>&1 || \
+  docker network create miniblog-network
 
-# 2. 更新 Jenkins 环境变量
-# 在 Jenkins → Credentials → miniblog-dev-env 中修改：
-# MYSQL_HOST=mysql
-# REDIS_HOST=redis
+docker network inspect infra-network >/dev/null
 
-# 3. 重新触发构建
-# Jenkins UI → miniblog job → Build Now
+docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
 ```
 
-### 方案 B：完整架构（推荐用于长期规划）
+如果 `infra-network` 不存在，应回到基础设施配置确认网络名称、创建责任和依赖服务，
+不要临时创建同名空网络来掩盖配置错误。
+
+## 网络状态检查
 
 ```bash
-# 1. 运行迁移脚本
-chmod +x scripts/migrate-network.sh
-scripts/migrate-network.sh
+docker network inspect miniblog-network
+docker network inspect infra-network
 
-# 2. 查看网络拓扑
-docker network ls --format '{{.Name}}' | while read net; do 
-  echo "=== $net ==="; 
-  docker network inspect $net --format '{{range .Containers}}  - {{.Name}} ({{.IPv4Address}}){{println}}{{end}}'; 
-done
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=100
 ```
 
-## docker-compose.yml 网络配置
-
-### 当前配置（使用 infra_shared）
-
-```yaml
-services:
-  miniblog-backend:
-    networks:
-      - infra_shared
-    environment:
-      - MYSQL_HOST=mysql     # ← 修改为实际容器名
-      - REDIS_HOST=redis     # ← 修改为实际容器名
-
-networks:
-  infra_shared:
-    external: true
-```
-
-### 推荐配置（未来扩展）
-
-```yaml
-services:
-  miniblog-backend:
-    networks:
-      - miniblog_net
-    environment:
-      - MYSQL_HOST=mysql
-      - REDIS_HOST=redis
-
-networks:
-  miniblog_net:
-    name: infra_shared  # 使用现有网络作为别名
-    external: true
-```
-
-## 验证命令
+检查某个 MiniBlog 容器实际加入的网络：
 
 ```bash
-# 1. 检查容器网络连接
-docker inspect mysql --format='{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}'
-
-# 2. 测试连通性
-docker exec miniblog-backend ping -c 3 mysql
-docker exec miniblog-backend ping -c 3 redis
-
-# 3. 查看网络详情
-docker network inspect infra_shared
-
-# 4. 检查 DNS 解析
-docker exec miniblog-backend nslookup mysql
-docker exec miniblog-backend getent hosts redis
+docker inspect miniblog-backend \
+  --format='{{range $name, $config := .NetworkSettings.Networks}}{{$name}} {{end}}'
 ```
 
-## 故障排查
+## 502 排查边界
 
-### 问题: migrate 容器无法连接 MySQL
+出现 Nginx 502 时，按请求链路检查：
 
-```bash
-# 检查 MySQL 是否在 infra_shared 网络
-docker network inspect infra_shared | jq '.[] | .Containers | .[] | select(.Name == "mysql")'
+1. ServerA Nginx upstream 配置指向的 ServerD 地址和端口是否正确。
+2. ServerD 上 `miniblog-backend` 是否运行并监听发布端口。
+3. ServerA 到 ServerD 的网络连通性是否正常。
+4. 后端日志中是否存在启动失败、数据库或 Redis 连接错误。
 
-# 如果没有，手动连接
-docker network connect infra_shared mysql
-```
+不要通过把 ServerA Nginx 随意加入 ServerD 的 Docker 网络来修复跨主机链路。
 
-### 问题: 后端容器无法解析 redis 主机名
+## 事实来源
 
-```bash
-# 检查 redis 是否在 infra_shared 网络
-docker network inspect infra_shared | grep redis
-
-# 连接 redis 到网络
-docker network connect infra_shared redis
-```
-
-### 问题: Nginx 502 Bad Gateway
-
-```bash
-# 检查 nginx 是否能访问后端
-docker exec nginx ping -c 3 miniblog-backend
-
-# 如果失败，连接 nginx 到应用网络
-docker network connect infra_shared nginx
-
-# 检查 nginx 配置
-docker exec nginx nginx -t
-docker exec nginx cat /etc/nginx/conf.d/miniblog.conf
-```
-
-## 下一步行动清单
-
-- [ ] 在服务器上执行 `docker network connect infra_shared redis`
-- [ ] 在服务器上执行 `docker network connect infra_shared nginx`
-- [ ] 更新 Jenkins credentials 中的 MYSQL_HOST=mysql, REDIS_HOST=redis
-- [ ] 重新触发 Jenkins 构建
-- [ ] 验证 DB migration 成功
-- [ ] 检查应用是否能正常连接 Redis
-- [ ] 更新 Nginx 配置使用容器名代理（如需要）
-- [ ] 考虑移除 docker-compose.prod.yml 中的端口暴露（8090）
-
-## 参考文档
-
-- 详细架构设计: `docs/infrastructure/network-architecture.md`
-- 迁移脚本: `scripts/migrate-network.sh`
+- 网络声明：`docker-compose.yml`
+- 生产差异：`docker-compose.prod.yml`
+- 部署预检：`.github/workflows/cicd.yml`
+- 脚本边界与执行方式：`scripts/README.md`
+- 基础设施网络的创建和维护：infra 仓库中的 `docs/network/architecture.md`

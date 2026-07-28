@@ -1,5 +1,9 @@
 # CI/CD 构建问题修复记录
 
+> 历史记录（2025-10-24）：本文描述的是当时的自托管 Mac Runner 方案。
+> 当前 workflow 使用 `ubuntu-latest` 和 `docker/setup-buildx-action@v3`，不再需要
+> 仓库内的手工 Buildx 安装脚本。请以 `.github/workflows/cicd.yml` 为当前事实来源。
+
 ## 问题描述
 
 CI/CD 在 `setup-buildx-action` 步骤失败，日志显示：
@@ -59,7 +63,7 @@ Post job cleanup.
 ## 改动文件
 
 - `.github/workflows/cicd.yml` - 完全重构 build-and-push job
-- `scripts/install-buildx.sh` - 添加手动安装脚本（备用）
+- 手工 Buildx 安装脚本属于旧 Runner 方案，现已删除
 
 ## 测试建议
 
