@@ -2,6 +2,8 @@
 //
 // 用法:
 //
+//	MYSQL_DSN='user:password@tcp(host:3306)/miniblog?parseTime=true' \
+//	  ./scripts/batch-upsert-articles.sh -file articles.json -dry-run
 //	go run ./scripts/batch-upsert-articles -file ./scripts/batch-upsert-articles/articles.example.json
 //	./scripts/batch-upsert-articles.sh -file articles.json -dry-run
 //
@@ -25,6 +27,7 @@ import (
 
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/pkg/db"
+	"github.com/yshujie/miniblog/scripts/internal/mysqlconfig"
 	"gorm.io/gorm"
 )
 
@@ -51,14 +54,10 @@ func main() {
 }
 
 func run() int {
+	mysqlConfig := mysqlconfig.Bind(flag.CommandLine)
 	var (
 		filePath = flag.String("file", "", "文章 JSON 文件路径（必填）")
 		dryRun   = flag.Bool("dry-run", false, "仅预览，不写入数据库")
-		host     = flag.String("host", envOr("MYSQL_HOST", "localhost"), "MySQL 主机")
-		port     = flag.String("port", envOr("MYSQL_PORT", "3306"), "MySQL 端口")
-		username = flag.String("user", envOr("MYSQL_USERNAME", "miniblog"), "MySQL 用户名")
-		dbPass   = flag.String("db-password", envOr("MYSQL_PASSWORD", "miniblog123"), "MySQL 密码")
-		database = flag.String("database", envOr("MYSQL_DATABASE", "miniblog"), "MySQL 数据库名")
 	)
 	flag.Parse()
 
@@ -78,14 +77,7 @@ func run() int {
 		return 1
 	}
 
-	gdb, err := db.NewMySQL(&db.MySQLOptions{
-		Host:     *host,
-		Port:     *port,
-		Username: *username,
-		Password: *dbPass,
-		Database: *database,
-		LogLevel: 1,
-	})
+	gdb, err := db.NewMySQL(mysqlConfig.DBOptions(1))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: 连接数据库失败: %v\n", err)
 		return 1
@@ -372,11 +364,4 @@ func parseStatus(raw string) (int, error) {
 			return 0, fmt.Errorf("无效 status 数值: %d", n)
 		}
 	}
-}
-
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }

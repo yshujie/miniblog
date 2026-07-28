@@ -13,6 +13,7 @@ import (
 
 // MySQLOptions 定义MySQL数据库的配置选项
 type MySQLOptions struct {
+	DSN                   string        // 完整连接串，非空时优先于分字段配置
 	Host                  string        // 主机
 	Port                  string        // 端口
 	Username              string        // 用户名
@@ -24,8 +25,12 @@ type MySQLOptions struct {
 	LogLevel              int           // 日志级别
 }
 
-// DNS 生成MySQL的连接字符串
-func (o *MySQLOptions) DNS() string {
+// DataSourceName 返回 MySQL 连接串。显式 DSN 非空时优先使用。
+func (o *MySQLOptions) DataSourceName() string {
+	if o.DSN != "" {
+		return o.DSN
+	}
+
 	return fmt.Sprintf(`%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=%t&loc=%s`,
 		o.Username,
 		o.Password,
@@ -34,6 +39,11 @@ func (o *MySQLOptions) DNS() string {
 		o.Database,
 		true,
 		"Local")
+}
+
+// DNS 保留原方法，兼容现有调用方。
+func (o *MySQLOptions) DNS() string {
+	return o.DataSourceName()
 }
 
 // 自定义 GORM 日志记录器
@@ -97,7 +107,7 @@ func NewMySQL(opts *MySQLOptions) (*gorm.DB, error) {
 		LogLevel: logLevel,
 	}
 
-	db, err := gorm.Open(mysql.Open(opts.DNS()), &gorm.Config{
+	db, err := gorm.Open(mysql.Open(opts.DataSourceName()), &gorm.Config{
 		Logger: customLogger,
 	})
 	if err != nil {

@@ -72,20 +72,43 @@ MYSQL_DBNAME=miniblog
 ```
 
 也可使用同义的 `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME`。
-`batch-upsert-articles.sh` 和 `reset-user-password.sh` 不会自动读取
-`PIPELINE_ENV_FILE`；执行它们前需要把变量导入当前 shell。这两个 Go 工具的数据库名
-变量是 `MYSQL_DATABASE`（不是 `MYSQL_DBNAME`），且不读取 `DB_*` 同义变量。
+
+`batch-upsert-articles.sh` 和 `reset-user-password.sh` 推荐直接设置 `MYSQL_DSN`。格式如下：
+
+```text
+user:password@tcp(db.example.internal:3306)/miniblog?charset=utf8mb4&parseTime=true&loc=Local
+```
+
+这里必须使用 Go MySQL Driver DSN 格式，不能使用 `mysql://user:password@host/database`
+形式的 URL。`MYSQL_DSN` 非空时优先级最高，`-host`、`-port`、`-user`、
+`-db-password`、`-database` 以及对应的分字段环境变量都会被忽略。
+
+在交互式终端中可隐藏输入，避免完整 DSN 进入 shell 历史：
+
+```bash
+read -r -s -p 'MYSQL_DSN: ' MYSQL_DSN
+printf '\n'
+export MYSQL_DSN
+```
+
+这两个 Go 工具不会自动读取 `PIPELINE_ENV_FILE`；执行前需要将 `MYSQL_DSN` 导入当前
+shell。如果不设置 `MYSQL_DSN`，仍可继续使用 `MYSQL_HOST`、`MYSQL_PORT`、
+`MYSQL_USERNAME`、`MYSQL_PASSWORD`、`MYSQL_DATABASE` 或原有命令行参数。
 
 ### 3. 生产变更前检查
 
 在执行任何写操作前，至少确认：
 
 ```bash
-printf 'host=%s port=%s database=%s user=%s\n' \
-  "${MYSQL_HOST:-${DB_HOST:-unset}}" \
-  "${MYSQL_PORT:-${DB_PORT:-3306}}" \
-  "${MYSQL_DBNAME:-${DB_NAME:-unset}}" \
-  "${MYSQL_USERNAME:-${DB_USER:-unset}}"
+if [[ -n "${MYSQL_DSN:-}" ]]; then
+  echo 'MYSQL_DSN is set (value hidden)'
+else
+  printf 'host=%s port=%s database=%s user=%s\n' \
+    "${MYSQL_HOST:-${DB_HOST:-unset}}" \
+    "${MYSQL_PORT:-${DB_PORT:-3306}}" \
+    "${MYSQL_DBNAME:-${MYSQL_DATABASE:-${DB_NAME:-unset}}}" \
+    "${MYSQL_USERNAME:-${DB_USER:-unset}}"
+fi
 ```
 
 - 输出的主机、数据库和用户属于预期环境。
@@ -117,10 +140,11 @@ scripts/batch-upsert-articles.sh \
 
 ```bash
 scripts/batch-upsert-articles.sh -file /tmp/miniblog-articles/articles.json
+unset MYSQL_DSN
 ```
 
-必要时可以显式传入 `-host`、`-port`、`-user`、`-db-password` 和
-`-database`。建议优先使用环境变量，避免密码进入 shell 历史和进程参数。
+未设置 `MYSQL_DSN` 时，可以显式传入 `-host`、`-port`、`-user`、`-db-password`
+和 `-database`。建议优先使用环境变量，避免密码进入 shell 历史和进程参数。
 
 结果说明：
 
@@ -140,7 +164,7 @@ read -r -s RESET_PASSWORD
 export RESET_PASSWORD
 printf '\n'
 scripts/reset-user-password.sh -id 123
-unset RESET_PASSWORD
+unset RESET_PASSWORD MYSQL_DSN
 ```
 
 密码长度必须为 6 到 18 个字符。也支持 `-password`，但命令行参数可能进入
