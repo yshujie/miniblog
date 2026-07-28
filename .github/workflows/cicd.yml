@@ -587,7 +587,6 @@ jobs:
           key:      ${{ env.SVRA_SSH_KEY }}
           port:     ${{ env.SVRA_SSH_PORT }}
           envs: SUDO_PASSWORD
-          script_stop: true
           command_timeout: 5m
           script: |
             set -Eeuo pipefail
@@ -607,6 +606,22 @@ jobs:
               run_sudo() {
                 sudo -n "$@"
               }
+            fi
+
+            echo "👤 ServerA SSH user: $(id -un)"
+
+            if command -v docker >/dev/null 2>&1; then
+              echo "✅ ServerA: docker command found."
+            else
+              echo "⚠️ ServerA: docker command not found for the SSH user." >&2
+            fi
+
+            if [ -z "${SUDO_PASSWORD:-}" ]; then
+              if sudo -n true >/dev/null 2>&1; then
+                echo "✅ ServerA: passwordless sudo is available."
+              else
+                echo "⚠️ ServerA: passwordless sudo is unavailable; trying direct Docker access." >&2
+              fi
             fi
 
             echo "🔄 Reloading nginx on ServerA..."
