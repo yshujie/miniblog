@@ -414,6 +414,7 @@ func TestMySQLHTTPContractAndError(t *testing.T) {
 	g.PUT("/articles/:id", controller.Update)
 	g.PUT("/articles/:id/move", controller.Move)
 	g.GET("/articleDetail", reader.GetArticleDetail)
+	g.GET("/modules", reader.GetModuleList)
 	send := func(method, path, body string) (int, map[string]interface{}) {
 		t.Helper()
 		request := httptest.NewRequest(method, path, bytes.NewBufferString(body))
@@ -430,6 +431,14 @@ func TestMySQLHTTPContractAndError(t *testing.T) {
 	}
 	payload := func(response map[string]interface{}) map[string]interface{} {
 		return response["payload"].(map[string]interface{})
+	}
+	listStatus, listResponse := send("GET", "/modules", "")
+	if listStatus != 200 {
+		t.Fatal(listStatus, listResponse)
+	}
+	firstModule := payload(listResponse)["modules"].([]interface{})[0].(map[string]interface{})
+	if firstModule["id"].(json.Number).String() != "1" || firstModule["code"] != "m1" || firstModule["status"].(json.Number).String() != "1" {
+		t.Fatal("module summaries dropped stored identity", firstModule)
 	}
 	status, response := send("POST", "/articles/register", `{"external_link":"https://example.com/http","title":"HTTP published","section_code":"s1","publish":true}`)
 	if status != 200 {

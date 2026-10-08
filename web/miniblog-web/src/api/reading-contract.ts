@@ -3,7 +3,7 @@ import { Module } from '@/types/module'
 import { Section } from '@/types/section'
 import { Subsection } from '@/types/subsection'
 
-export interface ModuleSummaryDTO { id: string | number; code: string; title: string }
+export interface ModuleSummaryDTO { id?: string | number | null; code: string; title: string }
 export interface ArticleDTO {
   id: string; title: string; module_code?: string; section_code?: string; subsection_code?: string
   external_link?: string; author?: string; content?: string; tags?: string[] | null
@@ -16,7 +16,7 @@ export interface SectionDTO {
   id: string; code: string; title: string; module_code: string
   articles?: ArticleDTO[] | null; subsections?: SubsectionDTO[] | null
 }
-export interface ModuleDetailDTO extends ModuleSummaryDTO { sections?: SectionDTO[] | null }
+export interface ModuleDetailDTO extends ModuleSummaryDTO { id: string | number; sections?: SectionDTO[] | null }
 
 export function decimalID(value: string | number): string {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) {
@@ -39,7 +39,9 @@ export function mapArticle(data: ArticleDTO, moduleCode = ''): Article {
 }
 
 export function mapModuleSummary(data: ModuleSummaryDTO): Module {
-  return new Module({ id: decimalID(data.id), code: data.code, title: data.title })
+  // Legacy summaries emit id=0. Modules are located by code; only articles require a positive ID.
+  const id = data.id == null || data.id === '' || data.id === 0 || data.id === '0' ? '' : decimalID(data.id)
+  return new Module({ id, code: data.code, title: data.title })
 }
 
 export function mapModuleDetail(data: ModuleDetailDTO): Module {

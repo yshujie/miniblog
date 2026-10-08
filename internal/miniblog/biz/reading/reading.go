@@ -23,7 +23,7 @@ func (b *Service) Modules(ctx context.Context) (*v1.GetModuleListResponse, error
 	}
 	out := &v1.GetModuleListResponse{Modules: make([]*v1.ModuleInfo, 0, len(rows))}
 	for _, m := range rows {
-		out.Modules = append(out.Modules, &v1.ModuleInfo{Code: m.Code, Title: m.Title, Sort: m.Sort})
+		out.Modules = append(out.Modules, &v1.ModuleInfo{ID: int(m.ID), Code: m.Code, Title: m.Title, Sort: m.Sort, Status: m.Status})
 	}
 	return out, nil
 }
