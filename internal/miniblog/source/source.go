@@ -42,14 +42,15 @@ func Parse(rawURL string) (Identity, error) {
 	}
 	identity := Identity{Provider: "other", CanonicalURL: u.String()}
 	host := strings.ToLower(u.Hostname())
-	notionHost := host == "notion.so" || strings.HasSuffix(host, ".notion.so") || host == "notion.site" || strings.HasSuffix(host, ".notion.site")
+	appNotionHost := host == "app.notion.com"
+	notionHost := appNotionHost || host == "notion.so" || strings.HasSuffix(host, ".notion.so") || host == "notion.site" || strings.HasSuffix(host, ".notion.site")
 	if notionHost {
 		identity.Provider = "notion"
 		// Database/view URLs can point to a different page through p/v. Preserve
 		// their complete URL identity rather than merging on the database path ID.
 		path := strings.TrimSuffix(u.Path, "/")
 		segment := path[strings.LastIndex(path, "/")+1:]
-		if id := notionID.FindStringSubmatch(segment); len(id) > 1 && !u.Query().Has("p") && !u.Query().Has("v") {
+		if id := notionID.FindStringSubmatch(segment); len(id) > 1 && (!appNotionHost || strings.HasPrefix(u.Path, "/p/")) && !u.Query().Has("p") && !u.Query().Has("v") {
 			identity.PageID = normalizePageID(id[1])
 			identity.CanonicalURL = "https://www.notion.so/" + identity.PageID
 		}

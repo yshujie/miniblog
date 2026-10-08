@@ -12,7 +12,7 @@ import (
 
 func TestParseConservativeIdentity(t *testing.T) {
 	page := "aabbccddeeff00112233445566778899"
-	urls := []string{"https://www.notion.so/Title-" + page + "?pvs=4", "https://space.notion.site/" + page, "https://notion.so/aabbccdd-eeff-0011-2233-445566778899"}
+	urls := []string{"https://www.notion.so/Title-" + page + "?pvs=4", "https://space.notion.site/" + page, "https://notion.so/aabbccdd-eeff-0011-2233-445566778899", "https://app.notion.com/p/Title-" + page + "?source=copy_link", "https://app.notion.com/p/shujie-blog/" + page}
 	first, err := Parse(urls[0])
 	if err != nil {
 		t.Fatal(err)
@@ -116,5 +116,21 @@ func TestNotionUnavailableHasSanitizedReason(t *testing.T) {
 	_, err := c.GetTitle(context.Background(), page)
 	if err == nil || err.Error() != "notion_not_configured" {
 		t.Fatal(err)
+	}
+}
+
+func TestAppNotionViewsAndNonPagePathsRemainConservative(t *testing.T) {
+	page := "aabbccddeeff00112233445566778899"
+	canonical, _ := Parse("https://www.notion.so/" + page)
+	for _, raw := range []string{
+		"https://app.notion.com/p/" + page + "?v=11223344556677889900aabbccddeeff",
+		"https://app.notion.com/p/" + page + "?p=" + page,
+		"https://app.notion.com/settings/" + page,
+		"https://app.notion.com.example.com/p/" + page,
+	} {
+		identity, err := Parse(raw)
+		if err != nil || identity.PageID != "" || identity.SourceKey == canonical.SourceKey {
+			t.Fatalf("guessed page identity: %+v %v", identity, err)
+		}
 	}
 }
