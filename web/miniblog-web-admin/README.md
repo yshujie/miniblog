@@ -17,7 +17,7 @@ npm run dev:test
 
 本机后台页面默认 `http://localhost:8001/`，开发/测试 API 默认 `http://localhost:8080/v1`；通过 `VITE_API_ROOT` 可覆盖。不会自动加载旧模板 mock 或外部测试代理。
 
-`VITE_CONTENT_REGISTER_ENABLED` 本地默认开启。生产未显式开启时隐藏工作台菜单并禁用收录入口，已有文章仍可管理。`.env.build_prod` 保留原生产 API 地址及关闭的收录开关；生产开启前须完成后端来源回填、唯一索引和 `MINIBLOG_CONTENT_REGISTER_ENABLED=true` 切换。后端返回 `ContentRegistrationUnavailable` 时，页面说明切换尚未完成并保留输入。
+`VITE_CONTENT_REGISTER_ENABLED` 本地默认开启。生产未显式开启时禁用收录入口；工作台与同步管理菜单仍保留，已有文章仍可管理。`.env.build_prod` 保留原生产 API 地址及关闭的收录开关；生产开启前须完成后端来源回填、唯一索引和 `MINIBLOG_CONTENT_REGISTER_ENABLED=true` 切换。后端返回 `ContentRegistrationUnavailable` 时，页面说明切换尚未完成并保留输入。
 
 ```sh
 npm run type-check
@@ -49,7 +49,7 @@ npx vite preview --host 127.0.0.1 --port 8003 --strictPort --outDir /tmp/miniblo
 MINIBLOG_ADMIN_GATE_URL=http://127.0.0.1:8003 npm run test:browser:fixture
 ```
 
-2026-10-08 本地验证：39 个单元/组件用例通过；真实 Chrome fixture 通过以下场景：目录/昵称默认及连续发布、Notion 迟到建议保留手改标题、空作者发布、503 保留输入、不确定结果原请求重试、重复归档文章显式恢复、production mode 收录开关隐藏/禁用。它证明本地 UI 与截获协议行为；实际 API/数据库联调、真实 Notion 接入和生产发布是另外的验收边界。
+2026-10-08 本地验证：57 个单元/组件用例通过；真实 Chrome fixture 通过以下场景：目录/昵称默认及连续发布、Notion 迟到建议保留手改标题、空作者发布、503 保留输入、不确定结果原请求重试、重复归档文章显式恢复、production mode 收录开关禁用（工作台菜单保留）。它证明本地 UI 与截获协议行为；实际 API/数据库联调、真实 Notion 接入和生产发布是另外的验收边界。
 
 运行证据输出至 `test-results/browser-fixture/`（已忽略）：
 
@@ -59,3 +59,13 @@ MINIBLOG_ADMIN_GATE_URL=http://127.0.0.1:8003 npm run test:browser:fixture
 - `03-failure-retains-input.png`：失败输入保留。
 - `04-duplicate-explicit-restore.png`：重复文档恢复草稿。
 - `05-production-gate-disabled.png`：生产开关未开启。
+
+## Notion 同步与托管文章
+
+`/content/sync` 显示同步健康、来源配置、主题绑定、页面问题、预览与同步运行及逐项变更。页面每 15 秒刷新可见页面的健康与列表；打开运行明细后，每 2 秒读取尚未结束的运行。分页默认每页 20 项。运行请求取得 ID 后只重试读取；响应不确定时先检查运行历史，不自动重发。
+
+服务总开关由后端配置控制。预览不写入文章或目录；手动同步重新扫描当前来源，不重放旧预览。历史文章的状态审核与回填接管通过受控命令完成，网页只展示待审核情况。配置与主题绑定带版本号提交，冲突或失败保留本次输入。
+
+托管文章以 `allowed_actions` 为准，来源管理字段只读；作者通过单字段 PATCH 保存，历史本地正文保留，目录内排序仍可操作。旧页面在编辑中途被接管时，409 后重新读取管理状态，并提供之前输入的副本；不再提交来源字段。紧急下架覆盖来源发布状态；解除后等待下一次同步重新核验，不立即恢复前台。手工飞书收录、编辑与状态操作仍使用原流程。
+
+[同步浏览器夹具说明与截图](docs/notion-sync-fixtures.md)记录本机复现步骤及验收边界。

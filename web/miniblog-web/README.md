@@ -8,7 +8,7 @@ This template should help get you started developing with Vue 3 in Vite.
 - **npm**: 随 Node 自带的 npm ≥ 9（仓库使用 `package-lock.json`，默认包管理器为 npm）。
 - **核心依赖**：
  	- `vue@^3.5.13`
- 	- `vite@^6.2.4` 与 `@vitejs/plugin-vue`
+  - `vite@6.4.0` 与 `@vitejs/plugin-vue`
  	- `pinia@^3.0.2`
  	- `element-plus@^2.9.10`
  	- `axios@^1.9.0`
@@ -72,3 +72,8 @@ npm run build
 文章正文继续通过外链 iframe 阅读，始终提供打开原文。iframe 的 load 事件仅代表收到加载事件，十秒提示也只提供原文出口，不判断平台页面是否真正可读。小于 1280px 的屏幕通过目录抽屉选择文章。
 
 单元与组件测试使用本地替身，覆盖 v1 映射、大 ID、首篇、空目录、错误重试、历史链接、请求竞态、目录交互和 iframe 状态。它们不证明 Notion/飞书真实页面可访问；真实平台与 iOS/Android/Safari 的阅读验收需要单独记录。
+
+
+公开文章可提供 `reading_url`，正文优先使用该地址，再回退旧 `external_link`；两者只接受 HTTP(S)。文章 ID 与旧路由保持不变。模块摘要和完整目录缓存有效期为 60 秒；阅读页可见时每 60 秒刷新，重新回到前台或获得焦点时刷新。相同阅读地址保留 iframe，资料刷新失败保留已加载内容并显示重试提示，明确的 404 则移除正文。紧急下架与解除后的来源重新核验由后端判断。
+
+[管理端本机浏览器夹具](../miniblog-web-admin/docs/notion-sync-fixtures.md)同时覆盖阅读地址、跨模块历史链接、60 秒刷新和紧急下架。当前验证使用本机替身正文，仍不证明真实 Notion/飞书允许 iframe 阅读。
