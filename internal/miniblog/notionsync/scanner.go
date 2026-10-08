@@ -189,6 +189,9 @@ func (s *Service) scanAndApply(ctx context.Context, run model.NotionSyncRun, tok
 	var scanErrors []error
 	for _, id := range AllowedSources() {
 		src, pages, complete, e := s.scanSource(ctx, token, id, run.Mode == "sync")
+		if !complete && e == nil {
+			e = errors.New("incomplete data source query")
+		}
 		if src.Row.ID != "" {
 			sources[id] = src
 		}
@@ -455,23 +458,39 @@ func (s *Service) scanSource(ctx context.Context, token store.LeaseToken, id str
 	for _, archived := range []bool{false, true} {
 		cursor := ""
 		seenCursors := map[string]bool{}
+		resultCount := 0
 		for {
 			result, e := s.client.QueryDataSource(ctx, id, archived, cursor)
+			statusErr := result.QueryStatusError()
+			if statusErr != nil && !errors.Is(statusErr, source.ErrNotionQueryIncomplete) {
+				if e != nil {
+					queryErrors = append(queryErrors, e)
+				} else {
+					queryErrors = append(queryErrors, statusErr)
+				}
+				break
+			}
+			if (result.HasMore && (result.NextCursor == nil || strings.TrimSpace(*result.NextCursor) == "" || seenCursors[*result.NextCursor])) || (!result.HasMore && result.NextCursor != nil) {
+				queryErrors = append(queryErrors, errors.New("invalid or repeated query cursor"))
+				break
+			}
 			// Complete pages already returned remain useful even when the union is incomplete.
 			pages = append(pages, result.Results...)
+			// The cap is per query/partition and counts raw results before page-ID deduplication.
+			resultCount += len(result.Results)
 			if e != nil {
 				queryErrors = append(queryErrors, e)
 				break
 			}
-			if result.RequestStatus.Type != "complete" {
-				queryErrors = append(queryErrors, errors.New("incomplete data source query"))
+			if statusErr != nil {
+				queryErrors = append(queryErrors, statusErr)
+				break
+			}
+			if resultCount >= 10_000 {
+				queryErrors = append(queryErrors, errors.New("notion query result safety limit reached"))
 				break
 			}
 			if !result.HasMore {
-				break
-			}
-			if result.NextCursor == nil || *result.NextCursor == "" || seenCursors[*result.NextCursor] {
-				queryErrors = append(queryErrors, errors.New("invalid or repeated query cursor"))
 				break
 			}
 			cursor = *result.NextCursor

@@ -84,6 +84,8 @@ type NotionPage struct {
 	Properties map[string]NotionProperty `json:"properties"`
 }
 type NotionQueryResult struct {
+	Object        string       `json:"object"`
+	Type          string       `json:"type"`
 	Results       []NotionPage `json:"results"`
 	HasMore       bool         `json:"has_more"`
 	NextCursor    *string      `json:"next_cursor"`
@@ -91,6 +93,114 @@ type NotionQueryResult struct {
 		Type             string `json:"type"`
 		IncompleteReason string `json:"incomplete_reason"`
 	} `json:"request_status"`
+	requestStatusOmitted bool
+}
+
+var ErrNotionQueryIncomplete = errors.New("notion query incomplete")
+
+// QueryStatusError allows a genuinely omitted status only after wire validation.
+// Explicit complete/incomplete also support injected clients returning typed results.
+func (r NotionQueryResult) QueryStatusError() error {
+	switch r.RequestStatus.Type {
+	case "complete":
+		return nil
+	case "incomplete":
+		return ErrNotionQueryIncomplete
+	case "":
+		if r.requestStatusOmitted {
+			return nil
+		}
+	}
+	return errors.New("invalid notion query status")
+}
+
+// UnmarshalJSON validates the list envelope before exposing any page. JSON null
+// and missing fields are distinct; a pointer alone cannot preserve that distinction.
+func (r *NotionQueryResult) UnmarshalJSON(data []byte) error {
+	*r = NotionQueryResult{}
+	invalid := errors.New("invalid notion query envelope")
+	fields, err := notionQueryObject(data)
+	if err != nil {
+		return invalid
+	}
+	for _, key := range []string{"object", "type", "page_or_data_source", "results", "has_more", "next_cursor"} {
+		if _, exists := fields[key]; !exists {
+			return invalid
+		}
+	}
+	metadata, err := notionQueryObject(fields["page_or_data_source"])
+	if err != nil || len(metadata) != 0 || bytes.Equal(bytes.TrimSpace(fields["has_more"]), []byte("null")) {
+		return invalid
+	}
+	type plainResult NotionQueryResult
+	var decoded plainResult
+	if json.Unmarshal(data, &decoded) != nil || decoded.Object != "list" || decoded.Type != "page_or_data_source" || decoded.Results == nil || len(decoded.Results) > 100 {
+		return invalid
+	}
+	for _, page := range decoded.Results {
+		if page.Object != "page" && page.Object != "data_source" {
+			return invalid
+		}
+		if _, err := NotionIdentity(page.ID); err != nil {
+			return invalid
+		}
+	}
+	if decoded.HasMore {
+		if decoded.NextCursor == nil || strings.TrimSpace(*decoded.NextCursor) == "" {
+			return invalid
+		}
+	} else if decoded.NextCursor != nil {
+		return invalid
+	}
+	status, exists := fields["request_status"]
+	if exists {
+		statusFields, err := notionQueryObject(status)
+		if err != nil || (decoded.RequestStatus.Type != "complete" && decoded.RequestStatus.Type != "incomplete") {
+			return invalid
+		}
+		if reason, exists := statusFields["incomplete_reason"]; exists {
+			if bytes.Equal(bytes.TrimSpace(reason), []byte("null")) || decoded.RequestStatus.IncompleteReason != "query_result_limit_reached" {
+				return invalid
+			}
+		}
+	} else {
+		decoded.requestStatusOmitted = true
+	}
+	*r = NotionQueryResult(decoded)
+	return nil
+}
+
+// Duplicate envelope/status keys cannot erase an earlier incomplete marker.
+func notionQueryObject(data []byte) (map[string]json.RawMessage, error) {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	token, err := decoder.Token()
+	if err != nil || token != json.Delim('{') {
+		return nil, errors.New("invalid notion query object")
+	}
+	fields := map[string]json.RawMessage{}
+	for decoder.More() {
+		token, err = decoder.Token()
+		if err != nil {
+			return nil, err
+		}
+		key, ok := token.(string)
+		if _, duplicate := fields[key]; !ok || duplicate {
+			return nil, errors.New("invalid notion query object key")
+		}
+		var value json.RawMessage
+		if err := decoder.Decode(&value); err != nil {
+			return nil, err
+		}
+		fields[key] = value
+	}
+	if token, err = decoder.Token(); err != nil || token != json.Delim('}') {
+		return nil, errors.New("invalid notion query object")
+	}
+	var trailing interface{}
+	if decoder.Decode(&trailing) != io.EOF {
+		return nil, errors.New("invalid notion query trailing data")
+	}
+	return fields, nil
 }
 
 type NotionAPIError struct {
@@ -162,11 +272,8 @@ func (c *HTTPNotionSyncClient) QueryDataSource(ctx context.Context, id string, a
 		body["start_cursor"] = cursor
 	}
 	err := c.request(ctx, http.MethodPost, "/data_sources/"+id+"/query", body, &result, true)
-	if err == nil && result.RequestStatus.Type != "complete" {
-		err = errors.New("notion query incomplete or missing request_status")
-	}
-	if err == nil && result.HasMore && (result.NextCursor == nil || *result.NextCursor == "") {
-		err = errors.New("notion query missing cursor")
+	if err == nil {
+		err = result.QueryStatusError()
 	}
 	return result, err
 }

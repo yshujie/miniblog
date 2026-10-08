@@ -77,7 +77,7 @@ MySQL 验证发现 `ON UPDATE CURRENT_TIMESTAMP` 会在身份升级时改变历�
 | 真实 MySQL | 本任务独立 MySQL 8.0.36，回环端口 63368、测试库 miniblog_refactor_test_rollout；不使用用户或生产数据，全部 13 项集成回归通过（含 race） |
 | 前端 | 独立 Node 24，锁定依赖保持；类型/非修复 lint/构建通过；管理端 18 文件/73 测试，阅读端 9 文件/46 测试通过。原生 Chrome 本地替身验证状态展示、只读历史对照、大 ID、配置失败输入保留、作者失败重试、下架不可阅读、解除后待核验；不代替真实 Notion 或手机 |
 | CI / 兼容生产发布 | PR #3/#4 的 CI 与完整质量门槛通过；main 735344f 的部署 37781019063 成功。三服务实际 SHA 一致、后端 healthy，schema 6 clean 与唯一约束通过；历史文章和目录字段比对保持。运行只读 Token 已注入，bootstrap Token 未注入，同步 false、control paused、五来源 disabled |
-| 真实 Notion REST | schema_check 37781133297 成功：五库 complete=true，官方实际 data source ID 与固定清单一致，标题/主题/知识点类型和四态 ID 有效。运行连接身份为 miniblog_reader。尚未完整扫描页面、冻结基线、回填或接管 |
+| 真实 Notion REST | schema_check 37781133297 成功：五库 complete=true，官方实际 data source ID 与固定清单一致，标题/主题/知识点类型和四态 ID 有效。运行连接身份为 miniblog_reader。已读取 47 页；首次完整扫描被可选 request_status 的兼容缺陷安全阻止，未冻结基线。修复后重新扫描，回填和接管仍待审核 |
 | 生产定时 / 五库试运行 | 未启用；等待实际历史审核、分库接管与计时运行 |
 | 匿名阅读 / 实际手机 / 使用确认 | 待真实公开验收页及用户试读，不用浏览器视口代替手机 |
 
@@ -91,9 +91,17 @@ MySQL 验证发现 `ON UPDATE CURRENT_TIMESTAMP` 会在身份升级时改变历�
 - [PR #3](https://github.com/yshujie/miniblog/pull/3) 将运行只读 Secret 通过受限临时目录写入服务器私有环境；[PR #4](https://github.com/yshujie/miniblog/pull/4) 修复 SSH Key 换行兼容并增强任务目录所有权及清理守卫。34 项 Python 操作工具测试通过。首次 SSH 传输失败发生在服务替换和 Notion 请求之前；修复后验证成功，失败及成功任务的凭据暂存均已清理。
 - [兼容部署 37781019063](https://github.com/yshujie/miniblog/actions/runs/37781019063) 实际生产版本为 `735344f086302454590a8d3e0033285ea99e9423`；运行 Token 存在，回填 Token 不存在。私有环境 0600，生产身份审计无阻断项。公开接口健康验证通过；不代表真实文章阅读或实际手机验收。
 - [真实 schema_check 37781133297](https://github.com/yshujie/miniblog/actions/runs/37781133297) 使用当时运行的兼容镜像；其 Go/CLI 实现与 735344f 相同。完整报告留存服务器 `/opt/miniblog/ops/notion/37781133297-1/schema.json`（0600），未上传 GitHub Artifact，未读取回填 Secret。
-- [一次性初始化工具](../scripts/notion-rollout-init/README.md) 默认仅读预检，显式执行时在一个事务中保存固定五库映射、改名 database/project、新建停用 algorithm，保留历史目录状态 0、ID/code/排序及全部文章字段。不访问 Notion、不建立章节、不冻结基线、不启用来源或同步。实际生产初始化尚未执行。
+- [一次性初始化工具](../scripts/notion-rollout-init/README.md) 默认仅读预检，显式执行时在一个事务中保存固定五库映射、改名 database/project、新建停用 algorithm，保留历史目录状态、ID/code/排序及全部文章字段。不访问 Notion、不建立章节、不冻结基线、不启用来源或同步。已执行生产初始化：全新预检 20261008-2 后单事务保存五来源版本 1，全部停用；database/project 保留既有停用状态 2，仅改名，新建 algorithm 亦停用。42 篇文章、20 个章节、0 个子章节、25 篇公开文章及其 ID 集合保持。
 - 初始化工具本地独立 MySQL 8.0.36 测试通过（专用回环端口 63369、数据库 `miniblog_rollout_init_test`），含 race、第五库 SQL 失败完整回滚、真实旧状态/正文/作者/位置/时间保持、公开 ID 集合不变、重复执行 no-op、MyISAM 拒绝。14 项顶层测试与 vet 通过；真实五库 schema 报告离线复验通过。CI 为该夹具单独建库。初版完整质量门槛 37783971745/37783971877 通过；首次来源保存修复随后重新运行。
 
-接下来先审核初始化预检并执行固定配置，再完整 dry_run 冻结本次历史基线，生成历史匹配及公开条件清单。运行连接的页面读取、公开地址、接管回填、定时试运行、匿名阅读和实际手机验收仍分别待执行；当前不能把 schema-only 成功标记为五库自动同步已上线。
+固定配置初始化已完成，文章、章节、子章节的历史字段摘要再次比对完全一致。只读库存审计显示仅启用 database/project 模块不会新增公开文章；后续章节或 Notion 接管的可见性影响仍须逐项审核。完整 dry_run、最终历史匹配、回填和接管仍按顺序执行。定时试运行、匿名阅读和实际手机验收尚未执行。
 
 首次生产只读预检 `20261008-1` 安全阻止（five_sources_required），未写业务数据：管理接口会合成未配置来源 DTO，而初始化工具初版只接受五条物理记录。已补无记录及部分记录的默认初始化计划，缺失来源仅接受审核版本 0，执行仍调用事务内 UpdateSource；新增第五库 INSERT 失败完整回滚测试通过。新报告提供 source_record_count / before_exists 区分实际记录和虚拟占位。旧上传二进制未执行 apply，继续前必须重建并使用全新预检目录。
+
+
+### 官方查询响应兼容修复
+
+- [首次页面扫描 37787289642](https://github.com/yshujie/miniblog/actions/runs/37787289642) 读取 47 页后安全失败，未冻结基线、未写文章或 Notion。运行条目仅留存待审核来源；五库 schema 和凭据正常。
+- 实际官方空库、分页和归档查询均省略 request_status。官方 [查询响应](https://developers.notion.com/reference/query-a-data-source#pagination-limit) 将其设为可选，仅不能把 has_more=false 单独当作完整性证明。修复只接受严格验证的合法省略；显式 null/未知状态、畸形列表或游标拒绝，明确 incomplete 仍保留可靠部分页面并阻止全局完整标记。
+- 每个来源的归档与非归档分区分别按去重前结果数量计数；达到 10,000 即保守阻止完整扫描、冻结基线和缺席推断。这是本地安全门槛，官方恰好 10,000 条的合法结果也需人工处理，本轮不增加分窗扫描。
+- 回归覆盖空库/多页合法省略、必填字段和状态畸形、重复键、循环/矛盾游标、9,999/10,000 边界、双分区独立计数、可靠部分页面应用和全局不冻结/不按缺席撤回。source、同步和 CLI 的 race 与 vet 通过；修复提交后重跑全仓 CI 和生产只读扫描。
