@@ -207,11 +207,13 @@ func inspect(ctx context.Context, gdb *gorm.DB) (*snapshot, error) {
 		subsectionCache[code] = &row
 		return &row, nil
 	}
+	// SQL seeds (000002 and section.sql) contain inactive module/section status 0.
+	// Preserve that legacy value; public reads still require status 1.
 	for _, m := range state.modules {
 		if strings.TrimSpace(m.Code) == "" {
 			add("module", m.ID, "empty_code")
 		}
-		if m.Status != model.ModuleStatusNormal && m.Status != model.ModuleStatusDeleted {
+		if m.Status != 0 && m.Status != model.ModuleStatusNormal && m.Status != model.ModuleStatusDeleted {
 			add("module", m.ID, "invalid_status")
 		}
 	}
@@ -226,7 +228,7 @@ func inspect(ctx context.Context, gdb *gorm.DB) (*snapshot, error) {
 		if strings.TrimSpace(s.Code) == "" {
 			add("section", s.ID, "empty_code")
 		}
-		if s.Status != model.SectionStatusNormal && s.Status != model.SectionStatusDeleted {
+		if s.Status != 0 && s.Status != model.SectionStatusNormal && s.Status != model.SectionStatusDeleted {
 			add("section", s.ID, "invalid_status")
 		}
 	}

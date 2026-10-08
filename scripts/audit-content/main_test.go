@@ -2,13 +2,17 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/glebarez/sqlite"
+	"github.com/yshujie/miniblog/internal/miniblog/biz/reading"
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/source"
+	"github.com/yshujie/miniblog/internal/miniblog/store"
+	"github.com/yshujie/miniblog/internal/pkg/errno"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -235,5 +239,123 @@ func TestJSONTagBackfillPreservesCSVAndRequiresMaintenance(t *testing.T) {
 	}
 	if !row.UpdatedAt.Equal(state.candidates[0].before.UpdatedAt) {
 		t.Fatal("tag migration changed historical timestamp")
+	}
+}
+
+// Historical SQL seeds wrote status 0 directly, bypassing the create hooks.
+// Accepting these inactive module/section rows must never publish or normalize them.
+func TestAuditLegacyInactiveCatalogPreservesHistoryAndVisibility(t *testing.T) {
+	for _, kind := range []string{"module", "section"} {
+		t.Run(kind, func(t *testing.T) {
+			gdb := auditDB(t)
+			const articleID uint64 = 9007199254740993
+			auditArticle(t, gdb, articleID, "https://example.com/legacy-inactive")
+			created := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+			updated := created.Add(24 * time.Hour)
+			for _, table := range []string{"module", "section", "article"} {
+				changes := map[string]interface{}{"created_at": created, "updated_at": updated}
+				if table == kind {
+					changes["status"] = 0
+				}
+				if err := gdb.Table(table).Where("1 = 1").UpdateColumns(changes).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			var beforeModule model.Module
+			var beforeSection model.Section
+			var beforeArticle model.Article
+			for _, row := range []interface{}{&beforeModule, &beforeSection, &beforeArticle} {
+				if err := gdb.First(row).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			state, err := inspect(context.Background(), gdb)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if state.report.blocked() {
+				t.Fatalf("historical inactive %s blocked: %+v", kind, state.report)
+			}
+			if err = backfill(context.Background(), gdb, state); err != nil {
+				t.Fatal(err)
+			}
+			var afterModule model.Module
+			var afterSection model.Section
+			var afterArticle model.Article
+			for _, row := range []interface{}{&afterModule, &afterSection, &afterArticle} {
+				if err := gdb.First(row).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			if afterModule.Status != beforeModule.Status || afterSection.Status != beforeSection.Status || afterArticle.Status != beforeArticle.Status {
+				t.Fatal("backfill normalized historical status")
+			}
+			for _, stamps := range [][2]time.Time{{afterModule.CreatedAt, afterModule.UpdatedAt}, {afterSection.CreatedAt, afterSection.UpdatedAt}, {afterArticle.CreatedAt, afterArticle.UpdatedAt}} {
+				if !stamps[0].Equal(created) || !stamps[1].Equal(updated) {
+					t.Fatal("backfill changed historical timestamps")
+				}
+			}
+			if afterArticle.ID != beforeArticle.ID || afterArticle.Content != beforeArticle.Content || afterArticle.ExternalLink != beforeArticle.ExternalLink || afterArticle.Pos != beforeArticle.Pos || afterArticle.SourceKey == nil {
+				t.Fatal("backfill changed article history or omitted source identity")
+			}
+			public := reading.New(store.NewStore(gdb))
+			modules, err := public.Modules(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if kind == "module" {
+				if len(modules.Modules) != 0 {
+					t.Fatal("legacy inactive module became public")
+				}
+				if _, err = public.Module(context.Background(), "m"); !errors.Is(err, errno.ErrModuleNotFound) {
+					t.Fatalf("legacy inactive module detail is public: %v", err)
+				}
+			} else {
+				detail, err := public.Module(context.Background(), "m")
+				if err != nil || len(detail.ModuleDetail.Sections) != 0 {
+					t.Fatalf("legacy inactive section became public: %v", err)
+				}
+			}
+			if _, err = public.Article(context.Background(), articleID); !errors.Is(err, errno.ErrArticleNotFound) {
+				t.Fatalf("published article under inactive %s is public: %v", kind, err)
+			}
+		})
+	}
+}
+
+func TestAuditStillBlocksUnsupportedStatusesWithoutBackfill(t *testing.T) {
+	for _, tc := range []struct {
+		kind   string
+		status int
+	}{
+		{"module", -1}, {"module", 3}, {"section", -1}, {"section", 3},
+		{"subsection", 0}, {"subsection", 3}, {"article", 0}, {"article", 5},
+	} {
+		t.Run(fmt.Sprintf("%s_%d", tc.kind, tc.status), func(t *testing.T) {
+			gdb := auditDB(t)
+			auditArticle(t, gdb, 91, "https://example.com/invalid-status")
+			if tc.kind == "subsection" {
+				if err := gdb.Create(&model.Subsection{Code: "child", SectionCode: "s", Title: "Child", Status: model.SubsectionStatusNormal}).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := gdb.Table(tc.kind).Where("1 = 1").UpdateColumn("status", tc.status).Error; err != nil {
+				t.Fatal(err)
+			}
+			state, err := inspect(context.Background(), gdb)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !state.report.blocked() || len(state.report.Issues) != 1 || state.report.Issues[0].Kind != tc.kind || state.report.Issues[0].Reason != "invalid_status" {
+				t.Fatalf("unsupported status was accepted: %+v", state.report)
+			}
+			if err = backfill(context.Background(), gdb, state); err == nil {
+				t.Fatal("backfill accepted unsupported status")
+			}
+			var written int64
+			if err = gdb.Model(&model.Article{}).Where("source_key IS NOT NULL").Count(&written).Error; err != nil || written != 0 {
+				t.Fatal("blocked audit performed partial source backfill", err)
+			}
+		})
 	}
 }
