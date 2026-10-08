@@ -19,6 +19,7 @@ type Article struct {
 	SectionCode    string    `json:"section_code"`
 	SubsectionCode string    `json:"subsection_code"`
 	Author         string    `json:"author"`
+	TagsJSON       *string   `json:"-" gorm:"type:longtext"`
 	Tags           string    `json:"tags"`
 	Pos            int       `json:"pos"`
 	Status         int       `json:"status"`
