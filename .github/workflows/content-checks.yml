@@ -1,0 +1,58 @@
+name: Content contracts and frontends
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0.36
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: miniblog_refactor_test_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      MINIBLOG_TEST_MYSQL_DSN: root@tcp(127.0.0.1:3306)/miniblog_refactor_test_ci?parseTime=true&multiStatements=true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.0"
+          cache: true
+      - run: go test -race ./...
+      - run: go vet ./...
+      - run: git diff --check
+
+  frontend:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        directory: [web/miniblog-web, web/miniblog-web-admin]
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ${{ matrix.directory }}/package-lock.json
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm run lint:check --if-present
+      - run: npm run test:unit
+      - run: npm run build

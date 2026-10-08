@@ -1,6 +1,12 @@
 # ---------- Builder ----------
 FROM node:20-alpine AS builder
 
+# Feature enablement is a build-time choice, after the database cutover.
+ARG VITE_CONTENT_REGISTER_ENABLED=false
+ARG VITE_API_ROOT=https://api.yangshujie.com/v1
+ENV VITE_CONTENT_REGISTER_ENABLED=${VITE_CONTENT_REGISTER_ENABLED}
+ENV VITE_API_ROOT=${VITE_API_ROOT}
+
 # 设置构建参数
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
