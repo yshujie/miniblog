@@ -62,6 +62,7 @@ declare module 'vue' {
     Screenfull: typeof import('./src/components/Screenfull/index.vue')['default']
     SizeSelect: typeof import('./src/components/SizeSelect/index.vue')['default']
     SvgIcon: typeof import('./src/components/SvgIcon/index.vue')['default']
+    SyncHealthBar: typeof import('./src/components/content/SyncHealthBar.vue')['default']
   }
   export interface GlobalDirectives {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']

@@ -9,7 +9,7 @@ const AUTH_BASE_URL = apiRoot;
 const ADMIN_BASE_URL = `${apiRoot}/admin`;
 
 // Content pages own their inline errors; legacy login and user screens keep notifications.
-const isContentRequest = config => /^\/(articles|article-sources|catalog|modules|sections|subsections)(\/|$)/.test(config?.url || '');
+const isContentRequest = config => /^\/(articles|article-sources|catalog|modules|sections|subsections|notion-sync)(\/|$)/.test(config?.url || '');
 
 const service = axios.create({
   timeout: 5000,

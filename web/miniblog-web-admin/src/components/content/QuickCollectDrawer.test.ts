@@ -37,6 +37,16 @@ async function fill(title = '手填标题') {
   await wrapper.get('input[data-test="collect-title"]').setValue(title);
 }
 describe('quick collection drawer', () => {
+  it('offers view only for an already managed source, without move or restore', async () => {
+    const managed = { ...article, management: { mode: 'notion_sync' as const, managed_fields: ['title'] }, allowed_actions: ['view_source', 'reorder', 'release_hold'] };
+    vi.mocked(previewSource).mockResolvedValue({ provider: 'notion', canonical_url: 'https://example.feishu.cn/docx/a', title: '来源标题', metadata_status: 'resolved', existing_article: managed });
+    await open(); await fill();
+    await wrapper.findAll('button').find(button => button.text() === '重新获取')!.trigger('click'); await flushPromises();
+    expect(wrapper.get('[data-test="collect-duplicate"]').text()).toContain('Notion 同步管理');
+    expect(wrapper.findAll('button').some(button => button.text() === '移动到所选目录')).toBe(false);
+    expect(wrapper.findAll('button').some(button => button.text() === '恢复为草稿')).toBe(false);
+    expect(moveArticle).not.toHaveBeenCalled(); expect(changeArticleStatus).not.toHaveBeenCalled();
+  });
   it('prefers the current directory, defaults nickname, and preserves directory/author after publish and continue', async () => {
     useWorkspace().remember({ ...context, section_code: 'advanced' }, '');
     await open(); await fill();

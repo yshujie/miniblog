@@ -33,10 +33,11 @@
     <div v-if="quick.duplicate.value" class="duplicate" data-test="collect-duplicate">
       <p>现有文章：{{ quick.duplicate.value.title }}（{{ statusLabels[quick.duplicate.value.status] }}）</p>
       <p>归属：{{ quick.duplicate.value.module?.title }} / {{ quick.duplicate.value.section?.title }} / {{ quick.duplicate.value.subsection?.title || '直属章节' }}</p>
-      <p v-if="quick.duplicate.value.status === 'Deleted'">归档文章需先恢复为草稿，再移动目录。</p>
+      <p v-if="!isManagedArticle(quick.duplicate.value) && quick.duplicate.value.status === 'Deleted'">归档文章需先恢复为草稿，再移动目录。</p>
       <el-button :disabled="quick.requestLocked.value || duplicateBusy" @click="openExisting">打开现有文章</el-button>
-      <el-button :disabled="quick.requestLocked.value || quick.duplicate.value.status === 'Deleted' || !catalog.valid(quick.context())" :loading="duplicateBusy" @click="moveExisting">移动到所选目录</el-button>
-      <el-button v-if="quick.duplicate.value.status === 'Deleted'" :disabled="quick.requestLocked.value" :loading="duplicateBusy" @click="restoreExisting">恢复为草稿</el-button>
+      <p v-if="isManagedArticle(quick.duplicate.value)">此文章由 Notion 同步管理，请在来源修改资料；本地作者、排序和紧急下架仍可在工作台管理。</p>
+      <el-button v-if="canArticleAction(quick.duplicate.value, 'move')" :disabled="quick.requestLocked.value || quick.duplicate.value.status === 'Deleted' || !catalog.valid(quick.context())" :loading="duplicateBusy" @click="moveExisting">移动到所选目录</el-button>
+      <el-button v-if="canArticleAction(quick.duplicate.value, 'restore')" :disabled="quick.requestLocked.value" :loading="duplicateBusy" @click="restoreExisting">恢复为草稿</el-button>
     </div>
     <template #footer>
       <template v-if="quick.frozen.value && !quick.submitting.value">
@@ -61,6 +62,7 @@ import useWorkspace from '@/store/modules/contentWorkspace';
 import useUserStore from '@/store/modules/user';
 import { moveArticle, changeArticleStatus } from '@/api/content';
 import { contentRegistrationEnabled } from '@/utils/content-flags';
+import { canArticleAction, isManagedArticle } from '@/utils/article-actions';
 import { errorMessage } from '@/utils/api-error';
 import { statusLabels, type DirectoryContext, type ArticleInfo } from '@/types/content';
 const props = defineProps<{ modelValue: boolean; context?: DirectoryContext }>();
@@ -97,10 +99,10 @@ async function duplicateAction(action: () => Promise<{ article?: ArticleInfo }>)
   try { const result = await action(); if (result?.article) quick.duplicate.value = result.article; workspace.invalidateArticles(); emit('collected'); await quick.suggestTitle(); ElMessage.success('文章已更新'); } catch (cause) { quick.error.value = errorMessage(cause); } finally { duplicateBusy.value = false; }
 }
 const moveExisting = () => {
-  const article = quick.duplicate.value; if (!article) return;
+  const article = quick.duplicate.value; if (!article || !canArticleAction(article, 'move')) return;
   return duplicateAction(() => moveArticle(article.id, { section_code: quick.form.section_code, subsection_code: quick.form.subsection_code || undefined }));
 };
-const restoreExisting = () => { const article = quick.duplicate.value; if (article) return duplicateAction(() => changeArticleStatus(article.id, 'restore')); };
+const restoreExisting = () => { const article = quick.duplicate.value; if (article && canArticleAction(article, 'restore')) return duplicateAction(() => changeArticleStatus(article.id, 'restore')); };
 async function beforeClose(done: () => void) {
   if (quick.submitting.value) return;
   if (quick.form.external_link || quick.form.title) {

@@ -16,6 +16,8 @@ export async function fetchArticles(filters: ArticleFilters): Promise<ArticleLis
 }
 export const getArticle = (id: string) => articleResponse({ url: `/articles/${id}`, method: 'get' });
 export const saveArticle = (data: UpdateArticleRequest) => articleResponse({ url: `/articles/${data.id}`, method: 'put', data });
+export const saveArticleLocalFields = (id: string, data: { author: string }) => articleResponse({ url: `/articles/${id}/local-fields`, method: 'patch', data });
+export const setPublicationHold = (id: string, data: { held: boolean; reason?: string }) => articleResponse({ url: `/articles/${id}/publication-hold`, method: 'put', data });
 export const createLegacyArticle = (data: UpdateArticleRequest) => articleResponse({ url: '/articles', method: 'post', data });
 export async function changeArticleStatus(id: string, action: 'publish' | 'unpublish' | 'archive' | 'restore'): Promise<{ article?: ArticleInfo }> {
   const data = await request({ url: `/articles/${id}/${action}`, method: 'put' }) as unknown as { article?: ArticleWire } | undefined;

@@ -32,6 +32,7 @@ async function fixture(route) {
   requests.push({ method, pathname, body, key: request.headers()['idempotency-key'] });
   const reply = (payload, status = 200) => route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(payload) });
   if (pathname === '/users/myinfo') return reply(success({ user: { roles: ['admin'], nickname: '联调作者', avatar: '', introduction: '本地测试账号' }}));
+  if (pathname === '/notion-sync/status') return reply(success({ enabled: false, paused: false, health: 'disabled', pending_count: 0, error_count: 0, sources: [] }));
   if (pathname === '/modules') return reply(success({ modules: [moduleRow] }));
   if (pathname === '/sections/go') return reply(success({ sections }));
   if (pathname.startsWith('/subsections/')) return reply(success({ subsections: pathname.endsWith('/base') ? subsections : [] }));
@@ -132,7 +133,7 @@ async function snapshot(page, filename) {
     if (gateBase) {
       const gate = await prepare(browser, gateBase);
       assert.equal(await gate.page.getByRole('button', { name: '收录文章', exact: true }).isDisabled(), true);
-      assert.equal(await gate.page.locator('.sidebar-container').getByText('目录与收录', { exact: true }).count(), 0);
+      assert.equal(await gate.page.locator('.sidebar-container').getByText('目录与收录', { exact: true }).count(), 1);
       await gate.page.goto(`${gateBase}/#/content/workbench`); await gate.page.getByText('收录功能暂未启用，目录和已有文章仍可管理。', { exact: true }).waitFor();
       assert.equal(await gate.page.getByRole('button', { name: '收录文章', exact: true }).isDisabled(), true);
       await snapshot(gate.page, '05-production-gate-disabled.png'); await gate.context.close();

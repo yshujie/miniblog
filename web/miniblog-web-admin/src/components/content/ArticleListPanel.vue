@@ -11,20 +11,22 @@
     </el-form>
     <el-alert v-if="list.error.value" :title="list.error.value" type="error" :closable="false" show-icon><template #default><el-button link @click="list.search()">重试</el-button></template></el-alert>
     <el-table :data="list.articles.value" v-loading="list.loading.value" border empty-text="当前条件下没有文章">
-      <el-table-column label="标题" min-width="240"><template #default="{ row }"><router-link :to="`/article/edit/${row.id}`">{{ row.title }}</router-link><a class="source-link" :href="row.external_link" target="_blank" rel="noopener noreferrer">原文 ↗</a></template></el-table-column>
+      <el-table-column label="标题" min-width="240"><template #default="{ row }"><router-link :to="`/article/edit/${row.id}`">{{ row.title }}</router-link><a v-if="sourceURL(row)" class="source-link" :href="sourceURL(row)" target="_blank" rel="noopener noreferrer">原文 ↗</a></template></el-table-column>
       <el-table-column label="目录" min-width="190"><template #default="{ row }">{{ row.module?.title }} / {{ row.section?.title }} / {{ row.subsection?.title || '直属章节' }}</template></el-table-column>
       <el-table-column prop="author" label="作者" width="120" />
       <el-table-column label="标签" min-width="140"><template #default="{ row }"><el-tag v-for="tag in row.tags" :key="tag" class="tag">{{ tag }}</el-tag></template></el-table-column>
-      <el-table-column label="状态" width="100"><template #default="{ row }"><el-tag :type="row.status === 'Published' ? 'success' : row.status === 'Deleted' ? 'danger' : 'info'">{{ statusLabels[row.status as ArticleStatus] }}</el-tag></template></el-table-column>
+      <el-table-column label="状态" width="100"><template #default="{ row }"><el-tag :type="row.status === 'Published' ? 'success' : row.status === 'Deleted' ? 'danger' : 'info'">{{ statusLabels[row.status as ArticleStatus] }}</el-tag><el-tag v-if="isManagedArticle(row)">Notion 同步</el-tag><el-tag v-if="row.publication_hold?.held" type="danger">本地紧急下架</el-tag></template></el-table-column>
       <el-table-column label="操作" width="390" fixed="right"><template #default="{ row }">
-        <el-button link type="primary" @click="router.push(`/article/edit/${row.id}`)">编辑</el-button>
-        <el-button v-if="row.status !== 'Deleted'" link @click="openMove(row)">移动</el-button>
-        <el-button v-if="row.status !== 'Deleted' && row.status !== 'Published'" link type="success" :disabled="!!busy" @click="changeStatus(row, 'publish')">发布</el-button>
-        <el-button v-if="row.status === 'Published'" link type="warning" :disabled="!!busy" @click="changeStatus(row, 'unpublish')">下架</el-button>
-        <el-button v-if="row.status !== 'Deleted'" link type="danger" :disabled="!!busy" @click="changeStatus(row, 'archive')">归档</el-button>
-        <el-button v-else link type="success" :disabled="!!busy" @click="changeStatus(row, 'restore')">恢复草稿</el-button>
-        <el-button v-if="canReorder && row.status !== 'Deleted'" link :disabled="!!busy" @click="shiftArticle(row, -1)">上移</el-button>
-        <el-button v-if="canReorder && row.status !== 'Deleted'" link :disabled="!!busy" @click="shiftArticle(row, 1)">下移</el-button>
+        <el-button link type="primary" @click="router.push(`/article/edit/${row.id}`)">{{ isManagedArticle(row) ? '查看 / 本地信息' : '编辑' }}</el-button>
+        <el-button v-if="canArticleAction(row, 'move')" link @click="openMove(row)">移动</el-button>
+        <el-button v-if="canArticleAction(row, 'publish')" link type="success" :disabled="!!busy" @click="changeStatus(row, 'publish')">发布</el-button>
+        <el-button v-if="canArticleAction(row, 'unpublish')" link type="warning" :disabled="!!busy" @click="changeStatus(row, 'unpublish')">下架</el-button>
+        <el-button v-if="canArticleAction(row, 'archive')" link type="danger" :disabled="!!busy" @click="changeStatus(row, 'archive')">归档</el-button>
+        <el-button v-if="canArticleAction(row, 'restore')" link type="success" :disabled="!!busy" @click="changeStatus(row, 'restore')">恢复草稿</el-button>
+        <el-button v-if="canArticleAction(row, 'hold')" link type="danger" :disabled="!!busy" @click="changeHold(row, true)">紧急下架</el-button>
+        <el-button v-if="canArticleAction(row, 'release_hold')" link :disabled="!!busy" @click="changeHold(row, false)">解除本地下架</el-button>
+        <el-button v-if="canReorder && canArticleAction(row, 'reorder')" link :disabled="!!busy" @click="shiftArticle(row, -1)">上移</el-button>
+        <el-button v-if="canReorder && canArticleAction(row, 'reorder')" link :disabled="!!busy" @click="shiftArticle(row, 1)">下移</el-button>
       </template></el-table-column>
     </el-table>
     <p v-if="!canReorder" class="hint">选择章节直属位置或子章节，并清空标题与状态筛选后可调整文章顺序。</p>
@@ -43,8 +45,9 @@ import QuickCollectDrawer from './QuickCollectDrawer.vue';
 import { useCatalog } from '@/composables/useCatalog';
 import { useArticleList } from '@/composables/useArticleList';
 import useWorkspace from '@/store/modules/contentWorkspace';
-import { changeArticleStatus, fetchPositionArticles, moveArticle, reorderArticles } from '@/api/content';
+import { changeArticleStatus, fetchPositionArticles, moveArticle, reorderArticles, setPublicationHold } from '@/api/content';
 import { contentRegistrationEnabled } from '@/utils/content-flags';
+import { canArticleAction, isManagedArticle, sourceURL } from '@/utils/article-actions';
 import { errorMessage } from '@/utils/api-error';
 import { statusLabels, type ArticleInfo, type ArticleStatus, type DirectoryContext } from '@/types/content';
 const props = defineProps<{ context?: DirectoryContext; title?: string; directoryFilters?: boolean }>();
@@ -67,16 +70,23 @@ async function action(id: string, run: () => Promise<unknown>) {
   try { await run(); workspace.invalidateArticles(); ElMessage.success('操作成功'); } catch (cause) { ElMessage.error(errorMessage(cause)); } finally { busy.value = ''; }
 }
 async function changeStatus(row: ArticleInfo, command: 'publish' | 'unpublish' | 'archive' | 'restore') {
+  if (!canArticleAction(row, command)) return;
   if (command === 'archive') { try { await ElMessageBox.confirm('归档后文章将移出前台，记录仍保留，可恢复为草稿。', '归档文章'); } catch { return; } }
   await action(row.id, () => changeArticleStatus(row.id, command));
 }
-const openMove = (row: ArticleInfo) => { movingArticle.value = row; moveTarget.value = { module_code: row.module.code, section_code: row.section.code, subsection_code: row.subsection?.code || '' }; moveOpen.value = true; };
+const openMove = (row: ArticleInfo) => { if (!canArticleAction(row, 'move')) return; movingArticle.value = row; moveTarget.value = { module_code: row.module.code, section_code: row.section.code, subsection_code: row.subsection?.code || '' }; moveOpen.value = true; };
 async function submitMove() {
-  const article = movingArticle.value; if (!article || !catalog.valid(moveTarget.value)) return;
+  const article = movingArticle.value; if (!article || !canArticleAction(article, 'move') || !catalog.valid(moveTarget.value)) return;
   await action(article.id, async () => { await moveArticle(article.id, { section_code: moveTarget.value.section_code, subsection_code: moveTarget.value.subsection_code || undefined }); moveOpen.value = false; });
 }
+async function changeHold(row: ArticleInfo, held: boolean) {
+  if (!canArticleAction(row, held ? 'hold' : 'release_hold')) return;
+  let reason: string | undefined;
+  try { if (held) reason = (await ElMessageBox.prompt('只阻止 miniblog 阅读，不撤回外部原文权限。可填写原因。', '紧急下架')).value; else await ElMessageBox.confirm('解除后需重新同步核验来源，再按来源和目录状态决定是否公开。', '解除本地下架'); } catch { return; }
+  await action(row.id, () => setPublicationHold(row.id, { held, reason }));
+}
 async function shiftArticle(row: ArticleInfo, direction: -1 | 1) {
-  const section = list.filters.section_code; if (!section || !canReorder.value) return;
+  const section = list.filters.section_code; if (!section || !canReorder.value || !canArticleAction(row, 'reorder')) return;
   const subsection = list.filters.subsection_code || '';
   await action(row.id, async () => {
     const items = await fetchPositionArticles(section, subsection); const ids = items.map(item => item.id); const index = ids.indexOf(row.id); const target = index + direction;

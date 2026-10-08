@@ -7,13 +7,14 @@
       <div class="catalog-actions"><el-button size="small" :disabled="!selectedNode || orderBusy || !canMove(-1)" @click="moveNode(-1)">目录上移</el-button><el-button size="small" :disabled="!selectedNode || orderBusy || !canMove(1)" @click="moveNode(1)">目录下移</el-button></div>
       <div class="catalog-links"><router-link to="/module/list">模块管理</router-link><router-link to="/section/list">章节管理</router-link><router-link to="/subsection/list">子章节管理</router-link></div>
     </aside>
-    <main><el-alert v-if="!contentRegistrationEnabled" title="收录功能暂未启用，目录和已有文章仍可管理。" type="info" :closable="false" /><ArticleListPanel ref="panel" :context="selected" :title="catalog.label(selected) || '全部文章'" /></main>
+    <main><SyncHealthBar /><el-alert v-if="!contentRegistrationEnabled" title="收录功能暂未启用，目录和已有文章仍可管理。" type="info" :closable="false" /><ArticleListPanel ref="panel" :context="selected" :title="catalog.label(selected) || '全部文章'" /></main>
   </div>
 </template>
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
+import SyncHealthBar from '@/components/content/SyncHealthBar.vue';
 import ArticleListPanel from '@/components/content/ArticleListPanel.vue';
 import { useCatalog, type DirectoryNode } from '@/composables/useCatalog';
 import useWorkspace from '@/store/modules/contentWorkspace';

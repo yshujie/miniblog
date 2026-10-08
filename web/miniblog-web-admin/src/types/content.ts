@@ -6,7 +6,9 @@ export interface DirectoryContext { module_code: string; section_code: string; s
 export interface ArticleInfo {
   id: string; title: string; author: string; tags: string[]; external_link: string; content: string;
   module: ModuleItem; section: SectionItem; subsection?: SubsectionItem; pos: number; status: ArticleStatus;
-  created_at?: string; updated_at?: string;
+  created_at?: string; updated_at?: string; reading_url?: string;
+  management?: { mode: 'manual' | 'notion_sync'; source_id?: string; managed_fields: string[] };
+  allowed_actions?: string[]; publication_hold?: { held: boolean; reason?: string }; effective_visibility?: boolean;
 }
 export interface ArticleFilters { module_code?: string; section_code?: string; subsection_code?: string; direct_only?: boolean; title?: string; status?: ArticleStatus | ''; page: number; limit: number }
 export interface ArticleList { articles: ArticleInfo[]; total: number }
