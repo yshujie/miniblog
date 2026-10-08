@@ -9,18 +9,21 @@ import (
 
 // Article 文章
 type Article struct {
-	ID           uint64    `json:"id"`
-	Title        string    `json:"title"`
-	Content      string    `json:"content"`
-	ExternalLink string    `json:"external_link"`
+	ID             uint64    `json:"id"`
+	Title          string    `json:"title"`
+	Content        string    `json:"content"`
+	ExternalLink   string    `json:"external_link"`
+	Provider       *string   `json:"provider,omitempty"`
+	CanonicalURL   *string   `json:"canonical_url,omitempty"`
+	SourceKey      *string   `json:"-" gorm:"type:char(64);uniqueIndex:uq_article_source_key"`
 	SectionCode    string    `json:"section_code"`
 	SubsectionCode string    `json:"subsection_code"`
 	Author         string    `json:"author"`
-	Tags         string    `json:"tags"`
-	Pos          int       `json:"pos"`
-	Status       int       `json:"status"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	Tags           string    `json:"tags"`
+	Pos            int       `json:"pos"`
+	Status         int       `json:"status"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // 文章状态
