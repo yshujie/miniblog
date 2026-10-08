@@ -4,7 +4,7 @@ Notion 托管工作流见 [自动同步维护指南](notion-sync.md)。手工内
 
 后台目录工作台支持选择章节或子章节、粘贴外链、确认标题并一次发布，随后继续收录。保留 Go/Gin/GORM、Vue/Element Plus/Pinia、历史文章 ID、目录 code 和原始外链。Notion 标题只作建议，飞书继续手填。
 
-生产数据与 schema 尚未核验。以下验证来自本地测试库和浏览器夹具；生产部署、重复取舍和实际平台阅读验收由维护者完成。
+生产切换须核验真实 schema 与历史数据；本地验证和生产发布使用各自的验收记录。
 
 ## 职责与契约
 
@@ -85,7 +85,9 @@ Notion 托管工作流见 [自动同步维护指南](notion-sync.md)。手工内
 
    000005 再查来源缺失和重复，失败阻止约束生效，新入口保持关闭。migrate 若记录 dirty，维护者先核对 schema、日志和版本 4，只有确认失败在 ALTER 前，才修复迁移标记至 4 后重试；不要自动 force 或绕过审计。
 
-5. 开启后端 MINIBLOG_CONTENT_REGISTER_ENABLED=true；后台 VITE_CONTENT_REGISTER_ENABLED=true 后构建。用测试文档验证新增、重复、连续发布、刷新和移动，再做真实使用验收。Notion 页面须授予内部连接读取能力，原文分享权限另行设置。
+5. 部署当前完整程序前还必须完成 000006，包含 tags_json 与六张同步表，再通过 [只读发布门槛](../scripts/content-preflight/README.md)。历史 module/section 字面状态 0 保持非公开，NULL 与其他未知状态仍阻断审计。CI 后台构建开关读取仓库变量 MINIBLOG_CONTENT_REGISTER_ENABLED，运行开关单独配置。
+
+6. 开启后端 MINIBLOG_CONTENT_REGISTER_ENABLED=true；后台 VITE_CONTENT_REGISTER_ENABLED=true 后构建。用测试文档验证新增、重复、连续发布、刷新和移动，再做真实使用验收。Notion 页面须授予内部连接读取能力，原文分享权限另行设置。
 
 ## 回退及导入
 

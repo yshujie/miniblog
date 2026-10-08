@@ -1,6 +1,6 @@
 # Notion 自动同步维护指南
 
-在 Notion 中编写、选择主题和设置「博客状态」，miniblog 定时同步标题、标签、目录、状态及阅读地址。正文、作者、历史 ID 和本地排序保留。飞书与未接管 Notion 文章继续手工收录。生产部署和首轮历史回填尚未执行。
+在 Notion 中编写、选择主题和设置「博客状态」，miniblog 定时同步标题、标签、目录、状态及阅读地址。正文、作者、历史 ID 和本地排序保留。飞书与未接管 Notion 文章继续手工收录。同步默认关闭；程序发布与历史接管分别验收。
 
 ## 来源与目录
 
@@ -71,7 +71,7 @@ provider=notion 不代表接管，生效绑定才取得管理权。托管标题�
 先备份、核验真实 schema、迁移标记、部署版本和现有文章。此前 47 页仅为审计起点。
 
 1. 完成 [内容维护指南](content-refactor.md) 的 000004、身份审计和 000005。冲突未解决时停止。
-2. 执行 000006，仅扩展 tags_json 和六张同步表，总开关保持关闭。启动不会自动建表。兼容版本必须认识 JSON、别名、管理权和 reading_url。
+2. 部署当前完整程序前执行 000006，仅扩展 tags_json 和六张同步表，总开关保持关闭。CI 的 [只读结构检查](../scripts/content-preflight/README.md) 要求 clean version >= 6 与真实字段约束齐备；关闭同步不能代替迁移。启动不会自动建表。兼容版本必须认识 JSON、别名、管理权和 reading_url。
 3. 暂停同步及来源写入，排空任务、后台提交与导入。无损标签回填：`go run ./scripts/audit-content -apply -backfill-tags -report /tmp/miniblog-tags-audit.json`。JSON 非 NULL 时权威，NULL 才读取旧 CSV；上限 64KiB，超限报错。兼容 CSV 仅在无损且容量允许时更新。
 4. 配置五源模块，执行全库 dry_run。首个完整基线将已有页固定为 baseline_pending，未确认页以后仍不能自动视为新页。
 5. CLI bootstrap_preview 列出匹配、重复、目录/子章节变化、博客状态、公开条件与指纹。标题仅是线索。确认文件逐项明确 Page ID、文章 ID 或新页面、拟回填状态、审核人。
