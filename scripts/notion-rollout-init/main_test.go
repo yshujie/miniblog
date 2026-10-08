@@ -218,6 +218,14 @@ func TestPreflightIsReadOnlyAndApplyPreservesHistory(t *testing.T) {
 	if snapshot(t, gdb) != before {
 		t.Fatal("preflight wrote data")
 	}
+	if r.SourceRecordCount != 5 {
+		t.Fatal("existing physical source count not reported")
+	}
+	for _, s := range r.Sources {
+		if !s.BeforeExists {
+			t.Fatal("existing physical source not reported")
+		}
+	}
 	var beforeModules []model.Module
 	var beforeArticles []model.Article
 	var beforeSections []model.Section
@@ -305,7 +313,14 @@ func TestEveryGateRejectsWithoutWrites(t *testing.T) {
 		"algorithm active": func(db *gorm.DB, _ *preparedInput) error {
 			return db.Create(&model.Module{Code: "algorithm", Title: "数据结构&算法", Status: 1, Sort: 20}).Error
 		},
-		"missing fifth": func(db *gorm.DB, _ *preparedInput) error {
+		"unknown source": func(db *gorm.DB, _ *preparedInput) error {
+			return db.Create(&model.NotionSyncSource{ID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", DataSourceID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}).Error
+		},
+		"inconsistent data source": func(db *gorm.DB, _ *preparedInput) error {
+			return db.Model(&model.NotionSyncSource{}).Where("source_id = ?", targets[4].SourceID).Update("data_source_id", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").Error
+		},
+		"missing source nonzero expected": func(db *gorm.DB, in *preparedInput) error {
+			in.Revisions[targets[4].SourceID] = 1
 			return db.Delete(&model.NotionSyncSource{}, "source_id = ?", targets[4].SourceID).Error
 		},
 	} {
@@ -322,6 +337,74 @@ func TestEveryGateRejectsWithoutWrites(t *testing.T) {
 				t.Fatal("blocked apply changed database")
 			}
 		})
+	}
+}
+
+func deleteMissingSources(t *testing.T, gdb *gorm.DB, kept int) {
+	t.Helper()
+	var ids []string
+	for _, target := range targets[kept:] {
+		ids = append(ids, target.SourceID)
+	}
+	if err := gdb.Delete(&model.NotionSyncSource{}, "source_id IN ?", ids).Error; err != nil {
+		t.Fatal("cannot prepare missing-source fixture")
+	}
+}
+
+func TestMissingSourcesPreflightAndApply(t *testing.T) {
+	for _, kept := range []int{0, 2} {
+		t.Run(fmt.Sprintf("existing_%d", kept), func(t *testing.T) {
+			gdb, in := fixtureDB(t), fixtureInput(t)
+			deleteMissingSources(t, gdb, kept)
+			before := snapshot(t, gdb)
+			r, err := execute(context.Background(), gdb, in, false)
+			if err != nil || len(r.Sources) != 5 {
+				t.Fatalf("missing-source preflight rejected: %s", reason(err))
+			}
+			if snapshot(t, gdb) != before {
+				t.Fatal("preflight seeded missing sources")
+			}
+			if r.SourceRecordCount != kept {
+				t.Fatal("physical source count not reported")
+			}
+			for i, s := range r.Sources {
+				if s.ExpectedRevision != 0 || s.NextRevision != 1 || s.Enabled {
+					t.Fatal("missing-source plan bypassed default/CAS")
+				}
+				if i >= kept && s.Action != "create" {
+					t.Fatal("missing source not identified as create")
+				}
+				if s.BeforeExists != (i < kept) {
+					t.Fatal("plan did not distinguish stored and missing sources")
+				}
+			}
+			r, err = execute(context.Background(), gdb, in, true)
+			if err != nil || !reflect.DeepEqual(r.Before, r.After) {
+				t.Fatalf("missing-source apply failed: %s", reason(err))
+			}
+			var rows []model.NotionSyncSource
+			if err := gdb.Find(&rows).Error; err != nil || len(rows) != 5 {
+				t.Fatal("five source rows were not created")
+			}
+			for _, row := range rows {
+				if row.ConfigRevision != 1 || row.Enabled || row.ID != row.DataSourceID {
+					t.Fatal("source creation violated default revision or identity")
+				}
+			}
+		})
+	}
+}
+
+func TestInitialSourceIdentityMustBeUniqueAndApproved(t *testing.T) {
+	valid := model.NotionSyncSource{ID: targets[0].SourceID, DataSourceID: targets[0].SourceID}
+	for _, rows := range [][]model.NotionSyncSource{
+		{valid, valid},
+		{{ID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", DataSourceID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}},
+		{{ID: valid.ID, DataSourceID: targets[1].SourceID}},
+	} {
+		if _, err := indexInitialSources(rows); reason(err) != "source_initialization_not_ready" {
+			t.Fatal("unapproved, duplicate or inconsistent source identity accepted")
+		}
 	}
 }
 
@@ -546,7 +629,8 @@ func TestCLISuppressesIndependentMySQLDriverLogger(t *testing.T) {
 }
 
 // This test is opt-in and refuses every database except the dedicated loopback fixture.
-func TestMySQLInitializerAtomicAndPreservesContent(t *testing.T) {
+func mysqlFixtureDB(t *testing.T) *gorm.DB {
+	t.Helper()
 	dsn := os.Getenv("MINIBLOG_ROLLOUT_INIT_TEST_DSN")
 	if dsn == "" {
 		t.Skip("set MINIBLOG_ROLLOUT_INIT_TEST_DSN for the dedicated local fixture")
@@ -573,6 +657,11 @@ func TestMySQLInitializerAtomicAndPreservesContent(t *testing.T) {
 		}
 	}
 	seedFixture(t, gdb)
+	return gdb
+}
+
+func TestMySQLInitializerAtomicAndPreservesContent(t *testing.T) {
+	gdb := mysqlFixtureDB(t)
 	in := fixtureInput(t)
 	before := snapshot(t, gdb)
 	if err := gdb.Exec("ALTER TABLE module ENGINE=MyISAM").Error; err != nil {
@@ -615,5 +704,41 @@ func TestMySQLInitializerAtomicAndPreservesContent(t *testing.T) {
 	before = snapshot(t, gdb)
 	if _, err := execute(context.Background(), gdb, in, true); err != nil || snapshot(t, gdb) != before {
 		t.Fatal("MySQL repeat mutated data")
+	}
+}
+
+func TestMySQLMissingSourcesInsertFailureRollsBack(t *testing.T) {
+	for _, kept := range []int{0, 2} {
+		t.Run(fmt.Sprintf("existing_%d", kept), func(t *testing.T) {
+			gdb, in := mysqlFixtureDB(t), fixtureInput(t)
+			deleteMissingSources(t, gdb, kept)
+			before := snapshot(t, gdb)
+			if _, err := execute(context.Background(), gdb, in, false); err != nil || snapshot(t, gdb) != before {
+				t.Fatal("MySQL preflight seeded missing sources or failed")
+			}
+			trigger := "CREATE TRIGGER fail_project_insert BEFORE INSERT ON notion_sync_sources FOR EACH ROW BEGIN IF NEW.source_id = '" + targets[4].SourceID + "' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'fifth insert fixture failure'; END IF; END"
+			if err := gdb.Exec(trigger).Error; err != nil {
+				t.Fatal("cannot install fifth-insert failure fixture")
+			}
+			if _, err := execute(context.Background(), gdb, in, true); err == nil || !strings.Contains(err.Error(), "fifth insert fixture failure") || snapshot(t, gdb) != before {
+				t.Fatal("MySQL fifth INSERT did not roll back all source creates/updates and modules")
+			}
+			if err := gdb.Exec("DROP TRIGGER fail_project_insert").Error; err != nil {
+				t.Fatal("cannot remove insert failure fixture")
+			}
+			r, err := execute(context.Background(), gdb, in, true)
+			if err != nil || !reflect.DeepEqual(r.Before, r.After) {
+				t.Fatal("MySQL missing-source initialization changed public content or failed")
+			}
+			var rows []model.NotionSyncSource
+			if err := gdb.Find(&rows).Error; err != nil || len(rows) != 5 {
+				t.Fatal("MySQL missing source rows not created")
+			}
+			for _, row := range rows {
+				if row.Enabled || row.ConfigRevision != 1 || row.ID != row.DataSourceID {
+					t.Fatal("MySQL source defaults/CAS not preserved")
+				}
+			}
+		})
 	}
 }

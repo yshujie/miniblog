@@ -49,7 +49,7 @@ go build -o /private/tmp/notion-rollout-init ./scripts/notion-rollout-init
   --report /private/path/init-preflight.json
 ```
 
-预检不修改数据库，输出仅包含模式、结果、库数和输入报告摘要。完整审核计划在原子写入的 0600 文件中，包含固定模块变更、五库字段映射与前后版本、现有文章/目录数量和公开文章 ID 集合的 SHA256；不含正文、外链、数据库地址、凭据或完整来源数据库行。预检与执行输入报告可以使用同一个文件，但结果报告不能覆盖输入。
+预检不修改数据库，输出仅包含模式、结果、库数和输入报告摘要。完整审核计划在原子写入的 0600 文件中，包含固定模块变更、五库字段映射与前后版本、现有文章/目录数量和公开文章 ID 集合的 SHA256；不含正文、外链、数据库地址、凭据或完整来源数据库行。`source_record_count` 是实际读到的来源行数，每条计划的 `before_exists` 区分已有行与缺失行；管理接口合成的五库 DTO 不代表已存在数据库行。预检与执行输入报告可以使用同一个文件，但结果报告不能覆盖输入。
 
 ## 显式执行与门槛
 
@@ -66,11 +66,11 @@ go build -o /private/tmp/notion-rollout-init ./scripts/notion-rollout-init
 执行使用唯一外层 READ COMMITTED 事务，先锁 control，再按主键顺序锁既有模块，最后锁来源。锁内重新核验：
 
 - control 已暂停，基线未冻结，current_run_id 为空；按数据库 UTC 时间没有有效租约。
-- 恰好五个白名单来源，实际 data_source_id 一致、全部 disabled；module_code 只能为空或各自固定 code。
+- 数据库可已有 0–5 个固定来源；拒绝未知、重复或 source_id/data_source_id 不一致的来源。已有行全部 disabled，module_code 只能为空或各自固定 code。缺失来源仅当审核版本为 0 才计划创建；输入 schema 和版本文件仍须包含全部五库。
 - 每库 config_revision 与输入一致；managed page binding 数量为 0。
 - 目录及同步表已存在，module.sort/article.tags_json 扩展已完成；MySQL 十张相关表均须为 InnoDB 常规表。不接受目录 NULL 状态或 NULL 排序。
 
-模块改名复用事务绑定的 catalog.UpdateModule，五库配置复用事务绑定的 Service.UpdateSource；子事务使用保存点，任何一步失败都返回外层回滚。无当前字段变化时不会改来源版本；初始化后各源仍 disabled。工具不会修改 control/source_writes_paused、冻结基线、抢占租约或建立主题绑定。
+模块改名复用事务绑定的 catalog.UpdateModule，五库配置复用事务绑定的 Service.UpdateSource；缺失来源不在预检中 seed，显式执行时通过该业务方法按默认初始模型创建，并再次检查版本 0，成功后的版本为 1。子事务使用保存点，任何一步失败都返回外层回滚。已有来源无当前字段变化时不会改来源版本；初始化后各源仍 disabled。工具不会修改 control/source_writes_paused、冻结基线、抢占租约或建立主题绑定。
 
 提交前比较文章、章节、子章节、页面绑定、主题绑定数量，以及使用正式公开过滤规则算出的公开文章 ID 集合摘要；任何变化都回滚。原模块 ID/code/status/sort/created_at 也必须保持。database/project 的 updated_at 因真实改名正常更新；原文章及正文时间不会改变。
 
@@ -85,7 +85,7 @@ go test -race ./scripts/notion-rollout-init
 go vet ./scripts/notion-rollout-init
 ```
 
-回归覆盖完整报告与实际字段不一致、五库遗漏/重复、opaque ID、四态外的选项兼容、默认预检零写入、初始化门槛拒绝、第五库 SQL 失败全部回滚、历史目录状态 0/文章正文/作者/位置/时间保持、精确重复 no-op、私有报告以及 MySQL 驱动独立日志脱敏。设置 `MINIBLOG_ROLLOUT_SCHEMA_TEST_REPORT` 可对私有真实 schema 报告做离线校验，不会调用 Notion。
+回归覆盖完整报告与实际字段不一致、报告五库遗漏/重复、opaque ID、四态外的选项兼容、来源行全部缺失/部分缺失/已有五行、缺失行非零审核版本拒绝、默认预检零写入、初始化门槛拒绝、第五库 SQL 失败全部回滚、历史目录状态 0/文章正文/作者/位置/时间保持、精确重复 no-op、私有报告以及 MySQL 驱动独立日志脱敏。设置 `MINIBLOG_ROLLOUT_SCHEMA_TEST_REPORT` 可对私有真实 schema 报告做离线校验，不会调用 Notion。
 
 真实 MySQL 回归必须显式注入 `MINIBLOG_ROLLOUT_INIT_TEST_DSN`，只接受 loopback TCP 且数据库名严格为 `miniblog_rollout_init_test`。**测试会重建该专用库的十张夹具表，不可指向业务库或共享测试库。**测试文件读取环境，不从参数接收密码，也不打印 DSN：
 
@@ -94,4 +94,4 @@ go vet ./scripts/notion-rollout-init
 go test -race ./scripts/notion-rollout-init -run TestMySQL -count=1
 ```
 
-MySQL 测试使用失败触发器确认第五次来源写入已实际发生，再检查目录改名、新算法模块及前四库配置均回滚；随后验证成功提交、公开集合不变、历史状态与文章时间保持、重复执行不变。没有该测试变量时，此回归明确跳过。
+MySQL 测试分别使用 UPDATE 和 INSERT 失败触发器确认第五次来源写入已实际发生，再检查目录改名、新算法模块及前四库来源创建/配置均回滚；随后验证成功提交、公开集合不变、历史状态与文章时间保持、重复执行不变。没有该测试变量时，此回归明确跳过。

@@ -92,6 +92,8 @@ MySQL 验证发现 `ON UPDATE CURRENT_TIMESTAMP` 会在身份升级时改变历�
 - [兼容部署 37781019063](https://github.com/yshujie/miniblog/actions/runs/37781019063) 实际生产版本为 `735344f086302454590a8d3e0033285ea99e9423`；运行 Token 存在，回填 Token 不存在。私有环境 0600，生产身份审计无阻断项。公开接口健康验证通过；不代表真实文章阅读或实际手机验收。
 - [真实 schema_check 37781133297](https://github.com/yshujie/miniblog/actions/runs/37781133297) 使用当时运行的兼容镜像；其 Go/CLI 实现与 735344f 相同。完整报告留存服务器 `/opt/miniblog/ops/notion/37781133297-1/schema.json`（0600），未上传 GitHub Artifact，未读取回填 Secret。
 - [一次性初始化工具](../scripts/notion-rollout-init/README.md) 默认仅读预检，显式执行时在一个事务中保存固定五库映射、改名 database/project、新建停用 algorithm，保留历史目录状态 0、ID/code/排序及全部文章字段。不访问 Notion、不建立章节、不冻结基线、不启用来源或同步。实际生产初始化尚未执行。
-- 初始化工具本地独立 MySQL 8.0.36 测试通过（专用回环端口 63369、数据库 `miniblog_rollout_init_test`），含 race、第五库 SQL 失败完整回滚、真实旧状态/正文/作者/位置/时间保持、公开 ID 集合不变、重复执行 no-op、MyISAM 拒绝。12 项顶层测试与 vet 通过；真实五库 schema 报告离线复验通过。CI 为该夹具单独建库，远程结果随后记录。
+- 初始化工具本地独立 MySQL 8.0.36 测试通过（专用回环端口 63369、数据库 `miniblog_rollout_init_test`），含 race、第五库 SQL 失败完整回滚、真实旧状态/正文/作者/位置/时间保持、公开 ID 集合不变、重复执行 no-op、MyISAM 拒绝。14 项顶层测试与 vet 通过；真实五库 schema 报告离线复验通过。CI 为该夹具单独建库。初版完整质量门槛 37783971745/37783971877 通过；首次来源保存修复随后重新运行。
 
 接下来先审核初始化预检并执行固定配置，再完整 dry_run 冻结本次历史基线，生成历史匹配及公开条件清单。运行连接的页面读取、公开地址、接管回填、定时试运行、匿名阅读和实际手机验收仍分别待执行；当前不能把 schema-only 成功标记为五库自动同步已上线。
+
+首次生产只读预检 `20261008-1` 安全阻止（five_sources_required），未写业务数据：管理接口会合成未配置来源 DTO，而初始化工具初版只接受五条物理记录。已补无记录及部分记录的默认初始化计划，缺失来源仅接受审核版本 0，执行仍调用事务内 UpdateSource；新增第五库 INSERT 失败完整回滚测试通过。新报告提供 source_record_count / before_exists 区分实际记录和虚拟占位。旧上传二进制未执行 apply，继续前必须重建并使用全新预检目录。

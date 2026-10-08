@@ -68,6 +68,7 @@ type modulePlan struct {
 }
 type sourcePlan struct {
 	SourceID         string                  `json:"source_id"`
+	BeforeExists     bool                    `json:"before_exists"`
 	ModuleCode       string                  `json:"module_code"`
 	BeforeModuleCode string                  `json:"before_module_code"`
 	Action           string                  `json:"action"`
@@ -86,15 +87,16 @@ type contentProof struct {
 	PublicIDsHash string `json:"public_article_ids_sha256"`
 }
 type result struct {
-	Mode          string        `json:"mode"`
-	Outcome       string        `json:"outcome"`
-	Reason        string        `json:"reason,omitempty"`
-	SchemaHash    string        `json:"schema_report_sha256"`
-	RevisionsHash string        `json:"revisions_sha256"`
-	Modules       []modulePlan  `json:"modules,omitempty"`
-	Sources       []sourcePlan  `json:"sources,omitempty"`
-	Before        *contentProof `json:"before,omitempty"`
-	After         *contentProof `json:"after,omitempty"`
+	Mode              string        `json:"mode"`
+	Outcome           string        `json:"outcome"`
+	Reason            string        `json:"reason,omitempty"`
+	SchemaHash        string        `json:"schema_report_sha256"`
+	RevisionsHash     string        `json:"revisions_sha256"`
+	Modules           []modulePlan  `json:"modules,omitempty"`
+	Sources           []sourcePlan  `json:"sources,omitempty"`
+	SourceRecordCount int           `json:"source_record_count"`
+	Before            *contentProof `json:"before,omitempty"`
+	After             *contentProof `json:"after,omitempty"`
 }
 type blocked string
 
@@ -605,21 +607,24 @@ func plan(ctx context.Context, ds store.IStore, in *preparedInput, r *result, lo
 	if err := q.Order("source_id").Find(&sources).Error; err != nil {
 		return nil, err
 	}
-	if len(sources) != len(targets) {
-		return nil, blocked("five_sources_required")
-	}
-	bySource := map[string]model.NotionSyncSource{}
-	for _, s := range sources {
-		bySource[s.ID] = s
+	r.SourceRecordCount = len(sources)
+	bySource, err := indexInitialSources(sources)
+	if err != nil {
+		return nil, err
 	}
 	for _, t := range targets {
-		s, ok := bySource[t.SourceID]
-		if !ok || s.DataSourceID != t.SourceID || s.Enabled || (s.ModuleCode != "" && s.ModuleCode != t.ModuleCode) {
-			return nil, blocked("source_initialization_not_ready")
-		}
+		s, exists := bySource[t.SourceID]
 		expected, ok := in.Revisions[t.SourceID]
 		if !ok || expected != s.ConfigRevision {
 			return nil, blocked("source_revision_conflict")
+		}
+		if !exists {
+			// Planning is read-only. UpdateSource creates the same initial model
+			// inside the apply transaction and checks revision zero again.
+			s = model.NotionSyncSource{ID: t.SourceID, DataSourceID: t.SourceID, Label: t.Title, Health: "not_configured"}
+		}
+		if s.Enabled || (s.ModuleCode != "" && s.ModuleCode != t.ModuleCode) {
+			return nil, blocked("source_initialization_not_ready")
 		}
 		var previous notionsync.SourceConfig
 		if s.PropertyMappingJSON != "" && json.Unmarshal([]byte(s.PropertyMappingJSON), &previous) != nil {
@@ -629,14 +634,17 @@ func plan(ctx context.Context, ds store.IStore, in *preparedInput, r *result, lo
 			return nil, blocked("stored_source_config_invalid")
 		}
 		action, next := "no_op", expected
-		if s.ModuleCode != t.ModuleCode || !reflect.DeepEqual(previous, in.Configs[t.SourceID]) {
+		if !exists || s.ModuleCode != t.ModuleCode || !reflect.DeepEqual(previous, in.Configs[t.SourceID]) {
 			if next == math.MaxUint64 {
 				return nil, blocked("source_revision_exhausted")
 			}
 			next++
 			action = "configure"
+			if !exists {
+				action = "create"
+			}
 		}
-		r.Sources = append(r.Sources, sourcePlan{SourceID: s.ID, ModuleCode: t.ModuleCode, BeforeModuleCode: s.ModuleCode, Action: action, ExpectedRevision: expected, NextRevision: next, Config: in.Configs[t.SourceID]})
+		r.Sources = append(r.Sources, sourcePlan{SourceID: s.ID, BeforeExists: exists, ModuleCode: t.ModuleCode, BeforeModuleCode: s.ModuleCode, Action: action, ExpectedRevision: expected, NextRevision: next, Config: in.Configs[t.SourceID]})
 	}
 	proof, err := proveContent(ctx, db)
 	if err != nil {
@@ -644,6 +652,22 @@ func plan(ctx context.Context, ds store.IStore, in *preparedInput, r *result, lo
 	}
 	r.Before = &proof
 	return modules, nil
+}
+
+func indexInitialSources(rows []model.NotionSyncSource) (map[string]model.NotionSyncSource, error) {
+	allowed := make(map[string]bool, len(targets))
+	for _, t := range targets {
+		allowed[t.SourceID] = true
+	}
+	indexed := make(map[string]model.NotionSyncSource, len(rows))
+	for _, row := range rows {
+		_, duplicate := indexed[row.ID]
+		if !allowed[row.ID] || duplicate || row.DataSourceID != row.ID {
+			return nil, blocked("source_initialization_not_ready")
+		}
+		indexed[row.ID] = row
+	}
+	return indexed, nil
 }
 
 func proveContent(ctx context.Context, db *gorm.DB) (contentProof, error) {
