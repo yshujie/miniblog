@@ -3,8 +3,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/yshujie/miniblog/internal/miniblog/notionsync"
@@ -12,6 +14,8 @@ import (
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/pkg/db"
 	"github.com/yshujie/miniblog/scripts/internal/mysqlconfig"
+	"github.com/yshujie/miniblog/scripts/internal/safereport"
+	"gorm.io/gorm"
 	"io"
 	"os"
 	"os/signal"
@@ -21,11 +25,28 @@ import (
 )
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
+
+type dependencies struct {
+	client  func(string) source.SyncNotionClient
+	connect func(*db.MySQLOptions) (*gorm.DB, error)
+}
+
 func run(args []string, out, errout io.Writer) int {
+	return runWithDependencies(args, out, errout, dependencies{})
+}
+func runWithDependencies(args []string, out, errout io.Writer, deps dependencies) int {
+	if deps.client == nil {
+		deps.client = func(token string) source.SyncNotionClient { return source.NewNotionSyncClient(token) }
+	}
+	if deps.connect == nil {
+		deps.connect = db.NewMySQL
+	}
 	fs := flag.NewFlagSet("notion-sync", flag.ContinueOnError)
-	fs.SetOutput(errout)
+	fs.SetOutput(io.Discard)
 	config := mysqlconfig.Bind(fs)
-	mode := fs.String("mode", "dry_run", "dry_run|sync|status|bootstrap_preview|bootstrap_apply")
+	mode := fs.String("mode", "dry_run", "schema_check|catalog_prepare|dry_run|sync|status|bootstrap_preview|bootstrap_apply")
+	sourceID := fs.String("source-id", "", "catalog_prepare 的单个白名单 data source ID")
+	revision := fs.Uint64("expected-config-revision", 0, "catalog_prepare 审核时的来源配置版本")
 	manualMatches := fs.String("manual-matches", "", "bootstrap_preview 手工关联 BootstrapReviewInput JSON 文件")
 	confirmations := fs.String("confirmations", "", "已核对的 BootstrapInput JSON 文件（bootstrap_apply 必填）")
 	allowWrite := fs.Bool("allow-notion-write", false, "显式允许一次性接管状态回填；普通同步不会写 Notion")
@@ -34,20 +55,66 @@ func run(args []string, out, errout io.Writer) int {
 	report := fs.String("report", "-", "JSON 结果文件路径；- 为标准输出")
 	timeout := fs.Duration("timeout", 10*time.Minute, "本次任务最大时间")
 	if e := fs.Parse(args); e != nil {
+		if errors.Is(e, flag.ErrHelp) {
+			fs.SetOutput(errout)
+			fs.PrintDefaults()
+			return 0
+		}
+		fmt.Fprintln(errout, "命令参数无效；使用 -h 查看帮助")
 		return 2
 	}
 	if e := validateMode(*mode, *allowWrite, *confirmations); e != nil {
 		fmt.Fprintln(errout, e)
 		return 2
 	}
-	var review notionsync.BootstrapReviewInput
-	if *manualMatches != "" {
-		if *mode != "bootstrap_preview" {
-			fmt.Fprintln(errout, "--manual-matches 仅适用于 bootstrap_preview")
+	if fs.NArg() != 0 || *timeout <= 0 {
+		fmt.Fprintln(errout, "不接受位置参数，timeout 必须为正数")
+		return 2
+	}
+	revisionSet := false
+	fs.Visit(func(value *flag.Flag) {
+		if value.Name == "expected-config-revision" {
+			revisionSet = true
+		}
+	})
+	if e := validateCatalogArguments(*mode, *sourceID, *revision, revisionSet); e != nil {
+		fmt.Fprintln(errout, e)
+		return 2
+	}
+	if *manualMatches != "" && *mode != "bootstrap_preview" {
+		fmt.Fprintln(errout, "--manual-matches 仅适用于 bootstrap_preview")
+		return 2
+	}
+	if *confirmations != "" && *mode != "bootstrap_apply" {
+		fmt.Fprintln(errout, "--confirmations 仅适用于 bootstrap_apply")
+		return 2
+	}
+	if *report != "-" {
+		if e := safereport.CheckDestination(*report); e != nil {
+			fmt.Fprintln(errout, "结果文件目标无效")
 			return 2
 		}
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	ctx, cancel := context.WithTimeout(ctx, *timeout)
+	defer cancel()
+	if *mode == "schema_check" {
+		result, checkErr := notionsync.CheckSchemas(ctx, deps.client(os.Getenv("MINIBLOG_NOTION_TOKEN")))
+		if e := writeResult(result, *report, out); e != nil {
+			fmt.Fprintln(errout, "结果文件写入失败")
+			return 1
+		}
+		if checkErr != nil {
+			fmt.Fprintln(errout, checkErr)
+			return 1
+		}
+		return 0
+	}
+	var review notionsync.BootstrapReviewInput
+	if *manualMatches != "" {
 		if e := readStrictJSON(*manualMatches, &review); e != nil {
-			fmt.Fprintln(errout, "手工关联清单无效:", e)
+			fmt.Fprintln(errout, "手工关联清单无效，请核对文件与 JSON 字段")
 			return 2
 		}
 		if len(review.ManualMatches) == 0 {
@@ -64,11 +131,11 @@ func run(args []string, out, errout io.Writer) int {
 		var e error
 		input, e = readConfirmations(*confirmations)
 		if e != nil {
-			fmt.Fprintln(errout, "确认清单无效:", e)
+			fmt.Fprintln(errout, "确认清单无效，请核对文件与 JSON 字段")
 			return 2
 		}
 	}
-	gdb, e := db.NewMySQL(config.DBOptions(1))
+	gdb, e := deps.connect(config.DBOptions(1))
 	if e != nil {
 		fmt.Fprintln(errout, "连接数据库失败")
 		return 1
@@ -79,17 +146,38 @@ func run(args []string, out, errout io.Writer) int {
 		return 1
 	}
 	defer sqlDB.Close()
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	ctx, cancel := context.WithTimeout(ctx, *timeout)
-	defer cancel()
-	service := notionsync.New(store.NewStore(gdb), notionsync.Options{Enabled: *enableSync, Author: *author, Client: source.NewNotionSyncClient(os.Getenv("MINIBLOG_NOTION_TOKEN"))})
+	service := notionsync.New(store.NewStore(gdb), notionsync.Options{Enabled: *enableSync, Author: *author, Client: deps.client(os.Getenv("MINIBLOG_NOTION_TOKEN"))})
 	var result interface{}
 	switch *mode {
+	case "catalog_prepare":
+		prepared, prepareErr := service.PrepareCatalog(ctx, notionsync.CatalogPrepareInput{SourceID: *sourceID, ExpectedConfigRevision: *revision})
+		result, e = prepared, prepareErr
+		if e == nil && prepared != nil {
+			for _, item := range prepared.Items {
+				if item.Status != "bound" {
+					e = fmt.Errorf("部分主题目录待核对绑定，请查看完整结果")
+					break
+				}
+			}
+		}
 	case "status":
 		result, e = service.Status(ctx)
 	case "bootstrap_preview":
-		result, e = service.BootstrapPreview(ctx, review)
+		preview, previewErr := service.BootstrapPreview(ctx, review)
+		result, e = preview, previewErr
+		if e == nil {
+			if preview == nil {
+				e = validatePreviewRun(nil)
+			} else {
+				run, readErr := service.Run(ctx, preview.RunID)
+				if readErr != nil {
+					// Database/driver errors may contain connection details. Do not echo them.
+					e = fmt.Errorf("无法核验历史预览运行结果，请查看运行记录")
+				} else {
+					e = validatePreviewRun(run)
+				}
+			}
+		}
 	case "bootstrap_apply":
 		applied, applyErr := service.BootstrapApply(ctx, input, source.NewNotionSyncClient(os.Getenv("MINIBLOG_NOTION_BOOTSTRAP_TOKEN")))
 		result, e = applied, applyErr
@@ -123,22 +211,9 @@ func run(args []string, out, errout io.Writer) int {
 	stopctx, stopcancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer stopcancel()
 	_ = service.Stop(stopctx)
-	if result != nil {
-		encoded, encodeErr := json.MarshalIndent(result, "", "  ")
-		if encodeErr != nil {
-			fmt.Fprintln(errout, "结果序列化失败")
-			return 1
-		}
-		encoded = append(encoded, '\n')
-		if *report == "-" {
-			_, encodeErr = out.Write(encoded)
-		} else {
-			encodeErr = os.WriteFile(*report, encoded, 0600)
-		}
-		if encodeErr != nil {
-			fmt.Fprintln(errout, "结果文件写入失败")
-			return 1
-		}
+	if err := writeResult(result, *report, out); err != nil {
+		fmt.Fprintln(errout, "结果文件写入失败")
+		return 1
 	}
 	if e != nil {
 		fmt.Fprintln(errout, e)
@@ -146,9 +221,19 @@ func run(args []string, out, errout io.Writer) int {
 	}
 	return 0
 }
+
+// Pending/frozen entries are normal review states. Candidate public conditions
+// remain in the report for per-item approval; only run failures/blockers reject it.
+func validatePreviewRun(run *notionsync.RunDTO) error {
+	if run == nil || run.Status != "completed" || run.Counts.Failed != 0 || run.Counts.Blocked != 0 {
+		return fmt.Errorf("历史预览未完整完成，请查看运行记录与逐页结果")
+	}
+	return nil
+}
+
 func validateMode(mode string, write bool, path string) error {
 	switch mode {
-	case "dry_run", "sync", "status", "bootstrap_preview":
+	case "schema_check", "catalog_prepare", "dry_run", "sync", "status", "bootstrap_preview":
 		if write {
 			return fmt.Errorf("--allow-notion-write 仅适用于 bootstrap_apply")
 		}
@@ -161,6 +246,40 @@ func validateMode(mode string, write bool, path string) error {
 	}
 	return nil
 }
+func validateCatalogArguments(mode, sourceID string, revision uint64, revisionSet bool) error {
+	if mode != "catalog_prepare" {
+		if sourceID != "" || revisionSet {
+			return fmt.Errorf("source-id/expected-config-revision 仅适用于 catalog_prepare")
+		}
+		return nil
+	}
+	if sourceID == "" || revision == 0 || !revisionSet {
+		return fmt.Errorf("catalog_prepare 需要 source-id 和有效 expected-config-revision")
+	}
+	normal := strings.ToLower(strings.ReplaceAll(sourceID, "-", ""))
+	for _, id := range notionsync.AllowedSources() {
+		if normal == strings.ReplaceAll(id, "-", "") {
+			return nil
+		}
+	}
+	return fmt.Errorf("数据源不在五库白名单")
+}
+func writeResult(result interface{}, report string, out io.Writer) error {
+	if result == nil {
+		return nil
+	}
+	encoded, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return err
+	}
+	encoded = append(encoded, '\n')
+	if report == "-" {
+		_, err = out.Write(encoded)
+		return err
+	}
+	return safereport.Write(report, encoded)
+}
+
 func readConfirmations(path string) (notionsync.BootstrapInput, error) {
 	var input notionsync.BootstrapInput
 	if e := readStrictJSON(path, &input); e != nil {
@@ -177,7 +296,15 @@ func readStrictJSON(path string, input interface{}) error {
 		return e
 	}
 	defer f.Close()
-	decoder := json.NewDecoder(io.LimitReader(f, 2<<20))
+	const maxConfirmationBytes = 2 << 20
+	data, e := io.ReadAll(io.LimitReader(f, maxConfirmationBytes+1))
+	if e != nil {
+		return e
+	}
+	if len(data) > maxConfirmationBytes {
+		return fmt.Errorf("清单超过 2 MiB")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if e := decoder.Decode(input); e != nil {
 		return e

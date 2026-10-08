@@ -1,7 +1,9 @@
 package mysqlconfig
 
 import (
+	"bytes"
 	"flag"
+	"strings"
 	"testing"
 )
 
@@ -66,5 +68,41 @@ func TestBindUsesLegacyDefaultsWithoutEnvironment(t *testing.T) {
 	}
 	if opts.Username != "miniblog" || opts.Password != "miniblog123" || opts.Database != "miniblog" {
 		t.Fatalf("legacy defaults changed: user=%q password=%q database=%q", opts.Username, opts.Password, opts.Database)
+	}
+}
+
+func TestHelpAndParseFailureNeverPrintEnvironmentDefaults(t *testing.T) {
+	t.Setenv("MYSQL_DSN", "do-not-print-dsn")
+	t.Setenv("MYSQL_PASSWORD", "do-not-print-password")
+	t.Setenv("MYSQL_USERNAME", "do-not-print-account")
+	for _, args := range [][]string{{"-h"}, {"-unknown-option"}} {
+		var out bytes.Buffer
+		flags := flag.NewFlagSet("test", flag.ContinueOnError)
+		flags.SetOutput(&out)
+		Bind(flags)
+		_ = flags.Parse(args)
+		if strings.Contains(out.String(), "do-not-print") {
+			t.Fatal("credential environment was printed in usage")
+		}
+	}
+}
+
+func TestEnvironmentIsReadAfterParsingAndEmptyExplicitPasswordWins(t *testing.T) {
+	t.Setenv("MYSQL_DSN", "")
+	t.Setenv("MYSQL_PASSWORD", "initial")
+	flags := flag.NewFlagSet("test", flag.ContinueOnError)
+	config := Bind(flags)
+	t.Setenv("MYSQL_PASSWORD", "late")
+	if err := flags.Parse(nil); err != nil {
+		t.Fatal(err)
+	}
+	if config.DBOptions(1).Password != "late" {
+		t.Fatal("environment was captured too early")
+	}
+	if err := flags.Parse([]string{"-db-password", ""}); err != nil {
+		t.Fatal(err)
+	}
+	if config.DBOptions(1).Password != "" {
+		t.Fatal("explicit empty credential did not override environment")
 	}
 }
