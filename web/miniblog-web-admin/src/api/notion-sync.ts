@@ -17,12 +17,28 @@ async function list<T>(path: string, query: { page: number; limit: number }, map
   const data = await call<{ items?: T[]; entries?: T[]; total?: number; page?: number; limit?: number }>({ url: root + path, method: 'get', params: query });
   const result = normalizePage(data, query); result.items = result.items.map(map); return result;
 }
-export const getSyncStatus = () => call<SyncStatus>({ url: root + '/status', method: 'get' });
+export const getSyncStatus = (signal?: AbortSignal) => call<SyncStatus>({ url: root + '/status', method: 'get', ...(signal ? { signal } : {}) });
 export const getSyncSources = (query = { page: 1, limit: 20 }) => list<SyncSource>('/sources', query, item => ({ ...item, catalog_bindings: item.catalog_bindings || [] }));
 export const getSyncPages = (query: PageFilters) => list<SyncPage>('/pages', query, item => ({ ...item, article_id: exactID(item.article_id) }));
 export const getSyncRuns = (query = { page: 1, limit: 20 }) => list<SyncRun>('/runs', query, item => ({ ...item, run_id: exactID(item.run_id) || '' }));
 export const getSyncRun = (id: string) => call<SyncRun>({ url: root + '/runs/' + encodeURIComponent(id), method: 'get' });
-export const getSyncItems = (id: string, query = { page: 1, limit: 20 }) => list<SyncItem>('/runs/' + encodeURIComponent(id) + '/items', query, item => ({ ...item, article_id: exactID(item.article_id) }));
+function normalizeItem(item: SyncItem): SyncItem {
+  const result = { ...item, article_id: exactID(item.article_id) };
+  if (item.after && typeof item.after === 'object' && 'bootstrap_preview' in item.after) {
+    const candidate = item.after.bootstrap_preview;
+    if (candidate && typeof candidate === 'object') {
+      const fields = candidate as { article_id?: string | number; candidate_article_ids?: (string | number)[]; title_hint_article_ids?: (string | number)[] };
+      result.after = { ...item.after, bootstrap_preview: {
+        ...candidate,
+        article_id: exactID(fields.article_id),
+        candidate_article_ids: (fields.candidate_article_ids || []).map(id => exactID(id) || ''),
+        title_hint_article_ids: (fields.title_hint_article_ids || []).map(id => exactID(id) || '')
+      }};
+    }
+  }
+  return result;
+}
+export const getSyncItems = (id: string, query = { page: 1, limit: 20 }) => list<SyncItem>('/runs/' + encodeURIComponent(id) + '/items', query, normalizeItem);
 export const updateSyncControl = (data: { paused?: boolean; source_writes_paused?: boolean }) => call<SyncStatus>({ url: root + '/control', method: 'patch', data });
 export const updateSyncSource = (id: string, data: SourceUpdate) => call<SyncSource>({ url: root + '/sources/' + encodeURIComponent(id), method: 'patch', data });
 export const bindSyncCatalog = (binding: CatalogBinding, section_code: string, expected_config_revision: number) => call<CatalogBinding>({ url: root + '/catalog-bindings/' + encodeURIComponent(binding.id), method: 'put', data: { source_id: binding.source_id, option_id: binding.option_id, section_code, expected_config_revision }});
