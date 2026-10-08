@@ -1802,6 +1802,18 @@ components:
     SyncPage:
       type: object
       properties:
+        local_state:
+          type: string
+          nullable: true
+          description: Current local article state; null when no article is linked.
+        needs_revalidation:
+          type: boolean
+        effective_visibility:
+          type: boolean
+          description: Uses the same directory and source visibility query as public reading.
+        visibility_reason:
+          type: string
+          description: Empty when visible; otherwise the current publication or review blocker.
         page_id:
           type: string
         source_id:
@@ -1864,6 +1876,12 @@ components:
               type: integer
             unchanged:
               type: integer
+            pending:
+              type: integer
+              description: Historical review or nonpublished source records awaiting action; not an execution failure.
+            frozen:
+              type: integer
+              description: Source-disabled records preserved without applying changes.
             blocked:
               type: integer
             failed:
@@ -1910,8 +1928,13 @@ components:
           type: string
         pending_count:
           type: integer
+          description: Historical pages awaiting explicit takeover review.
+        blocked_count:
+          type: integer
+          description: Managed publication candidates restricted by public conditions, holds, or revalidation; excludes historical pending and ordinary drafts.
         error_count:
           type: integer
+          description: Page read or execution failures, separate from publication restrictions.
         sources:
           type: array
           items:
@@ -1945,6 +1968,7 @@ components:
         enabled:
           type: boolean
         config:
+          description: Send only actual mapping changes. Repeating identical configuration preserves the revision and visibility.
           $ref: '#/components/schemas/SyncConfig'
         expected_config_revision:
           type: integer

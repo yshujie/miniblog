@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"os"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -253,7 +254,10 @@ func (s *Service) Status(ctx context.Context) (*StatusDTO, error) {
 	if e = db.Model(&model.NotionPageBinding{}).Where("management_state = ?", model.NotionManagementBaselinePending).Count(&dto.PendingCount).Error; e != nil {
 		return nil, e
 	}
-	if e = db.Model(&model.NotionPageBinding{}).Where("last_error <> '' OR publish_block_reason <> ''").Count(&dto.ErrorCount).Error; e != nil {
+	if e = db.Model(&model.NotionPageBinding{}).Where("last_error <> ''").Count(&dto.ErrorCount).Error; e != nil {
+		return nil, e
+	}
+	if e = publicationBlockedPages(ctx, db).Count(&dto.BlockedCount).Error; e != nil {
 		return nil, e
 	}
 	for _, src := range list.Items {
@@ -380,6 +384,9 @@ func (s *Service) Pages(ctx context.Context, q PageQuery) (*PageResult[PageDTO],
 	for _, r := range rows {
 		result.Items = append(result.Items, pageDTO(r))
 	}
+	if e := decoratePageVisibility(ctx, db, rows, result.Items); e != nil {
+		return nil, e
+	}
 	return result, nil
 }
 func (s *Service) Runs(ctx context.Context, q ListQuery) (*PageResult[RunDTO], error) {
@@ -467,8 +474,8 @@ func (s *Service) UpdateControl(ctx context.Context, in ControlInput) (*StatusDT
 			if e != nil {
 				return e
 			}
-			if run.Mode == "bootstrap_apply" && run.Status == "running" && c.LeaseUntil != nil && c.LeaseUntil.After(now) {
-				return conflict("回填仍在进行，请等待完成或先暂停取消任务再解除维护")
+			if (run.Mode == "bootstrap_apply" || run.Mode == "catalog_prepare") && run.Status == "running" && c.LeaseUntil != nil && c.LeaseUntil.After(now) {
+				return conflict("维护任务仍在进行，请等待完成或先暂停取消任务再解除维护")
 			}
 		}
 		updates := map[string]interface{}{}
@@ -542,7 +549,8 @@ func (s *Service) UpdateSource(ctx context.Context, id string, in SourceInput) (
 			return e
 		}
 		e = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("source_id = ?", id).First(&row).Error
-		if errors.Is(e, gorm.ErrRecordNotFound) {
+		created := errors.Is(e, gorm.ErrRecordNotFound)
+		if created {
 			row = model.NotionSyncSource{ID: id, DataSourceID: id, Label: label, Health: "not_configured"}
 		} else if e != nil {
 			return e
@@ -550,6 +558,8 @@ func (s *Service) UpdateSource(ctx context.Context, id string, in SourceInput) (
 		if in.ExpectedConfigRevision != nil && *in.ExpectedConfigRevision != row.ConfigRevision {
 			return conflict("源配置已变化，请刷新")
 		}
+		before := row
+		mappingChanged := in.Config != nil && !reflect.DeepEqual(configOf(row), *in.Config)
 		moduleChanged := in.ModuleCode != "" && row.ModuleCode != "" && row.ModuleCode != in.ModuleCode
 		if moduleChanged && in.ExpectedConfigRevision == nil {
 			return invalid("模块重绑需 expected_config_revision")
@@ -573,9 +583,15 @@ func (s *Service) UpdateSource(ctx context.Context, id string, in SourceInput) (
 			}
 			row.Enabled = *in.Enabled
 		}
-		if in.Config != nil {
+		if mappingChanged {
 			row.PropertyMappingJSON = jsonText(in.Config)
 			row.StatusMappingJSON = jsonText(in.Config.StateOptionIDs)
+		}
+		if !created && before.Label == row.Label && before.ModuleCode == row.ModuleCode && before.Enabled == row.Enabled && !mappingChanged {
+			return nil
+		}
+		if row.ConfigRevision == ^uint64(0) {
+			return conflict("配置版本已耗尽")
 		}
 		row.ConfigRevision++
 		if e := tx.Save(&row).Error; e != nil {
@@ -586,7 +602,7 @@ func (s *Service) UpdateSource(ctx context.Context, id string, in SourceInput) (
 				return e
 			}
 		}
-		if moduleChanged || in.Config != nil {
+		if moduleChanged || mappingChanged {
 			return tx.Model(&model.NotionPageBinding{}).Where("source_id = ? AND management_state = ?", row.ID, model.NotionManagementManaged).Update("needs_revalidation", true).Error
 		}
 		return nil
@@ -638,6 +654,12 @@ func (s *Service) BindCatalog(ctx context.Context, in BindingInput) (*TopicBindi
 		if section == nil || section.ModuleCode != src.ModuleCode || section.Status != model.SectionStatusNormal {
 			return invalid("请选择源模块下有效章节")
 		}
+		if e := catalog.CheckSyncedThemeSectionAvailable(store.NewStore(tx), section.Code, result.ID); e != nil {
+			return e
+		}
+		if result.SectionCode != nil && *result.SectionCode == section.Code && result.Status == model.NotionCatalogBound && result.Reason == "" {
+			return nil
+		}
 		result.SectionCode = &section.Code
 		result.Status = model.NotionCatalogBound
 		result.Reason = ""
@@ -673,8 +695,8 @@ func lockConfigurationControl(tx *gorm.DB) error {
 		if e != nil {
 			return e
 		}
-		if run.Mode == "bootstrap_apply" && run.Status == "running" && control.LeaseUntil != nil && control.LeaseUntil.After(now) {
-			return conflict("接管正在回填，请等待完成后修改配置")
+		if (run.Mode == "bootstrap_apply" || run.Mode == "catalog_prepare") && run.Status == "running" && control.LeaseUntil != nil && control.LeaseUntil.After(now) {
+			return conflict("维护任务正在进行，请等待完成后修改配置")
 		}
 	}
 	return nil

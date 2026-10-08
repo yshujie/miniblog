@@ -92,6 +92,10 @@ type SourceDTO struct {
 	CatalogBindings    []TopicBindingDTO `json:"catalog_bindings"`
 }
 type PageDTO struct {
+	LocalState            *string `json:"local_state"`
+	NeedsRevalidation     bool    `json:"needs_revalidation"`
+	EffectiveVisibility   bool    `json:"effective_visibility"`
+	VisibilityReason      string  `json:"visibility_reason"`
 	PageID                string  `json:"page_id"`
 	ArticleID             *string `json:"article_id,omitempty"`
 	SourceID              string  `json:"source_id"`
@@ -109,6 +113,8 @@ type PageDTO struct {
 	Revision              uint64  `json:"revision"`
 }
 type RunCounts struct {
+	Pending   int `json:"pending"`
+	Frozen    int `json:"frozen"`
 	Seen      int `json:"seen"`
 	Created   int `json:"created"`
 	Updated   int `json:"updated"`
@@ -148,6 +154,7 @@ type StatusDTO struct {
 	Health             string      `json:"health"`
 	PendingCount       int64       `json:"pending_count"`
 	ErrorCount         int64       `json:"error_count"`
+	BlockedCount       int64       `json:"blocked_count"`
 	Sources            []SourceDTO `json:"sources"`
 }
 type BootstrapConfirm struct {

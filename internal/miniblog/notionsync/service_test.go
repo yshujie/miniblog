@@ -185,7 +185,7 @@ func TestCompleteBaselineFreezesEveryPageWithoutPublishing(t *testing.T) {
 	f.pages[firstPage] = fixturePage(firstPage, ids[0], "")
 	f.pages[secondPage] = fixturePage(secondPage, ids[1], "published")
 	run := waitFixtureRun(t, s, "dry_run")
-	if run.Status != "completed_with_errors" {
+	if run.Status != "completed" || run.Counts.Pending != 2 || run.Counts.Blocked != 0 || run.Counts.Failed != 0 {
 		t.Fatal(run)
 	}
 	var c model.NotionSyncControl
