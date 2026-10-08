@@ -59,7 +59,7 @@ func scratchDB(t *testing.T) (*gorm.DB, string) {
 	}
 	sql.SetMaxOpenConns(20)
 	t.Cleanup(func() { sql.Close() })
-	for _, table := range []string{"article", "subsection", "section", "module", "users", "user"} {
+	for _, table := range []string{"notion_sync_run_items", "notion_sync_runs", "notion_page_bindings", "notion_catalog_bindings", "notion_sync_sources", "notion_sync_control", "article", "subsection", "section", "module", "users", "user"} {
 		if err := db.Exec("DROP TABLE IF EXISTS " + table).Error; err != nil {
 			t.Fatal(err)
 		}
@@ -67,6 +67,7 @@ func scratchDB(t *testing.T) (*gorm.DB, string) {
 	migration(t, db, "000001_init.up.sql", cfg.DBName)
 	migration(t, db, "000003_add_subsection.up.sql", cfg.DBName)
 	migration(t, db, "000004_content_sources.up.sql", cfg.DBName)
+	migration(t, db, "000006_notion_sync.up.sql", cfg.DBName)
 	for _, statement := range []string{
 		"INSERT INTO module(id,code,title,status,sort) VALUES(1,'m1','One',1,1),(2,'m2','Two',1,2)",
 		"INSERT INTO section(id,code,title,module_code,status,sort) VALUES(1,'s1','One','m1',1,1),(2,'s2','Two','m2',1,1)",
