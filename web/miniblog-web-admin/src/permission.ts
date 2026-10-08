@@ -57,7 +57,11 @@ router.beforeEach(async (to, from, next) => {
 
           // hack method to ensure that addRoutes is complete
           // set the replace: true, so the navigation will not leave a history record
-          next({ ...to, replace: true });
+          // The static catch-all may have redirected a cold deep link before
+          // its authorized dynamic route existed. Rematch the original local URL.
+          const original = to.redirectedFrom?.fullPath;
+          const target = original?.startsWith('/') && !original.startsWith('//') ? original : to.fullPath;
+          next({ path: target, replace: true });
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error: any) {
           // remove token and go to login page to re-login
