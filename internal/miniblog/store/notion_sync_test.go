@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/yshujie/miniblog/internal/miniblog/model"
+	"github.com/yshujie/miniblog/internal/miniblog/source"
 	"testing"
 	"time"
 )
@@ -71,5 +72,50 @@ func TestAliasLookupRejectsCrossTableCollision(t *testing.T) {
 	}
 	if e = AuditSourceAliases(context.Background(), db); !errors.Is(e, ErrSourceIdentityConflict) {
 		t.Fatal(e)
+	}
+}
+
+func TestKnownURLsUseExactParsedIdentityAndRejectMultipleOwners(t *testing.T) {
+	db := storeTestDB(t)
+	if e := db.AutoMigrate(&model.Article{}, &model.NotionSyncControl{}, &model.NotionPageBinding{}); e != nil {
+		t.Fatal(e)
+	}
+	canonical, _ := source.Parse("https://www.notion.so/aabbccddeeff00112233445566778899")
+	a := model.Article{ID: 1, SourceKey: &canonical.SourceKey}
+	if e := db.Create(&a).Error; e != nil {
+		t.Fatal(e)
+	}
+	slug := "https://TEAM.notion.site:443/CaseSlug?filter=A#part"
+	p := model.NotionPageBinding{PageID: "aabbccddeeff00112233445566778899", ArticleID: &a.ID, ManagementState: model.NotionManagementManaged, PublicURL: &slug}
+	if e := db.Create(&p).Error; e != nil {
+		t.Fatal(e)
+	}
+	ds := NewStore(db)
+	exact, _ := source.Parse("https://team.notion.site/CaseSlug?filter=A#part")
+	owner, e := FindSourceOwner(ds, exact.SourceKey)
+	if e != nil || owner == nil || owner.ID != a.ID {
+		t.Fatal(owner, e)
+	}
+	for _, raw := range []string{"https://team.notion.site/caseslug?filter=A#part", "https://team.notion.site/CaseSlug?filter=a#part", "https://team.notion.site/CaseSlug?filter=A#other", "https://team.notion.site/unknown-slug"} {
+		other, _ := source.Parse(raw)
+		owner, e = FindSourceOwner(ds, other.SourceKey)
+		if e != nil || owner != nil {
+			t.Fatal("guessed URL equivalence", raw, owner, e)
+		}
+	}
+	// A direct generic owner alongside a known page's primary owner is a conflict.
+	if e = db.Create(&model.Article{ID: 2, SourceKey: &exact.SourceKey}).Error; e != nil {
+		t.Fatal(e)
+	}
+	if _, e = FindSourceOwner(ds, exact.SourceKey); !errors.Is(e, ErrSourceIdentityConflict) {
+		t.Fatal(e)
+	}
+	if _, e = FindSourceOwnerForURLs(ds, "", canonical.CanonicalURL, slug); !errors.Is(e, ErrSourceIdentityConflict) {
+		t.Fatal(e)
+	}
+	// Ignoring the current page must still find the manual generic owner.
+	owner, e = FindSourceOwnerForURLs(ds, p.PageID, slug)
+	if e != nil || owner == nil || owner.ID != 2 {
+		t.Fatal(owner, e)
 	}
 }

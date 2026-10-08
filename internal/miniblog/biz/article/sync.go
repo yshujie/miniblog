@@ -128,8 +128,11 @@ func (b *articleBiz) ApplySyncedSource(ctx context.Context, r SyncInput) (result
 				return e
 			}
 		} else {
-			a, e = findSource(ds, identity.SourceKey)
+			a, e = store.FindSourceOwnerForURLs(ds, r.PageID, identity.CanonicalURL)
 			if e != nil {
+				if errors.Is(e, store.ErrSourceIdentityConflict) || errors.Is(e, store.ErrSourceManagedPending) {
+					return syncConflict("PageID存在归属冲突，请先审核")
+				}
 				return e
 			}
 			if a != nil {
@@ -209,6 +212,55 @@ func (b *articleBiz) ApplySyncedSource(ctx context.Context, r SyncInput) (result
 				return syncConflict("新页面版本不匹配")
 			}
 			p = model.NotionPageBinding{PageID: r.PageID, SourceID: src.ID, ManagementState: model.NotionManagementManaged}
+		}
+		primaryOwner, primaryErr := store.FindSourceOwnerForURLs(ds, r.PageID, identity.CanonicalURL)
+		if primaryErr != nil {
+			if errors.Is(primaryErr, store.ErrSourceIdentityConflict) || errors.Is(primaryErr, store.ErrSourceManagedPending) {
+				return syncConflict("PageID存在归属冲突，请先审核")
+			}
+			return primaryErr
+		}
+		if primaryOwner != nil && (a == nil || primaryOwner.ID != a.ID) {
+			return syncConflict("PageID已属于其他文章，须先审核")
+		}
+		// Successful observations establish known addresses. A changed reader URL
+		// cannot overwrite another article. An already managed article still honors
+		// withdrawal independently and blocks publication while ownership is reviewed.
+		if r.MetadataComplete || r.PublicURLObserved {
+			urls := []string{r.PageURL}
+			if r.PublicURL != nil {
+				urls = append(urls, *r.PublicURL)
+			}
+			owner, lookupErr := store.FindSourceOwnerForURLs(ds, r.PageID, urls...)
+			addressConflict := errors.Is(lookupErr, store.ErrSourceIdentityConflict) || errors.Is(lookupErr, store.ErrSourceManagedPending) || (owner != nil && (a == nil || owner.ID != a.ID))
+			if lookupErr != nil && !addressConflict {
+				return lookupErr
+			}
+			if addressConflict {
+				if a == nil {
+					return syncConflict("来源地址已被其他文章收录，须先审核接管")
+				}
+				if r.DesiredState >= 1 && r.DesiredState <= 4 {
+					p.DesiredState = r.DesiredState
+					if r.DesiredState != model.ArticleStatusPublished && r.MetadataError != "out_of_scope" && a.Status != r.DesiredState {
+						a.Status = r.DesiredState
+						if e = save(ds, a); e != nil {
+							return e
+						}
+					}
+				}
+				observePrivacy(&p, r)
+				observeSuccessfulRevision(&p, r)
+				p.NeedsRevalidation = true
+				p.PublishBlockReason = "source_identity_conflict"
+				p.LastError = "source_identity_conflict"
+				p.LastSeenRunID = r.RunID
+				if e = persistPage(ds, &p, newPage); e != nil {
+					return e
+				}
+				result = &SyncResult{ArticleID: a.ID, PageID: p.PageID, Outcome: "state_only", Reason: p.PublishBlockReason, AppliedState: a.Status, BindingRevision: p.Revision}
+				return nil
+			}
 		}
 		// Failed reads preserve successful state and visibility. A successful observation
 		// of URL withdrawal/native archival remains independent from an unknown state.

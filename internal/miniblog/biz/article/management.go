@@ -9,7 +9,6 @@ import (
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/errno"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"strings"
 	"unicode/utf8"
@@ -38,21 +37,8 @@ func checkManualWritable(ds store.IStore, a *model.Article) error {
 // A managed source page can be pending without a blog article. Manual writers
 // must not create another ownership path for that document.
 func checkPendingSourceOwner(ds store.IStore, identity source.Identity) error {
-	if identity.PageID == "" || !store.HasNotionSyncSchema(ds.DB()) {
-		return nil
-	}
-	var p model.NotionPageBinding
-	e := ds.DB().Where("page_id = ?", identity.PageID).First(&p).Error
-	if errors.Is(e, gorm.ErrRecordNotFound) {
-		return nil
-	}
-	if e != nil {
-		return e
-	}
-	if p.ManagementState == model.NotionManagementManaged && p.ArticleID == nil {
-		return sourceManaged()
-	}
-	return nil
+	_, e := findSource(ds, identity.SourceKey)
+	return e
 }
 func bindParsedIdentity(ds store.IStore, a *model.Article, id source.Identity) error {
 	p, e := store.PageBindingByArticle(ds, a.ID)

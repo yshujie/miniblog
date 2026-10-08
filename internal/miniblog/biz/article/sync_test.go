@@ -571,3 +571,123 @@ func TestManagedPendingSourceRejectsLegacyManualWriters(t *testing.T) {
 		t.Fatal(duplicate, e)
 	}
 }
+
+func TestKnownNotionSlugRegistrationAndImportReturnManagedArticle(t *testing.T) {
+	db, b, r := syncFixture(t)
+	slug := "https://TEAM.notion.site:443/my-slug?view=public#intro"
+	r.PublicURL = &slug
+	first := syncApply(t, db, b, r)
+	readURL := "https://team.notion.site/my-slug?view=public#intro"
+	registered, e := b.RegisterSource(context.Background(), RegisterInput{ExternalLink: readURL, Title: "Overwrite", SectionCode: "s2", Publish: false})
+	if e != nil || registered.Outcome != "already_registered" || registered.Article.ID != fmt.Sprint(first.ArticleID) {
+		t.Fatal(registered, e)
+	}
+	imported, e := b.Import(context.Background(), ImportRequest{ExternalLink: readURL, Title: "Overwrite", SectionCode: "s2", Content: importString("bad")}, false)
+	if e != nil || imported.Outcome != "already_registered" || imported.ID != first.ArticleID {
+		t.Fatal(imported, e)
+	}
+	a := syncArticle(t, db, first.ArticleID)
+	if a.Title != r.Title || a.Status != 2 || a.SectionCode != "s1" || a.ExternalLink != r.PageURL {
+		t.Fatal("duplicate overwrote source projection", a)
+	}
+	var count int64
+	db.Model(&model.Article{}).Count(&count)
+	if count != 1 {
+		t.Fatal(count)
+	}
+}
+
+func TestKnownPendingNotionSlugRejectsManualButAllowsOwnFirstPublication(t *testing.T) {
+	db, b, r := syncFixture(t)
+	slug := "https://team.notion.site/my-slug"
+	r.PublicURL = &slug
+	r.DesiredState = 1
+	pending := syncApply(t, db, b, r)
+	if pending.ArticleID != 0 {
+		t.Fatal(pending)
+	}
+	_, e := b.RegisterSource(context.Background(), RegisterInput{ExternalLink: slug, Title: "Manual", SectionCode: "s1"})
+	errorHTTP(t, e, 409)
+	_, e = b.Import(context.Background(), ImportRequest{ExternalLink: slug, Title: "Manual", SectionCode: "s1"}, false)
+	errorHTTP(t, e, 409)
+	r.DesiredState = 2
+	created := syncApply(t, db, b, r)
+	if created.ArticleID == 0 || created.Outcome != "created" {
+		t.Fatal(created)
+	}
+	requirePublic(t, db, created.ArticleID, true)
+}
+
+func TestManualNotionSlugRequiresReviewBeforeSyncWithoutAnyOverwrite(t *testing.T) {
+	db, b, r := syncFixture(t)
+	slug := "https://team.notion.site/my-slug"
+	registered := register(t, b, slug, "s2", "", false)
+	id, _ := ParseID(registered.Article.ID)
+	before := syncArticle(t, db, id)
+	r.PublicURL = &slug
+	_, e := b.ApplySyncedSource(context.Background(), r)
+	errorHTTP(t, e, 409)
+	after := syncArticle(t, db, id)
+	if ArticleFingerprint(&after) != ArticleFingerprint(&before) || !after.UpdatedAt.Equal(before.UpdatedAt) {
+		t.Fatal("sync overwrote manual slug owner", after)
+	}
+	var articles, pages int64
+	db.Model(&model.Article{}).Count(&articles)
+	db.Model(&model.NotionPageBinding{}).Count(&pages)
+	if articles != 1 || pages != 0 {
+		t.Fatal("conflict created another identity", articles, pages)
+	}
+}
+
+func TestManagedReaderURLConflictWithdrawsOrBlocksWithoutOverwritingOwners(t *testing.T) {
+	for _, state := range []int{model.ArticleStatusDraft, model.ArticleStatusPublished} {
+		t.Run(fmt.Sprint(state), func(t *testing.T) {
+			db, b, r := syncFixture(t)
+			first := syncApply(t, db, b, r)
+			ownBefore := syncArticle(t, db, first.ArticleID)
+			bindingBefore := syncBinding(t, db)
+			slug := "https://team.notion.site/manual-owner"
+			manual := register(t, b, slug, "s2", "", true)
+			manualID, _ := ParseID(manual.Article.ID)
+			otherBefore := syncArticle(t, db, manualID)
+			r.PublicURL = &slug
+			r.Title = "must not overwrite last good title"
+			r.DesiredState = state
+			out := syncApply(t, db, b, r)
+			ownAfter := syncArticle(t, db, first.ArticleID)
+			otherAfter := syncArticle(t, db, manualID)
+			bindingAfter := syncBinding(t, db)
+			if out.Outcome != "state_only" || ownAfter.Status != state || ownAfter.Title != ownBefore.Title || ownAfter.SectionCode != ownBefore.SectionCode || ownAfter.ExternalLink != ownBefore.ExternalLink {
+				t.Fatal(out, ownAfter)
+			}
+			if ArticleFingerprint(&otherBefore) != ArticleFingerprint(&otherAfter) || !otherBefore.UpdatedAt.Equal(otherAfter.UpdatedAt) {
+				t.Fatal("changed other URL owner", otherAfter)
+			}
+			if bindingAfter.PublicURL == nil || *bindingAfter.PublicURL != *bindingBefore.PublicURL || !bindingAfter.NeedsRevalidation || bindingAfter.PublishBlockReason != "source_identity_conflict" {
+				t.Fatal(bindingAfter)
+			}
+			requirePublic(t, db, first.ArticleID, false)
+			requirePublic(t, db, manualID, true)
+		})
+	}
+}
+
+func TestAdoptCannotConfirmNewPageOverKnownManualSlugOwner(t *testing.T) {
+	db, b, r := syncFixture(t)
+	slug := "https://team.notion.site/manual-owner"
+	manual := register(t, b, slug, "s2", "", false)
+	id, _ := ParseID(manual.Article.ID)
+	before := syncArticle(t, db, id)
+	p := model.NotionPageBinding{PageID: syncPageID, SourceID: "a", ManagementState: model.NotionManagementBaselinePending, BootstrapState: "verified", BootstrapExpectedFingerprint: "confirmed", PageURL: r.PageURL, PublicURL: &slug, DesiredState: 2}
+	if e := db.Create(&p).Error; e != nil {
+		t.Fatal(e)
+	}
+	db.Model(&model.NotionSyncControl{}).Where("id=1").Updates(map[string]interface{}{"paused": true, "source_writes_paused": true, "baseline_frozen": true})
+	_, e := b.AdoptSyncedSource(context.Background(), AdoptInput{Lease: r.Lease, PageID: syncPageID, SourceID: "a", ExpectedConfigRevision: 1, ExpectedFingerprint: "confirmed"})
+	errorHTTP(t, e, 409)
+	after := syncArticle(t, db, id)
+	p = syncBinding(t, db)
+	if ArticleFingerprint(&before) != ArticleFingerprint(&after) || p.ManagementState != model.NotionManagementBaselinePending || p.BootstrapState != "verified" {
+		t.Fatal(after, p)
+	}
+}

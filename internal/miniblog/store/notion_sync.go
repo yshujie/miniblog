@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yshujie/miniblog/internal/miniblog/model"
+	"github.com/yshujie/miniblog/internal/miniblog/source"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"time"
@@ -15,6 +16,7 @@ var (
 	ErrSyncNotReady           = errors.New("notion sync schema is unavailable")
 	ErrSourceWritesPaused     = errors.New("external source writes are paused for maintenance")
 	ErrSourceIdentityConflict = errors.New("source identity resolves to multiple articles")
+	ErrSourceManagedPending   = errors.New("source is managed without a blog article")
 )
 
 type LeaseToken struct {
@@ -139,38 +141,114 @@ func PageBindingByArticle(ds IStore, id uint64) (*model.NotionPageBinding, error
 	return &p, e
 }
 
-// FindSourceOwner resolves the canonical key and the immutable bootstrap alias.
+// FindSourceOwner resolves canonical keys, immutable bootstrap aliases and known
+// page URLs. URL identity comparisons use Parse in Go, never SQL URL collation.
 func FindSourceOwner(ds IStore, key string) (*model.Article, error) {
-	var owners []model.Article
-	if e := ds.DB().Where("source_key = ?", key).Find(&owners).Error; e != nil {
-		return nil, e
-	}
-	if HasNotionSyncSchema(ds.DB()) {
-		var p model.NotionPageBinding
-		e := ds.DB().Where("legacy_source_key = ?", key).First(&p).Error
-		if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
+	return findSourceOwnerByKeys(ds, "", []string{key})
+}
+
+// FindSourceOwnerForURLs checks only observed addresses, without guessing slug aliases.
+// Ignoring a page skips its binding projections, not a manual article's direct key.
+func FindSourceOwnerForURLs(ds IStore, ignorePageID string, rawURLs ...string) (*model.Article, error) {
+	keys := make([]string, 0, len(rawURLs))
+	for _, raw := range rawURLs {
+		if raw == "" {
+			continue
+		}
+		identity, e := source.Parse(raw)
+		if e != nil {
 			return nil, e
 		}
-		if e == nil {
+		keys = append(keys, identity.SourceKey)
+	}
+	return findSourceOwnerByKeys(ds, ignorePageID, keys)
+}
+func findSourceOwnerByKeys(ds IStore, ignorePageID string, keys []string) (*model.Article, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	wanted := map[string]bool{}
+	for _, key := range keys {
+		wanted[key] = true
+	}
+	var rows []*model.Article
+	if e := ds.DB().Where("source_key IN ?", keys).Find(&rows).Error; e != nil {
+		return nil, e
+	}
+	owners := map[uint64]*model.Article{}
+	for _, a := range rows {
+		owners[a.ID] = a
+	}
+	pending := map[string]bool{}
+	if HasNotionSyncSchema(ds.DB()) {
+		// The six-table design keeps a page's current observed addresses in its
+		// binding. A single projection read avoids per-page queries and new registries.
+		var pages []model.NotionPageBinding
+		if e := ds.DB().Select("page_id", "article_id", "legacy_source_key", "management_state", "page_url", "public_url").Find(&pages).Error; e != nil {
+			return nil, e
+		}
+		ids := map[uint64]bool{}
+		for _, p := range pages {
+			if p.PageID == ignorePageID {
+				continue
+			}
+			aliasMatch := p.LegacySourceKey != nil && wanted[*p.LegacySourceKey]
+			match := aliasMatch
+			canonical, e := source.Parse("https://www.notion.so/" + p.PageID)
+			if e == nil && canonical.PageID != "" && wanted[canonical.SourceKey] {
+				match = true
+			}
+			urls := []string{p.PageURL}
+			if p.PublicURL != nil {
+				urls = append(urls, *p.PublicURL)
+			}
+			for _, raw := range urls {
+				identity, e := source.Parse(raw)
+				if e == nil && wanted[identity.SourceKey] {
+					match = true
+				}
+			}
+			if !match {
+				continue
+			}
 			if p.ArticleID == nil {
+				if aliasMatch {
+					return nil, ErrSourceIdentityConflict
+				}
+				if p.ManagementState == model.NotionManagementManaged {
+					pending[p.PageID] = true
+				}
+				continue
+			}
+			ids[*p.ArticleID] = true
+		}
+		if len(ids) > 0 {
+			wantedIDs := make([]uint64, 0, len(ids))
+			for id := range ids {
+				wantedIDs = append(wantedIDs, id)
+			}
+			var bound []*model.Article
+			if e := ds.DB().Where("id IN ?", wantedIDs).Find(&bound).Error; e != nil {
+				return nil, e
+			}
+			if len(bound) != len(ids) {
 				return nil, ErrSourceIdentityConflict
 			}
-			var a model.Article
-			if e = ds.DB().First(&a, *p.ArticleID).Error; e != nil {
-				return nil, ErrSourceIdentityConflict
-			}
-			if len(owners) == 0 || owners[0].ID != a.ID {
-				owners = append(owners, a)
+			for _, a := range bound {
+				owners[a.ID] = a
 			}
 		}
 	}
-	if len(owners) > 1 {
+	if len(owners) > 1 || len(pending) > 1 || (len(pending) > 0 && len(owners) > 0) {
 		return nil, ErrSourceIdentityConflict
 	}
-	if len(owners) == 0 {
-		return nil, nil
+	if len(pending) > 0 {
+		return nil, ErrSourceManagedPending
 	}
-	return &owners[0], nil
+	for _, a := range owners {
+		return a, nil
+	}
+	return nil, nil
 }
 func CheckSourceWrites(ds IStore) error {
 	if !HasNotionSyncSchema(ds.DB()) {

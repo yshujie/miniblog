@@ -88,6 +88,9 @@ func bindIdentity(a *model.Article, identity source.Identity) {
 }
 func findSource(ds store.IStore, key string) (*model.Article, error) {
 	a, err := store.FindSourceOwner(ds, key)
+	if errors.Is(err, store.ErrSourceManagedPending) {
+		return nil, sourceManaged()
+	}
 	if errors.Is(err, store.ErrSourceIdentityConflict) {
 		return nil, conflict("来源身份存在冲突，请先审核")
 	}

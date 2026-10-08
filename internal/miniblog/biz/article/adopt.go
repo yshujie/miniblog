@@ -87,6 +87,20 @@ func (b *articleBiz) AdoptSyncedSource(ctx context.Context, r AdoptInput) (resul
 		if p.SourceID != r.SourceID || p.Revision != r.ExpectedBindingRevision || p.BootstrapState != "verified" || p.BootstrapExpectedFingerprint != r.ExpectedFingerprint {
 			return syncConflict("审核快照未确认或已变化")
 		}
+		knownURLs := []string{identity.CanonicalURL, p.PageURL}
+		if p.PublicURL != nil {
+			knownURLs = append(knownURLs, *p.PublicURL)
+		}
+		knownOwner, knownErr := store.FindSourceOwnerForURLs(ds, r.PageID, knownURLs...)
+		if knownErr != nil {
+			if errors.Is(knownErr, store.ErrSourceIdentityConflict) || errors.Is(knownErr, store.ErrSourceManagedPending) {
+				return syncConflict("审核页面地址存在归属冲突")
+			}
+			return knownErr
+		}
+		if knownOwner != nil && (a == nil || knownOwner.ID != a.ID) {
+			return syncConflict("审核页面地址已属于其他文章")
+		}
 		if a != nil {
 			before, parseErr := ParseArticleBeforeJSON(p.LocalBeforeJSON)
 			if parseErr != nil {
