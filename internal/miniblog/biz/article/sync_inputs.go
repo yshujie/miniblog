@@ -1,6 +1,7 @@
 package article
 
 import (
+	"github.com/yshujie/miniblog/internal/miniblog/biz/catalog"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"time"
 )
@@ -36,8 +37,5 @@ type AdoptInput struct {
 	ExpectedArticleID, ExpectedBindingRevision uint64
 }
 
-type TopicOption struct{ ID, Name string }
-type TopicResult struct {
-	BindingID                              uint64
-	OptionID, SectionCode, Outcome, Reason string
-}
+type TopicOption = catalog.TopicOption
+type TopicResult = catalog.TopicResult
