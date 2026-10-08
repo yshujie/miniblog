@@ -31,6 +31,7 @@
         />
       </el-select>
       <el-button type="primary" :disabled="!selectedSectionCode" @click="openCreateDialog">新增子章节</el-button>
+      <el-button @click="goCollect()" :disabled="!selectedSectionCode || !contentRegistrationEnabled">收录文章</el-button>
       <el-button :loading="loading" @click="() => loadSubsections(true)">刷新</el-button>
     </div>
 
@@ -51,9 +52,10 @@
           <el-tag :type="statusType(row.status)">{{ statusText(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="260" align="center">
+      <el-table-column label="操作" width="340" align="center">
         <template #default="{ row }">
           <el-button size="small" type="primary" @click="openEditDialog(row)">编辑</el-button>
+          <el-button size="small" :disabled="!contentRegistrationEnabled" @click="goCollect(row)">收录</el-button>
           <el-button size="small" type="danger" @click="handleDelete(row)" style="margin-left:8px">删除</el-button>
           <el-button
             v-if="row.status !== NORMAL_STATUS"
@@ -111,6 +113,8 @@
 </template>
 
 <script setup lang="ts">
+import { contentRegistrationEnabled } from '@/utils/content-flags';
+import { useRouter } from 'vue-router';
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import 'element-plus/es/components/message-box/style/css';
@@ -122,6 +126,8 @@ import type { SectionItem } from '@/store/modules/section';
 import useSubsectionStore from '@/store/modules/subsection';
 import type { SubsectionItem } from '@/store/modules/subsection';
 
+const router = useRouter();
+const goCollect = (subsection?: SubsectionItem) => router.push({ path: '/content/workbench', query: { module_code: selectedModuleCode.value, section_code: selectedSectionCode.value, subsection_code: subsection?.code, collect: '1' }});
 const moduleStore = useModuleStore();
 const sectionStore = useSectionStore();
 const subsectionStore = useSubsectionStore();
@@ -213,7 +219,8 @@ const handleFormSubmit = async () => {
       await subsectionStore.createSubsection({
         section_code: formModel.section_code,
         code: formModel.code,
-        title: formModel.title
+        title: formModel.title,
+        sort: formModel.sort
       });
       ElMessage.success('新增子章节成功');
     } else {
@@ -296,7 +303,7 @@ const handleDelete = async (subsection: SubsectionItem) => {
     await subsectionStore.deleteSubsection(subsection.code);
     ElMessage.success('删除子章节成功');
     await loadSubsections(true);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error === 'cancel' || error === 'close') return;
     const message = error instanceof Error ? error.message : '删除子章节失败';
     ElMessage.error(message);

@@ -9,7 +9,14 @@
     "build:test": "vite build --mode build_test",
     "build:prod": "vite build --mode build_prod",
     "preview": "vite preview --port 4173",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
+    "type-check": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
+    "lint:check": "eslint src/api/content.ts src/api/content.test.ts src/api/article.js src/components/content src/composables src/stores src/store/index.ts src/store/modules/module.ts src/store/modules/section.ts src/store/modules/subsection.ts src/store/modules/contentWorkspace.ts src/store/modules/section.test.ts src/store/modules/subsection.test.ts src/types/content.ts src/utils/api-error.ts src/utils/content-flags.ts src/utils/content-flags.test.ts src/utils/request.js src/router/index.ts src/views/content src/views/article src/views/home/index.vue src/views/section/index.vue src/views/subsection/index.vue vite.config.ts vitest.config.ts scripts/browser-fixture.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run",
+    "build": "vite build --mode build_prod",
+    "test:browser:fixture": "node scripts/browser-fixture.mjs"
   },
   "dependencies": {
     "axios": "^1.11.0",
@@ -43,6 +50,9 @@
     "vite": "^6.3.5",
     "vite-plugin-inspect": "^11.3.2",
     "vite-plugin-mock": "^2.9.8",
-    "vue-tsc": "^3.0.4"
+    "vue-tsc": "^3.0.4",
+    "vitest": "3.2.7",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^26.1.0"
   }
 }
