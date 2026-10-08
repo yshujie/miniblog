@@ -1,5 +1,7 @@
 # 内容管理与阅读维护指南
 
+Notion 托管工作流见 [自动同步维护指南](notion-sync.md)。手工内容继续使用目录工作台。
+
 后台目录工作台支持选择章节或子章节、粘贴外链、确认标题并一次发布，随后继续收录。保留 Go/Gin/GORM、Vue/Element Plus/Pinia、历史文章 ID、目录 code 和原始外链。Notion 标题只作建议，飞书继续手填。
 
 生产数据与 schema 尚未核验。以下验证来自本地测试库和浏览器夹具；生产部署、重复取舍和实际平台阅读验收由维护者完成。
@@ -104,7 +106,7 @@ dry-run 校验归属、身份、冲突和状态，不写入、不预留 ID 或�
 
 本轮使用独立 Node 24，未改默认 Node 16。content-checks.yml 增补 PR 的 Go/race/vet、MySQL、类型、非修复 lint、单元及构建门槛，远端 CI 尚未运行。
 
-按原计划保持 Vitest 3.2.7。安装审计发现其开发依赖 tinypool 的已披露高危漏洞，以及 @vitest/mocker 漏洞；已提出 Vitest 5.0.3/Vite 6.4 的修复版本选择，尚未获回复，未擅自改变指定版本。功能检查通过不等于依赖安全检查通过：[tinypool 公告](https://github.com/advisories/GHSA-85c8-ppgw-ccpr)、[mocker 公告](https://github.com/advisories/GHSA-82fw-gwwq-j7x9)。
+本轮按确认计划升级 Vitest 5.0.3 与 Vite 6.4.0，构建和 CI 使用 Node 24。原 mocker/tinypool 公告已退出锁文件命中。Vite 6.4.0 仍命中后续公告，按明确版本约定保留并单独记录；其余结果见 [同步验证记录](notion-sync-verification.md)。工具通过不表示依赖审计无告警。
 
 ```sh
 go test -race ./...

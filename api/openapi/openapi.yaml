@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: miniblog content API
-  version: 1.1.0
+  version: 1.2.0
   description: Content endpoints in the existing /v1 contract. Authentication and
     other management APIs are unchanged. Registration requires MINIBLOG_CONTENT_REGISTER_ENABLED
     and completed source cutover. Archived state remains legacy wire Deleted. Nullable
@@ -704,6 +704,525 @@ paths:
           $ref: '#/components/responses/Error'
         '500':
           $ref: '#/components/responses/Error'
+  /v1/admin/notion-sync/status:
+    get:
+      summary: Sync health and controls
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncStatus'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /v1/admin/notion-sync/sources:
+    get:
+      summary: Paginated sources
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncSourceList'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - &id001
+        name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+          minimum: 1
+          maximum: 1000000
+      - &id002
+        name: limit
+        in: query
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+          maximum: 100
+  /v1/admin/notion-sync/pages:
+    get:
+      summary: Paginated pages
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncPageList'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - *id001
+      - *id002
+      - name: source_id
+        in: query
+        schema:
+          type: string
+      - name: management_state
+        in: query
+        schema:
+          type: string
+      - name: status
+        in: query
+        schema:
+          type: string
+      - name: title
+        in: query
+        schema:
+          type: string
+  /v1/admin/notion-sync/runs:
+    get:
+      summary: Paginated runs
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncRunList'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - *id001
+      - *id002
+    post:
+      summary: Start fresh dry_run or sync; bootstrap excluded
+      security:
+      - bearerAuth: []
+      responses:
+        '202':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      run_id:
+                        type: string
+                    required:
+                    - run_id
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncRunInput'
+  /v1/admin/notion-sync/runs/{run_id}:
+    get:
+      summary: Inspect one run
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncRun'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v1/admin/notion-sync/runs/{run_id}/items:
+    get:
+      summary: Paginated preview and application results
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncItemList'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      - *id002
+  /v1/admin/notion-sync/control:
+    patch:
+      summary: Pause and fence current work; runtime enabled is immutable
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncStatus'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncControlInput'
+  /v1/admin/notion-sync/sources/{source_id}:
+    patch:
+      summary: Configure a whitelisted source with revision check
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncSource'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncSourceInput'
+      parameters:
+      - name: source_id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v1/admin/notion-sync/catalog-bindings/{binding_id}:
+    put:
+      summary: Resolve a catalog conflict with revision check
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncTopicBinding'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncBindingInput'
+      parameters:
+      - name: binding_id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v1/admin/articles/{id}/local-fields:
+    patch:
+      summary: Save managed article local author
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      article:
+                        $ref: '#/components/schemas/LegacyArticle'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocalFieldsInput'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v1/admin/articles/{id}/publication-hold:
+    put:
+      summary: Set local hold or require fresh revalidation after release
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      article:
+                        $ref: '#/components/schemas/LegacyArticle'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicationHoldInput'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
 components:
   securitySchemes:
     bearerAuth:
@@ -875,6 +1394,18 @@ components:
           type: string
         updated_at:
           type: string
+        management:
+          $ref: '#/components/schemas/ArticleManagement'
+        allowed_actions:
+          type: array
+          items:
+            type: string
+        publication_hold:
+          $ref: '#/components/schemas/PublicationHold'
+        effective_visibility:
+          type: boolean
+        reading_url:
+          type: string
       required:
       - id
       - id_text
@@ -928,6 +1459,18 @@ components:
         created_at:
           type: string
         updated_at:
+          type: string
+        management:
+          $ref: '#/components/schemas/ArticleManagement'
+        allowed_actions:
+          type: array
+          items:
+            type: string
+        publication_hold:
+          $ref: '#/components/schemas/PublicationHold'
+        effective_visibility:
+          type: boolean
+        reading_url:
           type: string
       required:
       - id
@@ -1066,6 +1609,10 @@ components:
           type: string
         updated_at:
           type: string
+        reading_url:
+          type: string
+          description: Current effective HTTP(S) reading address; external_link remains
+            the historical original.
       required:
       - id
       - module_code
@@ -1140,6 +1687,390 @@ components:
       - code
       - msg
       - payload
+    ArticleManagement:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+          - manual
+          - notion_sync
+        source_id:
+          type: string
+        managed_fields:
+          type: array
+          items:
+            type: string
+      required:
+      - mode
+      - managed_fields
+    PublicationHold:
+      type: object
+      properties:
+        held:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - held
+    SyncConfig:
+      type: object
+      properties:
+        title_property_id:
+          type: string
+        state_property_id:
+          type: string
+        topic_property_id:
+          type: string
+        tags_property_id:
+          type: string
+        description_property_id:
+          type: string
+        difficulty_property_id:
+          type: string
+        date_property_id:
+          type: string
+        state_option_ids:
+          type: object
+          additionalProperties: false
+          properties:
+            draft:
+              type: string
+            published:
+              type: string
+            unpublished:
+              type: string
+            archived:
+              type: string
+          required:
+          - draft
+          - published
+          - unpublished
+          - archived
+    SyncTopicBinding:
+      type: object
+      properties:
+        id:
+          type: string
+        source_id:
+          type: string
+        option_id:
+          type: string
+        option_name:
+          type: string
+        section_code:
+          type: string
+        status:
+          type: string
+        reason:
+          type: string
+    SyncSource:
+      type: object
+      properties:
+        source_id:
+          type: string
+        label:
+          type: string
+        module_code:
+          type: string
+        health:
+          type: string
+        last_error:
+          type: string
+        enabled:
+          type: boolean
+        config_revision:
+          type: integer
+        config:
+          $ref: '#/components/schemas/SyncConfig'
+        catalog_bindings:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncTopicBinding'
+        last_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_complete_scan_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_success_at:
+          type: string
+          format: date-time
+          nullable: true
+    SyncPage:
+      type: object
+      properties:
+        page_id:
+          type: string
+        source_id:
+          type: string
+        title:
+          type: string
+        desired_state:
+          type: string
+        status:
+          type: string
+        management_state:
+          type: string
+        publish_block_reason:
+          type: string
+        last_error:
+          type: string
+        page_url:
+          type: string
+        publication_hold_reason:
+          type: string
+        bootstrap_state:
+          type: string
+        article_id:
+          type: string
+          nullable: true
+        public_url:
+          type: string
+          nullable: true
+        publication_hold:
+          type: boolean
+        revision:
+          type: integer
+    SyncRun:
+      type: object
+      properties:
+        run_id:
+          type: string
+        mode:
+          type: string
+        status:
+          type: string
+        phase:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        counts:
+          type: object
+          properties:
+            seen:
+              type: integer
+            created:
+              type: integer
+            updated:
+              type: integer
+            unchanged:
+              type: integer
+            blocked:
+              type: integer
+            failed:
+              type: integer
+        error:
+          type: string
+    SyncItem:
+      type: object
+      properties:
+        item_id:
+          type: string
+        page_id:
+          type: string
+        article_id:
+          type: string
+          nullable: true
+        outcome:
+          type: string
+        reason:
+          type: string
+        before: {}
+        after: {}
+        error:
+          type: string
+    SyncStatus:
+      type: object
+      properties:
+        last_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+        enabled:
+          type: boolean
+        paused:
+          type: boolean
+        source_writes_paused:
+          type: boolean
+        baseline_frozen:
+          type: boolean
+        current_run_id:
+          type: string
+          nullable: true
+        health:
+          type: string
+        pending_count:
+          type: integer
+        error_count:
+          type: integer
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncSource'
+        last_complete_scan_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_success_at:
+          type: string
+          format: date-time
+          nullable: true
+    SyncControlInput:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Runtime switch; requests may echo the current value but cannot change it. Use paused.
+        paused:
+          type: boolean
+        source_writes_paused:
+          type: boolean
+      additionalProperties: false
+    SyncSourceInput:
+      type: object
+      properties:
+        label:
+          type: string
+        module_code:
+          type: string
+        enabled:
+          type: boolean
+        config:
+          $ref: '#/components/schemas/SyncConfig'
+        expected_config_revision:
+          type: integer
+          minimum: 0
+      additionalProperties: false
+    SyncBindingInput:
+      type: object
+      properties:
+        source_id:
+          type: string
+        option_id:
+          type: string
+        section_code:
+          type: string
+        expected_config_revision:
+          type: integer
+          minimum: 0
+      required:
+      - source_id
+      - option_id
+      - section_code
+      - expected_config_revision
+      additionalProperties: false
+    SyncRunInput:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+          - dry_run
+          - sync
+      required:
+      - mode
+      additionalProperties: false
+    LocalFieldsInput:
+      type: object
+      properties:
+        author:
+          type: string
+          maxLength: 128
+      required:
+      - author
+      additionalProperties: false
+    PublicationHoldInput:
+      type: object
+      properties:
+        held:
+          type: boolean
+        reason:
+          type: string
+          maxLength: 255
+      required:
+      - held
+      additionalProperties: false
+    SyncSourceList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncSource'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+      - items
+      - total
+      - page
+      - limit
+    SyncPageList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncPage'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+      - items
+      - total
+      - page
+      - limit
+    SyncRunList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncRun'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+      - items
+      - total
+      - page
+      - limit
+    SyncItemList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncItem'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+      - items
+      - total
+      - page
+      - limit
   responses:
     Error:
       description: Business or database failure; never an empty-directory substitute
