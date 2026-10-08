@@ -55,22 +55,27 @@ type GetArticleResponse struct {
 
 // ArticleInfo 文章信息
 type ArticleInfo struct {
-	ID           uint64          `json:"id"`
-	IDText       string          `json:"id_text"`
-	Title        string          `json:"title"`
-	Content      string          `json:"content"`
-	ExternalLink string          `json:"external_link"`
-	Module       ModuleInfo      `json:"module"`
-	Section      SectionInfo     `json:"section"`
-	Subsection   *SubsectionInfo `json:"subsection,omitempty"`
-	Author       string          `json:"author"`
-	Tags         []string        `json:"tags"`
-	Pos          int             `json:"pos"`
-	Status       string          `json:"status"`
-	CreatedAt    string          `json:"created_at"`
-	UpdatedAt    string          `json:"updated_at"`
-	Provider     *string         `json:"provider,omitempty"`
-	CanonicalURL *string         `json:"canonical_url,omitempty"`
+	ID                  uint64            `json:"id"`
+	IDText              string            `json:"id_text"`
+	Title               string            `json:"title"`
+	Content             string            `json:"content"`
+	ExternalLink        string            `json:"external_link"`
+	Module              ModuleInfo        `json:"module"`
+	Section             SectionInfo       `json:"section"`
+	Subsection          *SubsectionInfo   `json:"subsection,omitempty"`
+	Author              string            `json:"author"`
+	Tags                []string          `json:"tags"`
+	Pos                 int               `json:"pos"`
+	Status              string            `json:"status"`
+	CreatedAt           string            `json:"created_at"`
+	UpdatedAt           string            `json:"updated_at"`
+	Provider            *string           `json:"provider,omitempty"`
+	ReadingURL          string            `json:"reading_url"`
+	Management          ArticleManagement `json:"management"`
+	AllowedActions      []string          `json:"allowed_actions"`
+	PublicationHold     PublicationHold   `json:"publication_hold"`
+	EffectiveVisibility bool              `json:"effective_visibility"`
+	CanonicalURL        *string           `json:"canonical_url,omitempty"`
 }
 
 // ArticleDTO is used by new commands. Legacy ArticleInfo keeps numeric id.
@@ -114,4 +119,22 @@ type ReorderArticlesRequest struct {
 	SectionCode    string   `json:"section_code"`
 	SubsectionCode string   `json:"subsection_code,omitempty"`
 	ArticleIDs     []string `json:"article_ids"`
+}
+
+// ArticleManagement declares source ownership, independently from provider.
+type ArticleManagement struct {
+	Mode          string   `json:"mode"`
+	SourceID      string   `json:"source_id,omitempty"`
+	ManagedFields []string `json:"managed_fields"`
+}
+type PublicationHold struct {
+	Held   bool   `json:"held"`
+	Reason string `json:"reason,omitempty"`
+}
+type PatchArticleLocalFieldsRequest struct {
+	Author string `json:"author"`
+}
+type PublicationHoldRequest struct {
+	Held   bool   `json:"held"`
+	Reason string `json:"reason"`
 }

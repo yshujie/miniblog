@@ -3,7 +3,6 @@ package reading
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
@@ -74,13 +73,16 @@ func (b *Service) Module(ctx context.Context, code string) (*v1.GetModuleDetailR
 		}
 	}
 	articles := make([]*store.CanonicalArticle, 0)
-	if err = store.PublishedArticles(ctx, db).Where("module.code = ?", m.Code).Select(store.CanonicalArticleSelect).Order("article.pos asc, article.id asc").Find(&articles).Error; err != nil {
+	if err = store.PublishedArticles(ctx, db).Where("module.code = ?", m.Code).Select(store.ReadingArticleSelect(db)).Order("article.pos asc, article.id asc").Find(&articles).Error; err != nil {
 		return nil, err
 	}
 	for _, a := range articles {
 		a.SectionCode = a.CanonicalSectionCode
 		a.SubsectionCode = a.CanonicalSubsectionCode
-		d := toDetail(&a.Article, a.CanonicalModuleCode)
+		d, e := toDetail(&a.Article, a.CanonicalModuleCode, a.ReadingURL)
+		if e != nil {
+			return nil, e
+		}
 		if a.SubsectionCode == "" {
 			if s := sectionMap[a.SectionCode]; s != nil {
 				s.Articles = append(s.Articles, d)
@@ -97,7 +99,7 @@ func (b *Service) Article(ctx context.Context, id uint64) (*v1.GetArticleDetailR
 	}
 	var a store.CanonicalArticle
 	q := store.PublishedArticles(ctx, b.ds.DB()).Where("article.id = ?", id)
-	err := q.Select(store.CanonicalArticleSelect).First(&a).Error
+	err := q.Select(store.ReadingArticleSelect(b.ds.DB())).First(&a).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errno.ErrArticleNotFound
 	}
@@ -106,12 +108,16 @@ func (b *Service) Article(ctx context.Context, id uint64) (*v1.GetArticleDetailR
 	}
 	a.SectionCode = a.CanonicalSectionCode
 	a.SubsectionCode = a.CanonicalSubsectionCode
-	return &v1.GetArticleDetailResponse{ArticleDetail: toDetail(&a.Article, a.CanonicalModuleCode)}, nil
-}
-func toDetail(a *model.Article, module string) *v1.ArticleDetail {
-	tags := []string{}
-	if a.Tags != "" {
-		tags = strings.Split(a.Tags, ",")
+	detail, e := toDetail(&a.Article, a.CanonicalModuleCode, a.ReadingURL)
+	if e != nil {
+		return nil, e
 	}
-	return &v1.ArticleDetail{ID: a.ID, Title: a.Title, Content: a.Content, ExternalLink: a.ExternalLink, ModuleCode: module, SectionCode: a.SectionCode, SubsectionCode: a.SubsectionCode, Author: a.Author, Tags: tags, Pos: a.Pos, Provider: a.Provider, CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt}
+	return &v1.GetArticleDetailResponse{ArticleDetail: detail}, nil
+}
+func toDetail(a *model.Article, module, readingURL string) (*v1.ArticleDetail, error) {
+	tags, e := model.ArticleTags(a)
+	if e != nil {
+		return nil, e
+	}
+	return &v1.ArticleDetail{ID: a.ID, Title: a.Title, Content: a.Content, ExternalLink: a.ExternalLink, ReadingURL: readingURL, ModuleCode: module, SectionCode: a.SectionCode, SubsectionCode: a.SubsectionCode, Author: a.Author, Tags: tags, Pos: a.Pos, Provider: a.Provider, CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt}, nil
 }

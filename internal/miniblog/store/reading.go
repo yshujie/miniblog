@@ -49,24 +49,37 @@ func ListArticles(ctx context.Context, db *gorm.DB, f ArticleFilter) ([]*model.A
 
 // PublishedArticles applies the same full-path visibility policy to list and detail.
 func PublishedArticles(ctx context.Context, db *gorm.DB) *gorm.DB {
-	return db.WithContext(ctx).Model(&model.Article{}).
+	q := db.WithContext(ctx).Model(&model.Article{}).
 		Joins("JOIN section ON section.code = article.section_code").
 		Joins("JOIN module ON module.code = section.module_code").
 		Joins("LEFT JOIN subsection ON subsection.code = article.subsection_code AND subsection.section_code = section.code").
 		Where("article.status = ? AND section.status = ? AND module.status = ?", model.ArticleStatusPublished, model.SectionStatusNormal, model.ModuleStatusNormal).
 		Where("article.subsection_code IS NULL OR article.subsection_code = '' OR subsection.status = ?", model.SubsectionStatusNormal)
+	if HasNotionSyncSchema(db) {
+		q = q.Joins("LEFT JOIN notion_page_bindings ON notion_page_bindings.article_id = article.id").
+			Where("notion_page_bindings.article_id IS NULL OR notion_page_bindings.management_state <> ? OR (notion_page_bindings.publication_held = ? AND notion_page_bindings.needs_revalidation = ? AND notion_page_bindings.native_archived = ? AND notion_page_bindings.in_trash = ? AND notion_page_bindings.publish_block_reason = '' AND TRIM(COALESCE(notion_page_bindings.public_url, '')) <> '')", model.NotionManagementManaged, false, false, false, false)
+	}
+	return q
+}
+func ReadingArticleSelect(db *gorm.DB) string {
+	if HasNotionSyncSchema(db) {
+		return CanonicalArticleSelect + ", CASE WHEN notion_page_bindings.management_state = 'managed' THEN COALESCE(NULLIF(notion_page_bindings.public_url,''),NULLIF(notion_page_bindings.page_url,''),article.external_link) ELSE article.external_link END AS reading_url"
+	}
+	return CanonicalArticleSelect + ", article.external_link AS reading_url"
 }
 
 type ArticleAssociations struct {
-	Modules     map[string]*model.Module
-	Sections    map[string]*model.Section
-	Subsections map[string]*model.Subsection
+	Modules      map[string]*model.Module
+	Sections     map[string]*model.Section
+	PageBindings map[uint64]*model.NotionPageBinding
+	Subsections  map[string]*model.Subsection
 }
 
 // CanonicalArticle projects the actual directory codes selected by the database.
 // MySQL collation equivalence is broader than Go string/lowercase equivalence.
 type CanonicalArticle struct {
 	model.Article           `gorm:"embedded"`
+	ReadingURL              string
 	CanonicalModuleCode     string
 	CanonicalSectionCode    string
 	CanonicalSubsectionCode string
@@ -75,7 +88,7 @@ type CanonicalArticle struct {
 const CanonicalArticleSelect = "article.*, module.code AS canonical_module_code, section.code AS canonical_section_code, subsection.code AS canonical_subsection_code"
 
 func LoadArticleAssociations(ctx context.Context, db *gorm.DB, articles []*model.Article) (*ArticleAssociations, error) {
-	result := &ArticleAssociations{Modules: map[string]*model.Module{}, Sections: map[string]*model.Section{}, Subsections: map[string]*model.Subsection{}}
+	result := &ArticleAssociations{Modules: map[string]*model.Module{}, Sections: map[string]*model.Section{}, Subsections: map[string]*model.Subsection{}, PageBindings: map[uint64]*model.NotionPageBinding{}}
 	if len(articles) == 0 {
 		return result, nil
 	}
@@ -144,6 +157,17 @@ func LoadArticleAssociations(ctx context.Context, db *gorm.DB, articles []*model
 		}
 		if s := subMap[r.SubsectionCode]; s != nil {
 			result.Subsections[r.RawSubsectionCode] = s
+		}
+	}
+	if HasNotionSyncSchema(db) {
+		var pages []*model.NotionPageBinding
+		if err = db.WithContext(ctx).Where("article_id IN ?", ids).Find(&pages).Error; err != nil {
+			return nil, err
+		}
+		for _, p := range pages {
+			if p.ArticleID != nil {
+				result.PageBindings[*p.ArticleID] = p
+			}
 		}
 	}
 	return result, nil

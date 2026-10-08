@@ -186,6 +186,9 @@ func (s *Service) DeleteModule(ctx context.Context, code string) error {
 		if m == nil {
 			return errno.ErrModuleNotFound
 		}
+		if e = CheckModuleBindingDependency(ds, m.Code); e != nil {
+			return e
+		}
 		children, e := ds.Sections().GetSections(m.Code)
 		if e != nil {
 			return e
@@ -253,6 +256,11 @@ func (s *Service) UpdateSection(ctx context.Context, code string, r UpdateInput)
 		if e := validName(m.Code, r.Title); e != nil {
 			return e
 		}
+		if m.Title != r.Title {
+			if e := CheckSectionBindingDependency(ds, m.Code); e != nil {
+				return e
+			}
+		}
 		m.Title = r.Title
 		if r.Sort != nil {
 			m.Sort = *r.Sort
@@ -272,6 +280,9 @@ func (s *Service) SectionStatus(ctx context.Context, code string, status int) (r
 }
 func (s *Service) DeleteSection(ctx context.Context, code string) error {
 	return s.mutateSection(ctx, code, func(ds store.IStore, m *model.Section) error {
+		if e := CheckSectionBindingDependency(ds, m.Code); e != nil {
+			return e
+		}
 		children, e := ds.Subsections().GetSubsections(m.Code)
 		if e != nil {
 			return e

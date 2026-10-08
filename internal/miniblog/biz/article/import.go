@@ -56,6 +56,14 @@ func (b *articleBiz) Import(ctx context.Context, r ImportRequest, dryRun bool) (
 	}
 	result := &ImportResult{}
 	e := store.InTransaction(ctx, b.ds, func(ds store.IStore) error {
+		if e := store.LockSourceControl(ds, true); e != nil {
+			return e
+		}
+		if identity != nil {
+			if e := checkPendingSourceOwner(ds, *identity); e != nil {
+				return e
+			}
+		}
 		p, e := catalog.Resolve(ds, r.SectionCode, r.SubsectionCode)
 		if e != nil {
 			return e
@@ -130,6 +138,22 @@ func (b *articleBiz) Import(ctx context.Context, r ImportRequest, dryRun bool) (
 				}
 			}
 		}
+		if existing != nil {
+			binding, bindErr := store.PageBindingByArticle(ds, existing.ID)
+			if bindErr != nil {
+				return bindErr
+			}
+			if binding != nil && r.ExternalLink != existing.ExternalLink {
+				return conflict("历史外链不可通过导入更换")
+			}
+			if e = checkManualWritable(ds, existing); e != nil {
+				return e
+			}
+		} else {
+			if e = store.CheckSourceWrites(ds); e != nil {
+				return e
+			}
+		}
 		status := model.ArticleStatusDraft
 		if existing != nil {
 			status = existing.Status
@@ -138,7 +162,12 @@ func (b *articleBiz) Import(ctx context.Context, r ImportRequest, dryRun bool) (
 			status = *r.Status
 		}
 		if existing != nil && existing.Status == model.ArticleStatusDeleted {
-			same := status == existing.Status && r.Title == existing.Title && r.ExternalLink == existing.ExternalLink && r.Author == existing.Author && strings.Join(r.Tags, ",") == existing.Tags
+			same := status == existing.Status && r.Title == existing.Title && r.ExternalLink == existing.ExternalLink && r.Author == existing.Author
+			tagsSame, tagsErr := model.ArticleTagsEqual(existing, r.Tags)
+			if tagsErr != nil {
+				return tagsErr
+			}
+			same = same && tagsSame
 			same = same && existing.SectionCode == p.Section.Code && ((p.Subsection == nil && existing.SubsectionCode == "") || (p.Subsection != nil && existing.SubsectionCode == p.Subsection.Code))
 			if r.Content != nil {
 				same = same && *r.Content == existing.Content
@@ -159,7 +188,9 @@ func (b *articleBiz) Import(ctx context.Context, r ImportRequest, dryRun bool) (
 		}
 		candidate.Title = r.Title
 		candidate.Author = r.Author
-		candidate.Tags = strings.Join(r.Tags, ",")
+		if e = model.SetArticleTags(candidate, r.Tags); e != nil {
+			return e
+		}
 		candidate.ExternalLink = r.ExternalLink
 		if e = validatePublication(candidate, p, status); e != nil {
 			return e
@@ -178,11 +209,15 @@ func (b *articleBiz) Import(ctx context.Context, r ImportRequest, dryRun bool) (
 			a.Content = *r.Content
 		}
 		a.Author = r.Author
-		a.Tags = strings.Join(r.Tags, ",")
+		if e = model.SetArticleTags(a, r.Tags); e != nil {
+			return e
+		}
 		a.Status = status
 		canonicalPlacement(a, p)
 		if identity != nil {
-			bindIdentity(a, *identity)
+			if e = bindParsedIdentity(ds, a, *identity); e != nil {
+				return e
+			}
 		} else {
 			a.Provider = nil
 			a.CanonicalURL = nil

@@ -20,6 +20,8 @@ import (
 )
 
 type IArticleBiz interface {
+	PatchLocal(context.Context, uint64, LocalPatchInput) (*v1.ArticleInfoResponse, error)
+	SetPublicationHold(context.Context, uint64, HoldInput) (*v1.ArticleInfoResponse, error)
 	Create(context.Context, *v1.CreateArticleRequest) (*v1.ArticleInfoResponse, error)
 	Update(context.Context, *v1.UpdateArticleRequest) (*v1.ArticleInfoResponse, error)
 	Publish(context.Context, uint64) error
@@ -34,13 +36,19 @@ type IArticleBiz interface {
 	Reorder(context.Context, *v1.ReorderArticlesRequest) error
 }
 type articleBiz struct {
-	ds     store.IStore
-	notion source.NotionClient
+	ds            store.IStore
+	notion        source.NotionClient
+	defaultAuthor string
 }
 
 func New(ds store.IStore) *articleBiz { return NewWithNotionClient(ds, source.FromEnvironment()) }
 func NewWithNotionClient(ds store.IStore, client source.NotionClient) *articleBiz {
 	return &articleBiz{ds: ds, notion: client}
+}
+
+// NewForSync configures the create-only local author default.
+func NewForSync(ds store.IStore, defaultAuthor string) *articleBiz {
+	return &articleBiz{ds: ds, defaultAuthor: defaultAuthor}
 }
 func invalid(message string) error {
 	return &errno.Errno{HTTP: 400, Code: errno.ErrInvalidParameter.Code, Message: message}
@@ -65,8 +73,11 @@ func validateFields(title, author string, tags []string) error {
 	if strings.TrimSpace(title) == "" || utf8.RuneCountInString(title) > 255 {
 		return invalid("标题须为1-255字")
 	}
-	if utf8.RuneCountInString(author) > 128 || utf8.RuneCountInString(strings.Join(tags, ",")) > 255 {
+	if utf8.RuneCountInString(author) > 128 {
 		return invalid("作者或标签过长")
+	}
+	if _, err := model.EncodeArticleTags(tags); err != nil {
+		return invalid(err.Error())
 	}
 	return nil
 }
@@ -76,16 +87,13 @@ func bindIdentity(a *model.Article, identity source.Identity) {
 	a.SourceKey = &identity.SourceKey
 }
 func findSource(ds store.IStore, key string) (*model.Article, error) {
-	var a model.Article
-	e := ds.DB().Where("source_key = ?", key).First(&a).Error
-	if errors.Is(e, gorm.ErrRecordNotFound) {
-		return nil, nil
+	a, err := store.FindSourceOwner(ds, key)
+	if errors.Is(err, store.ErrSourceIdentityConflict) {
+		return nil, conflict("来源身份存在冲突，请先审核")
 	}
-	if e != nil {
-		return nil, e
-	}
-	return &a, nil
+	return a, err
 }
+
 func sourceUniqueError(err error) bool {
 	var my *mysql.MySQLError
 	if errors.As(err, &my) {
@@ -123,7 +131,7 @@ func save(ds store.IStore, a *model.Article) error {
 	a.UpdatedAt = time.Now()
 	err := ds.DB().Model(&model.Article{}).Where("id = ?", a.ID).Updates(map[string]interface{}{
 		"title": a.Title, "content": a.Content, "external_link": a.ExternalLink, "section_code": a.SectionCode, "subsection_code": a.SubsectionCode,
-		"author": a.Author, "tags": a.Tags, "pos": a.Pos, "status": a.Status, "provider": a.Provider, "canonical_url": a.CanonicalURL, "source_key": a.SourceKey, "updated_at": a.UpdatedAt}).Error
+		"author": a.Author, "tags": a.Tags, "tags_json": a.TagsJSON, "pos": a.Pos, "status": a.Status, "provider": a.Provider, "canonical_url": a.CanonicalURL, "source_key": a.SourceKey, "updated_at": a.UpdatedAt}).Error
 	if sourceUniqueError(err) {
 		return conflict("该外部文档已被收录")
 	}
@@ -131,6 +139,9 @@ func save(ds store.IStore, a *model.Article) error {
 }
 func (b *articleBiz) withLocked(ctx context.Context, id uint64, targetSection, targetSub string, fn func(store.IStore, *model.Article, *catalog.Placement) error) error {
 	return store.InTransaction(ctx, b.ds, func(ds store.IStore) error {
+		if e := store.LockSourceControl(ds, false); e != nil {
+			return e
+		}
 		return withLockedOnStore(ds, id, targetSection, targetSub, fn)
 	})
 }
@@ -250,6 +261,15 @@ func (b *articleBiz) RegisterSource(ctx context.Context, r RegisterInput) (*v1.R
 	var a *model.Article
 	outcome := "created"
 	e = store.InTransaction(ctx, b.ds, func(ds store.IStore) error {
+		if e := store.LockSourceControl(ds, true); e != nil {
+			return e
+		}
+		if e := store.CheckSourceWrites(ds); e != nil {
+			return e
+		}
+		if e := checkPendingSourceOwner(ds, identity); e != nil {
+			return e
+		}
 		p, e := catalog.Resolve(ds, r.SectionCode, r.SubsectionCode)
 		if e != nil {
 			return e
@@ -274,7 +294,10 @@ func (b *articleBiz) RegisterSource(ctx context.Context, r RegisterInput) (*v1.R
 			outcome = "already_registered"
 			return nil
 		}
-		a = &model.Article{Title: strings.TrimSpace(r.Title), ExternalLink: strings.TrimSpace(r.ExternalLink), Author: r.Author, Tags: strings.Join(r.Tags, ","), Status: model.ArticleStatusDraft}
+		a = &model.Article{Title: strings.TrimSpace(r.Title), ExternalLink: strings.TrimSpace(r.ExternalLink), Author: r.Author, Status: model.ArticleStatusDraft}
+		if e = model.SetArticleTags(a, r.Tags); e != nil {
+			return e
+		}
 		canonicalPlacement(a, p)
 		bindIdentity(a, identity)
 		a.Pos, e = nextPos(ds, a.SectionCode, a.SubsectionCode)
@@ -343,6 +366,27 @@ func (b *articleBiz) Edit(ctx context.Context, r UpdateInput) (*v1.ArticleInfoRe
 	var result *model.Article
 	var e error
 	e = b.withLocked(ctx, id, r.SectionCode, r.SubsectionCode, func(ds store.IStore, a *model.Article, p *catalog.Placement) error {
+		binding, bindErr := store.PageBindingByArticle(ds, a.ID)
+		if bindErr != nil {
+			return bindErr
+		}
+		if binding != nil && binding.ManagementState == model.NotionManagementManaged {
+			same, err := editIsNoop(ds, a, p, r)
+			if err != nil {
+				return err
+			}
+			if same {
+				result = a
+				return nil
+			}
+			return sourceManaged()
+		}
+		if binding != nil && r.ExternalLink != a.ExternalLink {
+			return conflict("历史外链不可通过编辑更换，请使用最新阅读链接")
+		}
+		if e := checkManualWritable(ds, a); e != nil {
+			return e
+		}
 		if a.Status == model.ArticleStatusDeleted {
 			return conflict("归档文章须先恢复")
 		}
@@ -356,6 +400,9 @@ func (b *articleBiz) Edit(ctx context.Context, r UpdateInput) (*v1.ArticleInfoRe
 			}
 		}
 		if identity != nil {
+			if err := checkPendingSourceOwner(ds, *identity); err != nil {
+				return err
+			}
 			duplicate, err := findSource(ds, identity.SourceKey)
 			if err != nil {
 				return err
@@ -374,14 +421,18 @@ func (b *articleBiz) Edit(ctx context.Context, r UpdateInput) (*v1.ArticleInfoRe
 		changed := a.SectionCode != p.Section.Code || (p.Subsection == nil && a.SubsectionCode != "") || (p.Subsection != nil && a.SubsectionCode != p.Subsection.Code)
 		a.Title = r.Title
 		a.Author = r.Author
-		a.Tags = strings.Join(r.Tags, ",")
+		if e = model.SetArticleTags(a, r.Tags); e != nil {
+			return e
+		}
 		a.ExternalLink = r.ExternalLink
 		if r.Content != nil {
 			a.Content = *r.Content
 		}
 		canonicalPlacement(a, p)
 		if identity != nil {
-			bindIdentity(a, *identity)
+			if e = bindParsedIdentity(ds, a, *identity); e != nil {
+				return e
+			}
 		}
 		if changed {
 			a.Pos, e = nextPos(ds, a.SectionCode, a.SubsectionCode)
@@ -403,6 +454,9 @@ func (b *articleBiz) changeStatus(ctx context.Context, id uint64, status int) er
 		return invalid("文章ID无效")
 	}
 	return b.withLocked(ctx, id, "", "", func(ds store.IStore, a *model.Article, p *catalog.Placement) error {
+		if e := checkManualWritable(ds, a); e != nil {
+			return e
+		}
 		if status == model.ArticleStatusDraft && a.Status != model.ArticleStatusDeleted {
 			return conflict("只能恢复归档文章")
 		}
@@ -439,6 +493,9 @@ func (b *articleBiz) MoveArticle(ctx context.Context, id uint64, r MoveInput) (*
 		return nil, invalid("必须指定目标章节")
 	}
 	e := b.withLocked(ctx, id, r.SectionCode, r.SubsectionCode, func(ds store.IStore, a *model.Article, p *catalog.Placement) error {
+		if e := checkManualWritable(ds, a); e != nil {
+			return e
+		}
 		if a.Status == model.ArticleStatusDeleted {
 			return conflict("归档文章须先恢复")
 		}
@@ -589,9 +646,9 @@ func articleInfo(a *model.Article, associations *store.ArticleAssociations, simp
 	if m == nil {
 		return nil, errno.ErrModuleNotFound
 	}
-	tags := []string{}
-	if a.Tags != "" {
-		tags = strings.Split(a.Tags, ",")
+	tags, err := model.ArticleTags(a)
+	if err != nil {
+		return nil, err
 	}
 	out := &v1.ArticleInfo{ID: a.ID, IDText: strconv.FormatUint(a.ID, 10), Title: a.Title, Module: v1.ModuleInfo{ID: int(m.ID), Code: m.Code, Title: m.Title, Status: m.Status, Sort: m.Sort}, Section: v1.SectionInfo{Code: s.Code, Title: s.Title, ModuleCode: m.Code, Sort: s.Sort, Status: s.Status}, Author: a.Author, Tags: tags, Pos: a.Pos, Status: a.GetStatusString(), ExternalLink: a.ExternalLink, Provider: a.Provider, CanonicalURL: a.CanonicalURL}
 	if a.SubsectionCode != "" {
@@ -601,6 +658,7 @@ func articleInfo(a *model.Article, associations *store.ArticleAssociations, simp
 		}
 		out.Subsection = &v1.SubsectionInfo{Code: sub.Code, Title: sub.Title, SectionCode: s.Code, Sort: sub.Sort, Status: sub.Status}
 	}
+	decorateManagement(out, a, associations)
 	if !simple {
 		out.Content = a.Content
 		out.CreatedAt = a.CreatedAt.Format("2006-01-02 15:04:05")

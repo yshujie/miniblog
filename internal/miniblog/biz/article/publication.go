@@ -19,7 +19,11 @@ func validatePublication(a *model.Article, p *catalog.Placement, status int) err
 				return invalid(err.Error())
 			}
 		}
-		if err := validateFields(a.Title, a.Author, strings.Split(a.Tags, ",")); err != nil {
+		tags, err := model.ArticleTags(a)
+		if err != nil {
+			return err
+		}
+		if err := validateFields(a.Title, a.Author, tags); err != nil {
 			return err
 		}
 		return catalog.RequireVisible(p)

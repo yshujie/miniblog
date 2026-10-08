@@ -56,6 +56,7 @@ type ArticleDetail struct {
 	ID             uint64    `json:"id,string"`
 	Title          string    `json:"title"`
 	Content        string    `json:"content"`
+	ReadingURL     string    `json:"reading_url"`
 	ExternalLink   string    `json:"external_link"`
 	SectionCode    string    `json:"section_code"`
 	SubsectionCode string    `json:"subsection_code"`
