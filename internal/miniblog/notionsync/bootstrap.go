@@ -14,7 +14,6 @@ import (
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"sort"
 	"strconv"
 	"time"
 )
@@ -642,88 +641,6 @@ func bootstrapBeforeJSON(a *model.Article, revision uint64, newPage bool) (strin
 	}
 	result, e := json.Marshal(document)
 	return string(result), e
-}
-
-func (s *Service) synchronousRun(ctx context.Context, mode string, fn func(context.Context, model.NotionSyncRun, store.LeaseToken, *RunCounts) error) (string, error) {
-	taskctx, taskcancel, taskID, e := s.beginTask(ctx)
-	if e != nil {
-		return "", e
-	}
-	defer s.endTask(taskID, taskcancel)
-	ctx = taskctx
-	db, e := s.db(ctx)
-	if e != nil {
-		return "", e
-	}
-	repo := store.NewNotionSyncRepository(db)
-	control, e := repo.Control(ctx)
-	if e != nil {
-		return "", e
-	}
-	nowDB, e := store.DatabaseNow(db)
-	if e != nil {
-		return "", e
-	}
-	if control.CooldownUntil != nil && control.CooldownUntil.After(nowDB) {
-		return "", &Error{Code: "cooldown", Message: "Notion 限流冷却尚未结束", HTTPStatus: 429}
-	}
-	token, ok, e := repo.AcquireLease(ctx, s.opts.OwnerID, s.opts.LeaseDuration)
-	if e != nil {
-		return "", e
-	}
-	if !ok {
-		return "", conflict("已有同步或接管任务运行")
-	}
-	id := newID()
-	run := model.NotionSyncRun{ID: id, Mode: mode, Status: "running", Phase: "bootstrap", StartedAt: time.Now().UTC(), LeaseEpoch: token.Epoch, CountsJSON: jsonText(RunCounts{})}
-	if e = s.fenced(ctx, token, func(tx *gorm.DB, c *model.NotionSyncControl) error {
-		if e := tx.Create(&run).Error; e != nil {
-			return e
-		}
-		return tx.Model(c).Update("current_run_id", id).Error
-	}); e != nil {
-		_ = repo.ReleaseLease(context.Background(), token)
-		return id, e
-	}
-	runctx, cancel := context.WithCancel(ctx)
-	runctx = context.WithValue(runctx, leaseContextKey{}, token)
-	done := make(chan struct{})
-	go s.heartbeat(runctx, token, cancel, done)
-	counts := RunCounts{}
-	runErr := fn(runctx, run, token, &counts)
-	cancel()
-	<-done
-	finishctx, finishcancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer finishcancel()
-	now := time.Now().UTC()
-	status := "completed"
-	if runErr != nil {
-		status = "failed"
-	} else if counts.Failed > 0 {
-		status = "completed_with_errors"
-	}
-
-	updates := map[string]interface{}{"status": status, "phase": "finished", "finished_at": now, "counts_json": jsonText(counts)}
-	if runErr != nil {
-		updates["error"] = runErr.Error()
-	}
-	e = s.finishRun(finishctx, run, token, updates, false)
-
-	_ = repo.ReleaseLease(finishctx, token)
-	if runErr != nil {
-		return id, runErr
-	}
-	return id, e
-}
-
-// AllowedSources returns the fixed data-source inventory, without credentials.
-func AllowedSources() []string {
-	result := make([]string, 0, len(allowedSources))
-	for id := range allowedSources {
-		result = append(result, id)
-	}
-	sort.Strings(result)
-	return result
 }
 
 func validateBootstrapTopic(schema source.NotionDataSource, cfg SourceConfig, snap Snapshot) error {
