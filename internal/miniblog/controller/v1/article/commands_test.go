@@ -44,6 +44,8 @@ func testController(db *gorm.DB) *gin.Engine {
 	g.PUT("/articles/:id/archive", c.Archive)
 	g.PUT("/articles/:id/restore", c.Restore)
 	g.PUT("/articles/:id/move", c.Move)
+	g.PATCH("/articles/:id/local-fields", c.PatchLocal)
+	g.PUT("/articles/:id/publication-hold", c.PublicationHold)
 	return g
 }
 func send(t *testing.T, g *gin.Engine, method, path, body string) (int, map[string]interface{}) {

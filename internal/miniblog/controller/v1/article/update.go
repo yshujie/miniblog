@@ -45,13 +45,24 @@ func (c *ArticleController) Update(ctx *gin.Context) {
 		core.WriteResponse(ctx, err, nil)
 		return
 	}
+	binding, bindingErr := store.PageBindingByArticle(store.NewStore(c.ds.DB().WithContext(ctx.Request.Context())), id)
+	if bindingErr != nil {
+		core.WriteResponse(ctx, errno.InternalServerError, nil)
+		return
+	}
+	managed := binding != nil && binding.ManagementState == "managed"
 	if request.ExternalLink != "" {
 		identity, parseErr := source.Parse(request.ExternalLink)
 		if parseErr != nil {
 			core.WriteResponse(ctx, errno.ErrInvalidParameter, nil)
 			return
 		}
-		if current.SourceKey == nil || *current.SourceKey != identity.SourceKey {
+		owner, lookupErr := store.FindSourceOwner(store.NewStore(c.ds.DB().WithContext(ctx.Request.Context())), identity.SourceKey)
+		if lookupErr != nil {
+			core.WriteResponse(ctx, errno.InternalServerError, nil)
+			return
+		}
+		if !managed && (current.SourceKey == nil || *current.SourceKey != identity.SourceKey) && (owner == nil || owner.ID != id) {
 			if !c.registrationAllowed(ctx) {
 				return
 			}
@@ -68,6 +79,14 @@ func (c *ArticleController) Update(ctx *gin.Context) {
 	response, err := c.biz.ArticleBiz().Update(ctx.Request.Context(), request)
 	if err != nil {
 		log.C(ctx).Errorw("update article failed", "error", err, fmt.Sprintf("%T", err))
+		var typed *errno.Errno
+		if errors.As(err, &typed) && typed.HTTP == 409 {
+			latest, readErr := c.biz.ArticleBiz().GetOne(ctx.Request.Context(), id)
+			if readErr == nil {
+				core.WriteResponse(ctx, err, latest)
+				return
+			}
+		}
 		core.WriteResponse(ctx, err, nil)
 		return
 	}

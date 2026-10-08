@@ -7,9 +7,11 @@ import (
 	blogCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/blog"
 	catalogCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/catalog"
 	moduleCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/module"
+	syncCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/notionsync"
 	sectionCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/section"
 	subsectionCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/subsection"
 	userCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/user"
+	"github.com/yshujie/miniblog/internal/miniblog/notionsync"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/core"
 	"github.com/yshujie/miniblog/internal/pkg/errno"
@@ -19,7 +21,7 @@ import (
 )
 
 // installRouters 安装 miniblog 的路由
-func installRouters(g *gin.Engine) error {
+func installRouters(g *gin.Engine, syncServices ...*notionsync.Service) error {
 	// 注册 404 Handler
 	g.NoRoute(func(ctx *gin.Context) {
 		core.WriteResponse(ctx, errno.ErrPageNotFound, nil)
@@ -47,6 +49,11 @@ func installRouters(g *gin.Engine) error {
 	ssc := subsectionCtrl.New(store.S)
 	arCtrl := articleCtrl.New(store.S)
 	cc := catalogCtrl.New(store.S)
+	syncService := notionsync.New(store.S, notionsync.Options{})
+	if len(syncServices) > 0 && syncServices[0] != nil {
+		syncService = syncServices[0]
+	}
+	syncController := syncCtrl.New(syncService)
 
 	// 创建 v1 路由组
 	v1 := g.Group("/v1")
@@ -76,6 +83,17 @@ func installRouters(g *gin.Engine) error {
 			adminv1.Use(mw.Authn(), mw.Authz(authz))
 			adminv1.POST("/article-sources/preview", arCtrl.Preview)
 			adminv1.POST("/catalog/reorder", cc.Reorder)
+			syncRoutes := adminv1.Group("/notion-sync")
+			syncRoutes.GET("/status", syncController.Status)
+			syncRoutes.GET("/sources", syncController.Sources)
+			syncRoutes.GET("/pages", syncController.Pages)
+			syncRoutes.GET("/runs", syncController.Runs)
+			syncRoutes.GET("/runs/:run_id", syncController.Run)
+			syncRoutes.GET("/runs/:run_id/items", syncController.Items)
+			syncRoutes.PATCH("/control", syncController.UpdateControl)
+			syncRoutes.PATCH("/sources/:source_id", syncController.UpdateSource)
+			syncRoutes.PUT("/catalog-bindings/:binding_id", syncController.BindCatalog)
+			syncRoutes.POST("/runs", syncController.Trigger)
 
 			// users 路由分组
 			userv1 := adminv1.Group("/users")
@@ -131,6 +149,8 @@ func installRouters(g *gin.Engine) error {
 				articlesv1.PUT("/:id", arCtrl.Update)              // 更新文章
 				articlesv1.PUT("/:id/publish", arCtrl.Publish)     // 发布文章
 				articlesv1.PUT("/:id/unpublish", arCtrl.Unpublish) // 下架文章
+				articlesv1.PATCH("/:id/local-fields", arCtrl.PatchLocal)
+				articlesv1.PUT("/:id/publication-hold", arCtrl.PublicationHold)
 				articlesv1.PUT("/:id/move", arCtrl.Move)
 				articlesv1.PUT("/:id/archive", arCtrl.Archive)
 				articlesv1.PUT("/:id/restore", arCtrl.Restore)
