@@ -1,10 +1,13 @@
 package miniblog
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -48,7 +51,7 @@ func initConfig() {
 	}
 
 	// 打印配置
-	log.Infow("config initialized successfully", "config", viper.AllSettings())
+	log.Infow("config initialized successfully", "config", safeConfigSummary())
 }
 
 // loadConfigFromEnv 从环境变量中读取配置
@@ -62,21 +65,16 @@ func loadConfigFromEnv() {
 	// 3. 开启自动读取
 	viper.AutomaticEnv()
 
-	// 打印环境变量
-	log.Infow("environment variables",
-		"MYSQL_PORT", os.Getenv("MINIBLOG_DATABASE_PORT"),
-		"MYSQL_USERNAME", os.Getenv("MINIBLOG_DATABASE_USERNAME"),
-		"MYSQL_PASSWORD", os.Getenv("MINIBLOG_DATABASE_PASSWORD"),
-		"MYSQL_DBNAME", os.Getenv("MINIBLOG_DATABASE_DBNAME"),
-		"MYSQL_HOST", os.Getenv("MINIBLOG_DATABASE_HOST"),
-		"REDIS_HOST", os.Getenv("MINIBLOG_REDIS_HOST"),
-		"REDIS_PORT", os.Getenv("MINIBLOG_REDIS_PORT"),
-		"REDIS_PASSWORD", os.Getenv("MINIBLOG_REDIS_PASSWORD"),
-		"REDIS_DB", os.Getenv("MINIBLOG_REDIS_DB"),
-		"JWT_SECRET", os.Getenv("MINIBLOG_JWT_SECRET"),
-		"FEISHU_DOCREADER_APPID", os.Getenv("MINIBLOG_FEISHU_DOCREADER_APPID"),
-		"FEISHU_DOCREADER_APPSECRET", os.Getenv("MINIBLOG_FEISHU_DOCREADER_APPSECRET"),
-	)
+}
+
+// Log an explicit allowlist. Newly introduced credentials are excluded by default.
+func safeConfigSummary() map[string]interface{} {
+	return map[string]interface{}{
+		"log.level":               viper.GetString("log.level"),
+		"log.format":              viper.GetString("log.format"),
+		"database.max-idle-conns": viper.GetInt("database.max-idle-conns"),
+		"database.max-open-conns": viper.GetInt("database.max-open-conns"),
+	}
 }
 
 // loadConfigFromFile 从配置文件中读取配置
@@ -149,6 +147,12 @@ func initStore() error {
 	}
 
 	store.S = store.NewStore(db)
+	if enabled, _ := strconv.ParseBool(os.Getenv("MINIBLOG_CONTENT_REGISTER_ENABLED")); enabled {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ready, checkErr := store.RegistrationReady(ctx, db)
+		cancel()
+		log.Infow("content registration readiness", "ready", ready && checkErr == nil)
+	}
 
 	return nil
 }

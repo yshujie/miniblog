@@ -10,7 +10,7 @@ import (
 func (c *ModuleController) GetAll(ctx *gin.Context) {
 	log.C(ctx).Infow("Get all modules function called")
 
-	modules, err := c.biz.ModuleBiz().GetAll(ctx)
+	modules, err := c.biz.ModuleBiz().GetAll(ctx.Request.Context())
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
@@ -23,7 +23,7 @@ func (c *ModuleController) GetAll(ctx *gin.Context) {
 func (c *ModuleController) GetOne(ctx *gin.Context) {
 	log.C(ctx).Infow("Get one module function called")
 
-	module, err := c.biz.ModuleBiz().GetOne(ctx, ctx.Param("code"))
+	module, err := c.biz.ModuleBiz().GetOne(ctx.Request.Context(), ctx.Param("code"))
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return

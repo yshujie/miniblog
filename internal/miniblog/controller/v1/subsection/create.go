@@ -23,11 +23,11 @@ func (c *SubsectionController) Create(ctx *gin.Context) {
 
 	if _, err := govalidator.ValidateStruct(request); err != nil {
 		log.C(ctx).Errorw("invalid request parameters", "error", err)
-		core.WriteResponse(ctx, errno.ErrInvalidParameter.SetMessage("%s", err.Error()), nil)
+		core.WriteResponse(ctx, &errno.Errno{HTTP: 400, Code: errno.ErrInvalidParameter.Code, Message: err.Error()}, nil)
 		return
 	}
 
-	response, err := c.biz.SubsectionBiz().Create(ctx, request)
+	response, err := c.biz.SubsectionBiz().Create(ctx.Request.Context(), request)
 	if err != nil {
 		log.C(ctx).Errorw("create subsection failed", "error", err, "code", request.Code, "error_type", fmt.Sprintf("%T", err))
 		core.WriteResponse(ctx, err, nil)

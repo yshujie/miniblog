@@ -10,7 +10,7 @@ import (
 func (c *SectionController) Publish(ctx *gin.Context) {
 	log.C(ctx).Infow("Publish section function called")
 
-	resp, err := c.biz.SectionBiz().Publish(ctx, ctx.Param("code"))
+	resp, err := c.biz.SectionBiz().Publish(ctx.Request.Context(), ctx.Param("code"))
 	if err != nil {
 		log.C(ctx).Errorw("publish section failed", "error", err, "code", ctx.Param("code"))
 		core.WriteResponse(ctx, err, nil)
@@ -24,7 +24,7 @@ func (c *SectionController) Publish(ctx *gin.Context) {
 func (c *SectionController) Unpublish(ctx *gin.Context) {
 	log.C(ctx).Infow("Unpublish section function called")
 
-	resp, err := c.biz.SectionBiz().Unpublish(ctx, ctx.Param("code"))
+	resp, err := c.biz.SectionBiz().Unpublish(ctx.Request.Context(), ctx.Param("code"))
 	if err != nil {
 		log.C(ctx).Errorw("unpublish section failed", "error", err, "code", ctx.Param("code"))
 		core.WriteResponse(ctx, err, nil)
@@ -38,7 +38,7 @@ func (c *SectionController) Unpublish(ctx *gin.Context) {
 func (c *SectionController) Delete(ctx *gin.Context) {
 	log.C(ctx).Infow("Delete section function called")
 
-	if err := c.biz.SectionBiz().Delete(ctx, ctx.Param("code")); err != nil {
+	if err := c.biz.SectionBiz().Delete(ctx.Request.Context(), ctx.Param("code")); err != nil {
 		log.C(ctx).Errorw("delete section failed", "error", err, "code", ctx.Param("code"))
 		core.WriteResponse(ctx, err, nil)
 		return

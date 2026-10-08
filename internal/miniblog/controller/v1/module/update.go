@@ -22,11 +22,11 @@ func (c *ModuleController) Update(ctx *gin.Context) {
 
 	if _, err := govalidator.ValidateStruct(req); err != nil {
 		log.C(ctx).Errorw("invalid request parameters", "error", err)
-		core.WriteResponse(ctx, errno.ErrInvalidParameter.SetMessage("%s", err.Error()), nil)
+		core.WriteResponse(ctx, &errno.Errno{HTTP: 400, Code: errno.ErrInvalidParameter.Code, Message: err.Error()}, nil)
 		return
 	}
 
-	resp, err := c.biz.ModuleBiz().Update(ctx, ctx.Param("code"), req)
+	resp, err := c.biz.ModuleBiz().Update(ctx.Request.Context(), ctx.Param("code"), req)
 	if err != nil {
 		log.C(ctx).Errorw("update module failed", "error", err, "code", ctx.Param("code"))
 		core.WriteResponse(ctx, err, nil)

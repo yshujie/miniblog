@@ -5,6 +5,7 @@ import (
 	articleCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/article"
 	authCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/auth"
 	blogCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/blog"
+	catalogCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/catalog"
 	moduleCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/module"
 	sectionCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/section"
 	subsectionCtrl "github.com/yshujie/miniblog/internal/miniblog/controller/v1/subsection"
@@ -45,6 +46,7 @@ func installRouters(g *gin.Engine) error {
 	sc := sectionCtrl.New(store.S)
 	ssc := subsectionCtrl.New(store.S)
 	arCtrl := articleCtrl.New(store.S)
+	cc := catalogCtrl.New(store.S)
 
 	// 创建 v1 路由组
 	v1 := g.Group("/v1")
@@ -72,6 +74,8 @@ func installRouters(g *gin.Engine) error {
 
 			// 使用 Authn 和 Authz 中间件
 			adminv1.Use(mw.Authn(), mw.Authz(authz))
+			adminv1.POST("/article-sources/preview", arCtrl.Preview)
+			adminv1.POST("/catalog/reorder", cc.Reorder)
 
 			// users 路由分组
 			userv1 := adminv1.Group("/users")
@@ -119,12 +123,17 @@ func installRouters(g *gin.Engine) error {
 			// articles 路由分组
 			articlesv1 := adminv1.Group("/articles")
 			{
-				articlesv1.POST("", arCtrl.Create)                 // 创建文章
+				articlesv1.POST("", arCtrl.Create) // 创建文章
+				articlesv1.POST("/register", arCtrl.Register)
+				articlesv1.PUT("/reorder", arCtrl.Reorder)
 				articlesv1.GET("", arCtrl.GetList)                 // 获取文章列表
 				articlesv1.GET("/:id", arCtrl.GetOne)              // 获取文章信息
 				articlesv1.PUT("/:id", arCtrl.Update)              // 更新文章
 				articlesv1.PUT("/:id/publish", arCtrl.Publish)     // 发布文章
 				articlesv1.PUT("/:id/unpublish", arCtrl.Unpublish) // 下架文章
+				articlesv1.PUT("/:id/move", arCtrl.Move)
+				articlesv1.PUT("/:id/archive", arCtrl.Archive)
+				articlesv1.PUT("/:id/restore", arCtrl.Restore)
 			}
 		}
 	}

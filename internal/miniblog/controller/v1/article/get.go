@@ -1,8 +1,6 @@
 package article
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/yshujie/miniblog/internal/pkg/core"
@@ -28,7 +26,7 @@ func (c *ArticleController) GetList(ctx *gin.Context) {
 	}
 
 	// 获取文章列表
-	articlesResp, err := c.biz.ArticleBiz().GetList(ctx, &req)
+	articlesResp, err := c.biz.ArticleBiz().GetList(ctx.Request.Context(), &req)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
@@ -42,14 +40,13 @@ func (c *ArticleController) GetOne(ctx *gin.Context) {
 	log.C(ctx).Infow("Get one article function called")
 
 	// 获取文章ID
-	id, err := strconv.Atoi(ctx.Param("id"))
-	if err != nil {
-		core.WriteResponse(ctx, err, nil)
+	id, ok := commandID(ctx)
+	if !ok {
 		return
 	}
 
 	// 获取文章详情
-	article, err := c.biz.ArticleBiz().GetOne(ctx, uint64(id))
+	article, err := c.biz.ArticleBiz().GetOne(ctx.Request.Context(), id)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return

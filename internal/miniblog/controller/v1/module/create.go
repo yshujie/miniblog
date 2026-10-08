@@ -30,12 +30,12 @@ func (c *ModuleController) Create(ctx *gin.Context) {
 	// 验证请求参数
 	if _, err := govalidator.ValidateStruct(request); err != nil {
 		log.C(ctx).Errorw("invalid request parameters", "error", err)
-		core.WriteResponse(ctx, errno.ErrInvalidParameter.SetMessage("%s", err.Error()), nil)
+		core.WriteResponse(ctx, &errno.Errno{HTTP: 400, Code: errno.ErrInvalidParameter.Code, Message: err.Error()}, nil)
 		return
 	}
 
 	// 调用 Biz 层，创建模块
-	response, err := c.biz.ModuleBiz().Create(ctx, request)
+	response, err := c.biz.ModuleBiz().Create(ctx.Request.Context(), request)
 	if err != nil {
 		log.C(ctx).Errorw("create module failed", "error", err, "code", request.Code, "title", request.Title, "error_type", fmt.Sprintf("%T", err))
 		core.WriteResponse(ctx, err, nil)
