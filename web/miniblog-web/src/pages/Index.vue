@@ -12,7 +12,9 @@
         <br />
         这里便是我创造的：对 AI 的探索、对技术的思考、对生活的记录。
       </p>
-      <el-button type="success" size="large" class="read-btn" @click="goToBlog">开始阅读</el-button>
+      <el-button type="success" size="large" class="read-btn" :loading="starting" @click="goToBlog">开始阅读</el-button>
+      <p v-if="entryError" role="alert">{{ entryError }}</p>
+      <p v-else-if="store.listStatus === 'empty'" role="status">暂无阅读模块</p>
     </div>
 
     <!-- 分割线 -->
@@ -43,19 +45,19 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import logo from '@/assets/logo.jpeg'
-import { useModuleStore } from '@/stores/module'
-
-const moduleStore = useModuleStore()
-
-const goToBlog = async () => {
-  const modules = moduleStore.modules
-  if (modules.length === 0) {
-    await moduleStore.loadModules()
-  }
-  if (modules.length > 0) {
-    window.location.href = `/blog/${modules[0].code}`
-  }
+import { useReadingNavigation } from '@/composables/useReadingNavigation'
+const { store, openFirstModule } = useReadingNavigation()
+const starting = ref(false)
+const entryError = ref('')
+async function goToBlog() {
+  if (starting.value) return
+  starting.value = true
+  entryError.value = ''
+  try { await openFirstModule() }
+  catch { entryError.value = '模块加载失败，请再次点击开始阅读重试' }
+  finally { starting.value = false }
 }
 </script>
 
@@ -101,6 +103,7 @@ const goToBlog = async () => {
 
 .columns {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 24px;
   margin-top: 40px;

@@ -1,81 +1,67 @@
 import { defineStore } from 'pinia'
+import { computed, reactive, ref } from 'vue'
 import type { Module } from '@/types/module'
 import { fetchModules } from '@/api/module'
-import { Section } from '@/types/section'
-import { Subsection } from '@/types/subsection'
 import { fetchModuleDetail } from '@/api/blog'
-import { Article } from '@/types/article'
 
-// module store
-export const useModuleStore = defineStore('module', {
-  state: () => ({
-    currentModule: null as Module | null,
-    modules: [] as Module[],
-  }),
+type ListStatus = 'idle' | 'loading' | 'success' | 'empty' | 'error'
+type CacheEntry = { completeness: 'partial' | 'full'; module: Module }
 
-  getters: {
-    // 获取所有模块
-    getAllModules: (state): Module[] => state.modules,
+export const useModuleStore = defineStore('module', () => {
+  const modules = ref<Module[]>([])
+  const listStatus = ref<ListStatus>('idle')
+  const listError = ref('')
+  const directoryCache = reactive<Record<string, CacheEntry>>(Object.create(null))
+  let listRequest: Promise<Module[]> | undefined
+  const detailRequests = new Map<string, Promise<Module>>()
 
-    // 根据 code 获取模块
-    getModuleByCode: (state) => (code: string): Module | undefined => {
-      return state.modules.find(module => module.code === code)
-    },
-
-    // 根据 code 获取模块下的所有章节
-    getSectionsByCode: (state) => (code: string): Section[] => {
-      const module = state.modules.find(module => module.code === code)
-      return module?.sections || []
-    },
-  },
-
-  actions: {
-    // 加载所有模块
-    async loadModules() {
-      if (this.modules.length > 0) {
-        return // 如果已经加载过，直接返回
-      }
-
-      this.modules = await fetchModules()
-    },
-
-    // 加载所有模块详情
-    async loadAllModuleDetail() {
-      for (const module of this.modules) {
-        this.loadModuleDetail(module.code)
-      }
-    },
-
-    // 加载模块详情
-    async loadModuleDetail(moduleCode: string) {
-      const module = this.modules.find(module => module.code === moduleCode)
-      if (module) {
-        const moduleDetail = await fetchModuleDetail(module.code)
-        module.title = moduleDetail.title
-        module.sections = moduleDetail.sections.map(section => new Section(section))
-        module.sections.forEach(section => {
-          section.subsections = section.subsections.map(subsection => new Subsection(subsection))
-          section.subsections.forEach(subsection => {
-            subsection.articles = subsection.articles.map(article => new Article(article))
-          })
-          section.articles = section.articles.map(article => new Article(article))
-        })
-      }
-    },
-
-    // 设置当前模块
-    setCurrentModule(module: Module) {
-      this.currentModule = module
-    },
-
-    // 清除当前模块
-    clearCurrentModule() {
-      this.currentModule = null
-    },
-
-    // 清除模块数据
-    clearModules() {
-      this.modules = []
-    }
+  function getModuleByCode(code: string) {
+    return directoryCache[code]?.module ?? modules.value.find(module => module.code === code)
   }
-}) 
+
+  async function loadModules(force = false): Promise<Module[]> {
+    if (listRequest) return listRequest
+    if (!force && ['success', 'empty'].includes(listStatus.value)) return modules.value
+    listStatus.value = 'loading'
+    listError.value = ''
+    listRequest = (async () => {
+      try {
+        const summaries = await fetchModules()
+        modules.value = summaries.map(summary => {
+          const cached = directoryCache[summary.code]
+          if (cached?.completeness === 'full') return cached.module
+          directoryCache[summary.code] = { completeness: 'partial', module: summary }
+          return summary
+        })
+        listStatus.value = modules.value.length ? 'success' : 'empty'
+        return modules.value
+      } catch (error) {
+        listStatus.value = 'error'
+        listError.value = '模块加载失败，请重试'
+        throw error
+      } finally { listRequest = undefined }
+    })()
+    return listRequest
+  }
+
+  async function loadModuleDetail(code: string, force = false): Promise<Module> {
+    const inflight = detailRequests.get(code)
+    if (inflight) return inflight
+    const cached = directoryCache[code]
+    if (!force && cached?.completeness === 'full') return cached.module
+    const request = (async () => {
+      try {
+        const module = await fetchModuleDetail(code)
+        directoryCache[code] = { completeness: 'full', module }
+        const index = modules.value.findIndex(item => item.code === code)
+        if (index >= 0) modules.value[index] = module
+        return module
+      } finally { detailRequests.delete(code) }
+    })()
+    detailRequests.set(code, request)
+    return request
+  }
+
+  return { modules, listStatus, listError, directoryCache, getModuleByCode, loadModules, loadModuleDetail,
+    getAllModules: computed(() => modules.value) }
+})

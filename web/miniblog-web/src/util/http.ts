@@ -1,83 +1,55 @@
-import axios from 'axios'
-import type { ApiResponse } from '../types/response'
+import axios, { type AxiosRequestConfig, type Method } from 'axios'
+import type { ApiResponse } from '@/types/response'
 
-// Default to proxy path in dev, fall back to public API domain in production.
-const DEFAULT_BASE_URL = import.meta.env.PROD ? 'https://api.yangshujie.com/v1' : '/api/v1'
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? DEFAULT_BASE_URL
-
-// 创建 axios 实例
-const http = axios.create({
-  baseURL: API_BASE_URL, // dev 默认走 Vite 代理
-  timeout: 5000, // 请求超时时间
-  headers: {
-    'Content-Type': 'application/json'
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number, readonly code = '') {
+    super(message)
+    this.name = 'ApiError'
   }
+}
+
+// The legacy module list emits numeric IDs. Preserve them before JSON number conversion.
+export function parseResponse(data: unknown): unknown {
+  if (typeof data !== 'string') return data
+  return JSON.parse(data.replace(/("id"\s*:\s*)(\d+)(?=\s*[,}])/g, '$1"$2"'))
+}
+
+const client = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD && import.meta.env.MODE !== 'test' ? 'https://api.yangshujie.com/v1' : '/api/v1'),
+  timeout: 5000,
+  headers: { 'Content-Type': 'application/json' },
+  transformResponse: [parseResponse],
 })
 
-// 设置新的 API 地址
-export function setBaseURL(url: string) {
-  http.defaults.baseURL = url
-}
+client.interceptors.request.use(config => {
+  const token = localStorage.getItem('token')
+  if (token) config.headers.Authorization = 'Bearer ' + token
+  return config
+})
 
-// 获取当前 API 地址
-export function getBaseURL(): string {
-  return http.defaults.baseURL || ''
-}
-
-// 请求拦截器
-http.interceptors.request.use(
-  config => {
-    // 从 localStorage 获取 token
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+async function request<T>(method: Method, url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  try {
+    const response = await client.request<ApiResponse<T>>({ ...config, method, url, data })
+    if (response.data.code !== 'ok') {
+      throw new ApiError(response.data.message || response.data.msg || '请求失败，请重试', response.status, response.data.code)
     }
-    return config
-  },
-  error => {
-    return Promise.reject(error)
-  }
-)
-
-// 响应拦截器
-http.interceptors.response.use(
-  response => {
-    // 直接返回响应数据，因为后端已经包装了 code、msg 和 payload
     return response.data
-  },
-  error => {
-    if (error.response) {
-      switch (error.response.status) {
-        case 401:
-          // 未授权，清除 token 并跳转到登录页
-          localStorage.removeItem('token')
-          window.location.href = '/login'
-          break
-        case 403:
-          // 权限不足
-          console.error('没有权限访问该资源')
-          break
-        case 404:
-          // 资源不存在
-          console.error('请求的资源不存在')
-          break
-        default:
-          console.error('服务器错误')
-      }
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.code !== 'ERR_CANCELED') {
+      const body = error.response?.data as Partial<ApiResponse<unknown>> | undefined
+      throw new ApiError(body?.message || body?.msg || '请求失败，请检查网络后重试', error.response?.status ?? 0, body?.code)
     }
-    return Promise.reject(error)
-  }
-)
-
-// 扩展 axios 实例的类型
-declare module 'axios' {
-  interface AxiosInstance {
-    get<T = any>(url: string, config?: any): Promise<ApiResponse<T>>
-    post<T = any>(url: string, data?: any, config?: any): Promise<ApiResponse<T>>
-    put<T = any>(url: string, data?: any, config?: any): Promise<ApiResponse<T>>
-    delete<T = any>(url: string, config?: any): Promise<ApiResponse<T>>
-    patch<T = any>(url: string, data?: any, config?: any): Promise<ApiResponse<T>>
+    throw error
   }
 }
 
-export default http 
+export const setBaseURL = (url: string) => { client.defaults.baseURL = url }
+export const getBaseURL = () => client.defaults.baseURL || ''
+
+export default {
+  get: <T>(url: string, config?: AxiosRequestConfig) => request<T>('GET', url, undefined, config),
+  post: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) => request<T>('POST', url, data, config),
+  put: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) => request<T>('PUT', url, data, config),
+  patch: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) => request<T>('PATCH', url, data, config),
+  delete: <T>(url: string, config?: AxiosRequestConfig) => request<T>('DELETE', url, undefined, config),
+}

@@ -1,11 +1,7 @@
 import http from '@/util/http'
-import { Module } from '../types/module'
+import { mapModuleSummary, type ModuleSummaryDTO } from './reading-contract'
 
-// fetchModules 获取所有模块
-export async function fetchModules(): Promise<Module[]> {
-  const { payload } = await http.get<{ modules: any[] }>('/blog/modules')
-  return payload.modules.map(moduleData => new Module({
-    ...moduleData,
-    id: String(moduleData.id)
-  }))
+export async function fetchModules() {
+  const { payload } = await http.get<{ modules: ModuleSummaryDTO[] | null }>('/blog/modules')
+  return (payload.modules ?? []).map(mapModuleSummary)
 }

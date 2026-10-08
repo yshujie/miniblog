@@ -1,6 +1,7 @@
 // Article 文章
 export class Article {
   id: string
+  moduleCode: string
   sectionCode: string
   subsectionCode: string
   title: string
@@ -14,23 +15,25 @@ export class Article {
 
   constructor(data: {
     id: string
-    sectionCode: string
+    moduleCode?: string
+    sectionCode?: string
     subsectionCode?: string
     title: string
-    externalLink: string
-    author: string
-    content: string | undefined
-    tags: string[] | undefined
-    pos: number | undefined
-    createdAt: string | undefined
-    updatedAt: string | undefined
+    externalLink?: string
+    author?: string
+    content?: string
+    tags?: string[]
+    pos?: number
+    createdAt?: string
+    updatedAt?: string
   }) {
     this.id = data.id
-    this.sectionCode = data.sectionCode
+    this.moduleCode = data.moduleCode || ''
+    this.sectionCode = data.sectionCode || ''
     this.subsectionCode = data.subsectionCode || ''
     this.title = data.title
-    this.author = data.author
-    this.externalLink = data.externalLink
+    this.author = data.author || ''
+    this.externalLink = data.externalLink || ''
     this.content = data.content || ''
     this.tags = data.tags || []
     this.pos = data.pos || 0

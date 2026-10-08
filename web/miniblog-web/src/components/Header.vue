@@ -10,7 +10,7 @@
       </div>
       <div class="header-right">
         <nav class="nav-section">
-          <a 
+          <button type="button"
             v-for="module in moduleStore.modules" 
             :key="module.code" 
             :class="['nav-link', { 'nav-link-active': currentFullPath === `/blog/${module.code}` }]"
@@ -19,7 +19,8 @@
             <!-- AI 图标 (芯片/智能) -->
             <component :is="getModuleIcon(module.code)" class="nav-icon" />
             <span>{{ module.title }}</span>
-          </a>
+          </button>
+          <button v-if="moduleStore.listStatus === 'error'" type="button" @click="reloadModules">重试模块</button>
           <a 
             href="https://github.com/yshujie" 
             target="_blank" 
@@ -38,78 +39,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeMount, type Component } from 'vue'
-import { useModuleStore } from '@/stores/module'
-import { useRoute, useRouter } from 'vue-router'
-import { useUiStore } from '@/stores/ui'
+import { computed, type Component } from 'vue'
+import { useRoute } from 'vue-router'
+import { useReadingNavigation } from '@/composables/useReadingNavigation'
 import { MagicStick, Compass, Grid, DataBoard, Briefcase, Menu as MenuIcon } from '@element-plus/icons-vue'
-
-// module store
-const moduleStore = useModuleStore()
-const uiStore = useUiStore()
-
-// 模块图标映射
-const moduleIcons: Record<string, Component> = {
-  ai: MagicStick,
-  go: Compass,
-  ddd: Grid,
-  database: DataBoard,
-  project: Briefcase
-}
-
-// 获取路由实例
-const router = useRouter()
-
-// 获取路由实例
+const { store: moduleStore, openModule: handleModuleClick, reloadModules } = useReadingNavigation()
 const route = useRoute()
-
-// 计算属性 currentFullPath
-const currentFullPath = computed(() => {
-  // 如果 route.path 以 /blog/ 开头，则返回 /blog/xxx 前两位
-  if (route.path.startsWith('/blog/')) {
-    const path = route.path.split('/')
-    return '/' + path[1] + '/' + path[2]
-  }
-
-  return '/'
-})
-
-// 判断是否是博客页面
-const isBlogPage = computed(() => {
-  return route.path.startsWith('/blog/')
-})
-
-const sidebarOpen = computed(() => uiStore.sidebarOpen)
-
-onBeforeMount(async () => {
-  console.log('onBeforeMount')
-
-  // 加载模块数据
-  await moduleStore.loadModules()
-
-  // 预热所有模块数据
-  await moduleStore.loadAllModuleDetail()
-})
-
-// 切换侧边栏
-const toggleSidebar = () => {
-  uiStore.toggleSidebar()
-}
-
-// 模块点击事件
-const handleModuleClick = (moduleCode: string) => {
-  // 加载模块详情
-  moduleStore.loadModuleDetail(moduleCode)
-
-  // 尝试选择第一篇文章
-  const firstArticle = moduleStore.modules.find(module => module.code === moduleCode)?.sections[0].articles[0]
-  if (firstArticle) {
-    router.push(`/blog/${moduleCode}/article/${firstArticle.id}`)
-  }
-}
-
+const currentFullPath = computed(() => '/blog/' + (route.params.module || ''))
+const moduleIcons: Record<string, Component> = { ai: MagicStick, go: Compass, ddd: Grid, database: DataBoard, project: Briefcase }
 const getModuleIcon = (code: string) => moduleIcons[code] || MenuIcon
-
 </script>
 
 <style lang="less" scoped>
@@ -205,6 +143,10 @@ const getModuleIcon = (code: string) => moduleIcons[code] || MenuIcon
 }
 
 .nav-link {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
   color: var(--text-secondary);
   font-weight: 500;
   text-decoration: none;
@@ -243,4 +185,9 @@ const getModuleIcon = (code: string) => moduleIcons[code] || MenuIcon
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+</style>
+
+<style scoped>
+@media (max-width: 768px) { .header-container { flex-direction: column; gap: 1rem; } .nav-section { gap: 1rem; max-width: 90vw; overflow-x: auto; } }
+.nav-link:focus-visible { outline: 2px solid var(--sidebar-active-color); }
 </style>
