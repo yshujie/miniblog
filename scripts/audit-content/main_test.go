@@ -8,6 +8,7 @@ import (
 
 	"github.com/glebarez/sqlite"
 	"github.com/yshujie/miniblog/internal/miniblog/model"
+	"github.com/yshujie/miniblog/internal/miniblog/source"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -164,5 +165,75 @@ func TestContentOnlyHistoryRemainsUnbound(t *testing.T) {
 	gdb.First(&row)
 	if row.SourceKey != nil || row.Provider != nil || row.CanonicalURL != nil {
 		t.Fatal("invented external identity for historical content")
+	}
+}
+
+func TestAuditPreservesVerifiedIdentityAndImmutableLegacyAlias(t *testing.T) {
+	db := auditDB(t)
+	if err := db.AutoMigrate(&model.NotionPageBinding{}, &model.NotionSyncControl{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&model.NotionSyncControl{ID: 1}).Error; err != nil {
+		t.Fatal(err)
+	}
+	const id uint64 = 9007199254740993
+	const pageID = "1234567890abcdef1234567890abcdef"
+	const link = "https://example.com/historical-alias#keep"
+	auditArticle(t, db, id, link)
+	legacy, _ := source.Parse(link)
+	canonical, _ := source.NotionIdentity(pageID)
+	if err := db.Model(&model.Article{}).Where("id=?", id).UpdateColumns(map[string]interface{}{"provider": canonical.Provider, "canonical_url": canonical.CanonicalURL, "source_key": canonical.SourceKey}).Error; err != nil {
+		t.Fatal(err)
+	}
+	binding := model.NotionPageBinding{PageID: pageID, ArticleID: newUint(id), LegacySourceKey: &legacy.SourceKey, ManagementState: model.NotionManagementManaged, Revision: 7}
+	if err := db.Create(&binding).Error; err != nil {
+		t.Fatal(err)
+	}
+	state, err := inspect(context.Background(), db)
+	if err != nil || state.report.blocked() {
+		t.Fatal(err, state.report)
+	}
+	if err = backfill(context.Background(), db, state); err != nil {
+		t.Fatal(err)
+	}
+	var row model.Article
+	db.First(&row, id)
+	if *row.SourceKey != canonical.SourceKey || row.ExternalLink != link || row.ID != id {
+		t.Fatal("verified identity regressed")
+	}
+	db.Model(&binding).Update("revision", 8)
+	if err = backfill(context.Background(), db, state); err == nil {
+		t.Fatal("stale binding audit accepted")
+	}
+}
+func newUint(v uint64) *uint64 { return &v }
+
+func TestJSONTagBackfillPreservesCSVAndRequiresMaintenance(t *testing.T) {
+	db := auditDB(t)
+	if err := db.AutoMigrate(&model.NotionPageBinding{}, &model.NotionSyncControl{}); err != nil {
+		t.Fatal(err)
+	}
+	db.Create(&model.NotionSyncControl{ID: 1})
+	auditArticle(t, db, 51, "https://example.com/tags")
+	db.Model(&model.Article{}).Where("id=?", 51).UpdateColumn("tags", "Go,复杂标签")
+	state, err := inspect(context.Background(), db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = backfill(context.Background(), db, state, true); err == nil {
+		t.Fatal("unpaused migration accepted")
+	}
+	db.Model(&model.NotionSyncControl{}).Where("id=1").Updates(map[string]interface{}{"paused": true, "source_writes_paused": true})
+	if err = backfill(context.Background(), db, state, true); err != nil {
+		t.Fatal(err)
+	}
+	var row model.Article
+	db.First(&row, 51)
+	tags, err := model.ArticleTags(&row)
+	if err != nil || len(tags) != 2 || tags[1] != "复杂标签" || row.Tags != "Go,复杂标签" || row.TagsJSON == nil {
+		t.Fatal(row.TagsJSON, tags, err)
+	}
+	if !row.UpdatedAt.Equal(state.candidates[0].before.UpdatedAt) {
+		t.Fatal("tag migration changed historical timestamp")
 	}
 }

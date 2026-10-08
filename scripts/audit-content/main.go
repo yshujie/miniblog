@@ -14,6 +14,7 @@ import (
 
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/source"
+	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/pkg/db"
 	"github.com/yshujie/miniblog/scripts/internal/mysqlconfig"
 	"gorm.io/gorm"
@@ -46,6 +47,7 @@ func (r report) blocked() bool { return len(r.Issues) > 0 || len(r.Duplicates) >
 type candidate struct {
 	before   model.Article
 	identity *source.Identity
+	binding  *model.NotionPageBinding
 }
 
 type snapshot struct {
@@ -53,6 +55,7 @@ type snapshot struct {
 	sections    []model.Section
 	subsections []model.Subsection
 	candidates  []candidate
+	bindings    []model.NotionPageBinding
 	report      report
 }
 
@@ -61,8 +64,13 @@ func main() { os.Exit(run()) }
 func run() int {
 	config := mysqlconfig.Bind(flag.CommandLine)
 	apply := flag.Bool("apply", false, "回填来源身份；默认只读。须先停止旧写入程序")
+	backfillTags := flag.Bool("backfill-tags", false, "配合 -apply，在维护窗口无损回填旧CSV标签为JSON")
 	output := flag.String("report", "-", "JSON 审计报告路径；- 为标准输出（不包含原始链接或凭据）")
 	flag.Parse()
+	if *backfillTags && !*apply {
+		fmt.Fprintln(os.Stderr, "-backfill-tags 须配合 -apply，默认审计始终只读")
+		return 1
+	}
 	gdb, err := db.NewMySQL(config.DBOptions(1))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "连接数据库失败:", err)
@@ -80,7 +88,7 @@ func run() int {
 		return 1
 	}
 	if *apply && !state.report.blocked() {
-		if err = backfill(context.Background(), gdb, state); err != nil {
+		if err = backfill(context.Background(), gdb, state, *backfillTags); err != nil {
 			fmt.Fprintln(os.Stderr, "回填失败，事务已回滚:", err)
 			return 1
 		}
@@ -125,6 +133,21 @@ func inspect(ctx context.Context, gdb *gorm.DB) (*snapshot, error) {
 	}
 	if err := gdb.Order("id").Find(&articles).Error; err != nil {
 		return nil, err
+	}
+	bound := map[uint64]*model.NotionPageBinding{}
+	if store.HasNotionSyncSchema(gdb) {
+		if err := gdb.Order("page_id").Find(&state.bindings).Error; err != nil {
+			return nil, err
+		}
+		if err := store.AuditSourceAliases(ctx, gdb); err != nil {
+			return nil, err
+		}
+		for i := range state.bindings {
+			p := &state.bindings[i]
+			if p.ArticleID != nil {
+				bound[*p.ArticleID] = p
+			}
+		}
 	}
 	state.sections, state.subsections = sections, subsections
 	state.report.Articles = len(articles)
@@ -268,7 +291,7 @@ func inspect(ctx context.Context, gdb *gorm.DB) (*snapshot, error) {
 			group := fmt.Sprintf("%d/%d/%d", parentID, childID, a.Pos)
 			order[group] = append(order[group], fmt.Sprint(a.ID))
 		}
-		c := candidate{before: a}
+		c := candidate{before: a, binding: bound[a.ID]}
 		if strings.TrimSpace(a.ExternalLink) == "" {
 			state.report.LegacyContentOnly++
 			if a.SourceKey != nil {
@@ -279,6 +302,18 @@ func inspect(ctx context.Context, gdb *gorm.DB) (*snapshot, error) {
 			if err != nil {
 				add("article", a.ID, "invalid_external_link")
 			} else {
+				// A verified Page ID supersedes the historical URL digest. The alias
+				// is audit evidence, never a replacement identity to backfill.
+				if c.binding != nil {
+					canonical, parseErr := source.NotionIdentity(c.binding.PageID)
+					if parseErr != nil || a.SourceKey == nil || *a.SourceKey != canonical.SourceKey {
+						add("article", a.ID, "invalid_verified_page_identity")
+					} else if identity.SourceKey != canonical.SourceKey && (c.binding.LegacySourceKey == nil || *c.binding.LegacySourceKey != identity.SourceKey) {
+						add("article", a.ID, "unverified_legacy_source_alias")
+					} else {
+						identity = canonical
+					}
+				}
 				c.identity = &identity
 				state.report.WithSource++
 				sources[identity.SourceKey] = append(sources[identity.SourceKey], fmt.Sprint(a.ID))
@@ -312,7 +347,11 @@ func inspect(ctx context.Context, gdb *gorm.DB) (*snapshot, error) {
 	return state, nil
 }
 
-func backfill(ctx context.Context, gdb *gorm.DB, state *snapshot) error {
+func backfill(ctx context.Context, gdb *gorm.DB, state *snapshot, migrateTags ...bool) error {
+	tags := len(migrateTags) > 0 && migrateTags[0]
+	if tags && !gdb.Migrator().HasColumn(&model.Article{}, "tags_json") {
+		return errors.New("apply expand migration 000006 first")
+	}
 	if state.report.blocked() {
 		return errors.New("unresolved audit issues")
 	}
@@ -325,6 +364,16 @@ func backfill(ctx context.Context, gdb *gorm.DB, state *snapshot) error {
 		return errors.New("apply expand migration 000004 first")
 	}
 	return gdb.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Match the source-write lock order and exclude a concurrent takeover.
+		if store.HasNotionSyncSchema(tx) {
+			var control model.NotionSyncControl
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&control, 1).Error; err != nil {
+				return err
+			}
+			if tags && (!control.Paused || !control.SourceWritesPaused || control.LeaseOwner != "") {
+				return errors.New("JSON tag backfill requires paused sync, drained source writes and no active lease")
+			}
+		}
 		var modules []model.Module
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Order("id").Find(&modules).Error; err != nil {
 			return err
@@ -356,12 +405,34 @@ func backfill(ctx context.Context, gdb *gorm.DB, state *snapshot) error {
 		if !reflect.DeepEqual(sections, state.sections) || !reflect.DeepEqual(subsections, state.subsections) {
 			return errors.New("catalog changed since audit; rerun")
 		}
+		if store.HasNotionSyncSchema(tx) {
+			var bindings []model.NotionPageBinding
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Order("page_id").Find(&bindings).Error; err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(bindings, state.bindings) {
+				return errors.New("source bindings changed since audit; rerun")
+			}
+		}
 		for i, row := range current {
 			c := state.candidates[i]
 			if !reflect.DeepEqual(row, c.before) {
 				return errors.New("article changed since audit; rerun")
 			}
-			if c.identity == nil {
+			if tags && row.TagsJSON == nil {
+				values, err := model.ArticleTags(&row)
+				if err != nil {
+					return err
+				}
+				raw, err := model.EncodeArticleTags(values)
+				if err != nil {
+					return err
+				}
+				if err = tx.Model(&model.Article{}).Where("id=?", row.ID).UpdateColumns(map[string]interface{}{"tags_json": raw, "updated_at": row.UpdatedAt}).Error; err != nil {
+					return err
+				}
+			}
+			if c.identity == nil || c.binding != nil {
 				continue
 			}
 			if err := tx.Model(&model.Article{}).Where("id = ?", row.ID).UpdateColumns(map[string]interface{}{
