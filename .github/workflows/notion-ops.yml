@@ -1,0 +1,56 @@
+name: Notion read operations (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Five-source schema check or read-only historical audit
+        type: choice
+        options:
+          - schema_check
+          - dry_run
+          - bootstrap_preview
+        default: schema_check
+        required: true
+
+permissions:
+  contents: read
+
+# Share deployment serialization, including workflow dispatch across files.
+concurrency:
+  group: miniblog-prod
+  cancel-in-progress: false
+
+jobs:
+  read-operations:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out reviewed main revision
+        uses: actions/checkout@v4
+
+      - name: Validate private operation scripts
+        run: python3 -m unittest discover -s scripts/notion-ops -p 'test_*.py'
+
+      # No writer secret, user-supplied paths, arbitrary commands or full reports.
+      - name: Run restricted read operation on ServerD
+        env:
+          SVRD_HOST: ${{ secrets.SVRD_HOST }}
+          SVRD_USER: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          SVRD_PORT: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          SVRD_SSH_KEY: ${{ secrets.SVRD_SSH_KEY }}
+          SVRD_HOST_FINGERPRINT: ${{ secrets.SVRD_HOST_FINGERPRINT }}
+          MINIBLOG_NOTION_TOKEN: ${{ secrets.MINIBLOG_NOTION_TOKEN }}
+          NOTION_READ_MODE: ${{ inputs.mode }}
+        run: python3 scripts/notion-ops/transport.py --mode "$NOTION_READ_MODE"
+
+      - name: Remove private maintenance staging
+        if: ${{ always() }}
+        env:
+          SVRD_HOST: ${{ secrets.SVRD_HOST }}
+          SVRD_USER: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          SVRD_PORT: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          SVRD_SSH_KEY: ${{ secrets.SVRD_SSH_KEY }}
+          SVRD_HOST_FINGERPRINT: ${{ secrets.SVRD_HOST_FINGERPRINT }}
+        run: python3 scripts/notion-ops/transport.py --mode cleanup_ops

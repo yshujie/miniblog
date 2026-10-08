@@ -201,6 +201,9 @@ jobs:
         run: |
           go test -v ./...
 
+      - name: Test restricted Notion operation scripts
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/notion-ops -p 'test_*.py'
+
   lint:
     name: Lint (go vet)
     runs-on: ubuntu-latest
@@ -326,6 +329,17 @@ jobs:
           rm: true
           overwrite: true
 
+      # The Notion runtime credential never enters build/test jobs or SSH exports.
+      - name: Stage read-only Notion credential privately
+        env:
+          SVRD_HOST: ${{ secrets.SVRD_HOST }}
+          SVRD_USER: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          SVRD_PORT: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          SVRD_SSH_KEY: ${{ secrets.SVRD_SSH_KEY }}
+          SVRD_HOST_FINGERPRINT: ${{ secrets.SVRD_HOST_FINGERPRINT }}
+          MINIBLOG_NOTION_TOKEN: ${{ secrets.MINIBLOG_NOTION_TOKEN }}
+        run: python3 scripts/notion-ops/transport.py --mode deploy_token
+
       - name: Deploy on ServerD (docker compose)
         uses: appleboy/ssh-action@v1.0.0
         env:
@@ -359,13 +373,19 @@ jobs:
           key:      ${{ secrets.SVRD_SSH_KEY }}
           port:     ${{ secrets.SVRD_SSH_PORT || 22 }}
           envs: _IMG_BACKEND,_IMG_FE_BLOG,_IMG_FE_ADMIN,_GH_USER,_GHCR_USERNAME,_GHCR_TOKEN,_MYSQL_HOST,_MYSQL_PORT,_MYSQL_DBNAME,_MYSQL_USERNAME,_MYSQL_PASSWORD,_REDIS_HOST,_REDIS_PORT,_REDIS_DB,_REDIS_PASSWORD,_JWT_SECRET,_FEISHU_APPID,_FEISHU_SECRET
+          debug: false
           script_stop: true
-          command_timeout: 15m
+          command_timeout: 30m
           script: |
             set -Eeuo pipefail
+            set +x
+            umask 077
 
             APP_DIR="/opt/miniblog"
             STAGE_DIR="/tmp/miniblog-deploy"
+            NOTION_STAGE="/tmp/miniblog-notion-deploy-${{ github.run_id }}-${{ github.run_attempt }}"
+            ENV_CANDIDATE=""
+            trap 'test -z "$ENV_CANDIDATE" || rm -f -- "$ENV_CANDIDATE"; rm -rf -- "$NOTION_STAGE"' EXIT
             COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml --env-file .env"
 
             echo "🚀 Deploying miniblog to ServerD..."
@@ -407,6 +427,10 @@ jobs:
             echo "📁 Setting up application directory..."
 
             mkdir -p "${APP_DIR}"
+            # The maintenance workflow uses this same server lock.
+            exec 9>"${APP_DIR}/.operations.lock"
+            chmod 600 "${APP_DIR}/.operations.lock"
+            flock -w 900 9 || { echo "Deployment blocked by another operation." >&2; exit 1; }
             cp "${STAGE_DIR}/docker-compose.yml" "${STAGE_DIR}/docker-compose.prod.yml" "${APP_DIR}/"
             rm -rf "${STAGE_DIR}"
 
@@ -425,16 +449,11 @@ jobs:
             # ----------------------------------------------------------------
             echo "⚙️ Creating .env file..."
 
-            # Keep server-only feature configuration across routine releases.
-            # Never print these values: the Notion token is a runtime credential.
-            FEATURE_ENV=$(mktemp)
-            chmod 600 "$FEATURE_ENV"
-            if [ -f .env ]; then
-              cp -p .env .env.previous
-              awk '/^(MINIBLOG_NOTION_TOKEN|MINIBLOG_NOTION_SYNC_ENABLED|MINIBLOG_NOTION_SYNC_INTERVAL|MINIBLOG_NOTION_SYNC_AUTHOR|MINIBLOG_CONTENT_REGISTER_ENABLED)=/' .env > "$FEATURE_ENV"
-            fi
-
-            cat > .env <<EOF
+            # Create a private candidate; the helper atomically replaces .env
+            # and keeps the old token when the Actions secret is unconfigured.
+            ENV_CANDIDATE=$(mktemp "${APP_DIR}/.env.candidate.XXXXXX")
+            chmod 600 "$ENV_CANDIDATE"
+            cat > "$ENV_CANDIDATE" <<EOF
             BACKEND_IMAGE_TAG=${_IMG_BACKEND}
             FRONTEND_BLOG_IMAGE_TAG=${_IMG_FE_BLOG}
             FRONTEND_ADMIN_IMAGE_TAG=${_IMG_FE_ADMIN}
@@ -458,10 +477,12 @@ jobs:
             FEISHU_DOCREADER_APPSECRET=${_FEISHU_SECRET}
             EOF
 
-            cat "$FEATURE_ENV" >> .env
-            rm -f "$FEATURE_ENV"
-            chmod 600 .env
-            echo "✅ .env file created."
+            python3 "$NOTION_STAGE/remote.py" runtime-env --app-dir "$APP_DIR" \
+              --candidate "$ENV_CANDIDATE" --credential "$NOTION_STAGE/credential"
+            rm -f -- "$ENV_CANDIDATE"
+            ENV_CANDIDATE=""
+            rm -rf -- "$NOTION_STAGE"
+            echo "✅ .env file created privately; feature switches preserved."
 
             # ----------------------------------------------------------------
             # Docker 网络与日志目录
@@ -600,6 +621,16 @@ jobs:
             # ----------------------------------------------------------------
             echo "📋 Final container status:"
             docker compose ${COMPOSE_FILES} ps
+
+      - name: Remove private Notion deployment staging
+        if: ${{ always() }}
+        env:
+          SVRD_HOST: ${{ secrets.SVRD_HOST }}
+          SVRD_USER: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
+          SVRD_PORT: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          SVRD_SSH_KEY: ${{ secrets.SVRD_SSH_KEY }}
+          SVRD_HOST_FINGERPRINT: ${{ secrets.SVRD_HOST_FINGERPRINT }}
+        run: python3 scripts/notion-ops/transport.py --mode cleanup_deploy
 
       - name: Reload nginx on ServerA
         if: ${{ env.SVRA_HOST != '' && env.SVRA_USER != '' && env.SVRA_SSH_KEY != '' }}
