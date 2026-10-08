@@ -326,12 +326,12 @@ func TestAuditLegacyInactiveCatalogPreservesHistoryAndVisibility(t *testing.T) {
 func TestAuditStillBlocksUnsupportedStatusesWithoutBackfill(t *testing.T) {
 	for _, tc := range []struct {
 		kind   string
-		status int
+		status interface{}
 	}{
-		{"module", -1}, {"module", 3}, {"section", -1}, {"section", 3},
+		{"module", -1}, {"module", 3}, {"module", nil}, {"section", -1}, {"section", 3}, {"section", nil},
 		{"subsection", 0}, {"subsection", 3}, {"article", 0}, {"article", 5},
 	} {
-		t.Run(fmt.Sprintf("%s_%d", tc.kind, tc.status), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s_%v", tc.kind, tc.status), func(t *testing.T) {
 			gdb := auditDB(t)
 			auditArticle(t, gdb, 91, "https://example.com/invalid-status")
 			if tc.kind == "subsection" {
@@ -355,6 +355,32 @@ func TestAuditStillBlocksUnsupportedStatusesWithoutBackfill(t *testing.T) {
 			var written int64
 			if err = gdb.Model(&model.Article{}).Where("source_key IS NOT NULL").Count(&written).Error; err != nil || written != 0 {
 				t.Fatal("blocked audit performed partial source backfill", err)
+			}
+		})
+	}
+}
+
+func TestBackfillRejectsLegacyZeroChangedToNullSinceAudit(t *testing.T) {
+	for _, kind := range []string{"module", "section"} {
+		t.Run(kind, func(t *testing.T) {
+			gdb := auditDB(t)
+			auditArticle(t, gdb, 101, "https://example.com/catalog-cas")
+			if err := gdb.Table(kind).Where("1 = 1").UpdateColumn("status", 0).Error; err != nil {
+				t.Fatal(err)
+			}
+			state, err := inspect(context.Background(), gdb)
+			if err != nil || state.report.blocked() {
+				t.Fatal("legacy zero audit failed", err)
+			}
+			if err = gdb.Table(kind).Where("1 = 1").UpdateColumn("status", nil).Error; err != nil {
+				t.Fatal(err)
+			}
+			if err = backfill(context.Background(), gdb, state); err == nil {
+				t.Fatal("accepted status changed from legacy zero to SQL NULL")
+			}
+			var row model.Article
+			if err = gdb.First(&row, 101).Error; err != nil || row.SourceKey != nil {
+				t.Fatal("failed catalog CAS wrote source identity", err)
 			}
 		})
 	}

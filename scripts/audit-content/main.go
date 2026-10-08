@@ -208,12 +208,24 @@ func inspect(ctx context.Context, gdb *gorm.DB) (*snapshot, error) {
 		return &row, nil
 	}
 	// SQL seeds (000002 and section.sql) contain inactive module/section status 0.
-	// Preserve that legacy value; public reads still require status 1.
+	// Preserve that legacy value; public reads still require status 1. SQL NULL
+	// is not a legacy status, even though GORM decodes it as the int zero value.
+	nullStatuses := map[string]map[uint64]bool{}
+	for _, kind := range []string{"module", "section"} {
+		var ids []uint64
+		if err := gdb.Table(kind).Where("status IS NULL").Pluck("id", &ids).Error; err != nil {
+			return nil, err
+		}
+		nullStatuses[kind] = map[uint64]bool{}
+		for _, id := range ids {
+			nullStatuses[kind][id] = true
+		}
+	}
 	for _, m := range state.modules {
 		if strings.TrimSpace(m.Code) == "" {
 			add("module", m.ID, "empty_code")
 		}
-		if m.Status != 0 && m.Status != model.ModuleStatusNormal && m.Status != model.ModuleStatusDeleted {
+		if nullStatuses["module"][m.ID] || (m.Status != 0 && m.Status != model.ModuleStatusNormal && m.Status != model.ModuleStatusDeleted) {
 			add("module", m.ID, "invalid_status")
 		}
 	}
@@ -228,7 +240,7 @@ func inspect(ctx context.Context, gdb *gorm.DB) (*snapshot, error) {
 		if strings.TrimSpace(s.Code) == "" {
 			add("section", s.ID, "empty_code")
 		}
-		if s.Status != 0 && s.Status != model.SectionStatusNormal && s.Status != model.SectionStatusDeleted {
+		if nullStatuses["section"][s.ID] || (s.Status != 0 && s.Status != model.SectionStatusNormal && s.Status != model.SectionStatusDeleted) {
 			add("section", s.ID, "invalid_status")
 		}
 	}
@@ -403,6 +415,17 @@ func backfill(ctx context.Context, gdb *gorm.DB, state *snapshot, migrateTags ..
 		}
 		if err := tx.Order("id").Find(&subsections).Error; err != nil {
 			return err
+		}
+		// The int snapshots cannot distinguish a concurrent 0 -> NULL change.
+		// Recheck SQL values while the catalog's module locks are held.
+		for _, kind := range []string{"module", "section"} {
+			var missing int64
+			if err := tx.Table(kind).Where("status IS NULL").Count(&missing).Error; err != nil {
+				return err
+			}
+			if missing != 0 {
+				return errors.New("catalog status changed since audit; rerun")
+			}
 		}
 		if !reflect.DeepEqual(sections, state.sections) || !reflect.DeepEqual(subsections, state.subsections) {
 			return errors.New("catalog changed since audit; rerun")
