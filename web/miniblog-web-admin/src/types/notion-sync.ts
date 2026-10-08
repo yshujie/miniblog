@@ -10,16 +10,28 @@ export interface SyncSource {
 }
 export interface SyncStatus {
   enabled: boolean; paused: boolean; source_writes_paused?: boolean; baseline_frozen?: boolean; current_run_id?: string;
-  health: string; pending_count: number; error_count: number; last_complete_scan_at?: string; last_success_at?: string; sources: SyncSource[];
+  health: string; pending_count: number; blocked_count?: number; error_count: number; last_complete_scan_at?: string; last_success_at?: string; sources: SyncSource[];
 }
+export type SyncArticleState = 'draft' | 'published' | 'unpublished' | 'archived';
 export interface SyncPage {
   page_id: string; article_id?: string; source_id: string; title: string; desired_state: string; status: string; management_state: string;
+  local_state?: SyncArticleState | null; needs_revalidation?: boolean; effective_visibility?: boolean; visibility_reason?: string;
   publish_block_reason?: string; last_error?: string; page_url: string; public_url?: string; publication_hold: boolean; publication_hold_reason?: string; bootstrap_state?: string;
 }
+export interface RunCounts { seen: number; created: number; updated: number; unchanged: number; blocked: number; failed: number; pending?: number; frozen?: number }
 export interface SyncRun {
   run_id: string; mode: string; status: string; phase: string; started_at?: string; finished_at?: string;
-  counts: { seen: number; created: number; updated: number; unchanged: number; blocked: number; failed: number }; error?: string;
+  counts: RunCounts; error?: string;
 }
 export interface SyncItem { item_id?: string; page_id: string; article_id?: string; outcome: string; reason?: string; before?: unknown; after?: unknown; error?: string }
-export interface SourceUpdate { label: string; module_code: string; enabled?: boolean; config?: SyncConfig; expected_config_revision?: number }
+export interface SourceUpdate { label?: string; module_code?: string; enabled?: boolean; config?: SyncConfig; expected_config_revision?: number }
 export interface PageFilters { page: number; limit: number; source_id?: string; management_state?: string; status?: string; title?: string }
+export interface BootstrapCandidate {
+  page_id: string; source_id: string; title: string; topic: string; notion_state: string;
+  new_page: boolean; match_method: string; requires_legacy_alias: boolean; public_condition: string;
+  proposed_section_code?: string; proposed_section_title: string; placement_change: string;
+  candidate_article_ids: string[]; title_hint_article_ids: string[]; article_id?: string;
+  local_state?: string; local_title?: string; local_section_code?: string; local_subsection_code?: string;
+  expected_fingerprint?: string; publish_block_reason?: string; reason?: string;
+}
+export interface BootstrapPreviewAfter { bootstrap_preview: BootstrapCandidate }

@@ -37,4 +37,7 @@ type AdoptInput struct {
 }
 
 type TopicOption struct{ ID, Name string }
-type TopicResult struct{ OptionID, SectionCode, Outcome, Reason string }
+type TopicResult struct {
+	BindingID                              uint64
+	OptionID, SectionCode, Outcome, Reason string
+}

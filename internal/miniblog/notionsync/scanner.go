@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -242,7 +243,8 @@ func (s *Service) scanAndApply(ctx context.Context, run model.NotionSyncRun, tok
 		src := sources[obs.Snapshot.SourceID]
 		changed := obs.Previous.PageID == "" || obs.Previous.MetadataHash != metadataHash(obs.Snapshot) || obs.Previous.NeedsRevalidation
 		conflict := obs.Error != nil
-		if (conflict || (run.Mode == "sync" && src.Row.Enabled && changed)) && obs.Seen {
+		movedToDisabled := obs.Previous.ManagementState == model.NotionManagementManaged && obs.Snapshot.SourceID != obs.Previous.SourceID
+		if (conflict || (run.Mode == "sync" && changed && (src.Row.Enabled || movedToDisabled))) && obs.Seen {
 			snap, readErr := s.readLatest(ctx, id, sources, observationHint(obs))
 			obs.Snapshot = snap
 			obs.Error = readErr
@@ -305,14 +307,27 @@ func (s *Service) scanAndApply(ctx context.Context, run model.NotionSyncRun, tok
 			}
 		}
 	}
+	// Pending historical pages and disabled sources are review/freeze states,
+	// not failures of the enabled library's projection.
+	projectionHealthy := map[string]bool{}
+	for id, src := range sources {
+		if src.Row.Enabled {
+			projectionHealthy[id] = src.SchemaError == nil
+		}
+	}
 	if run.Mode == "sync" && !firstBaseline {
 		for _, srcID := range AllowedSources() {
 			src, ok := sources[srcID]
 			if !ok || !src.Row.Enabled {
 				continue
 			}
+			beforeBlocked := counts.Blocked
 			if e := s.syncTopics(ctx, run, token, src, counts); e != nil {
+				projectionHealthy[srcID] = false
 				scanErrors = append(scanErrors, e)
+			}
+			if counts.Blocked > beforeBlocked {
+				projectionHealthy[srcID] = false
 			}
 		}
 	}
@@ -325,6 +340,7 @@ func (s *Service) scanAndApply(ctx context.Context, run model.NotionSyncRun, tok
 		obs := observations[id]
 		counts.Seen++
 		src := sources[obs.Snapshot.SourceID]
+		beforeFailed, beforeBlocked := counts.Failed, counts.Blocked
 		if e := s.processObservation(ctx, run, token, src, obs, firstBaseline, counts); e != nil {
 			if errors.Is(e, store.ErrLeaseLost) || ctx.Err() != nil {
 				return e
@@ -337,20 +353,37 @@ func (s *Service) scanAndApply(ctx context.Context, run model.NotionSyncRun, tok
 				return e2
 			}
 		}
+		if obs.Previous.ManagementState != model.NotionManagementBaselinePending && obs.Previous.ManagementState != model.NotionManagementDetached && (counts.Failed > beforeFailed || counts.Blocked > beforeBlocked) {
+			for _, affected := range []string{src.Row.ID, obs.Previous.SourceID} {
+				if _, enabled := projectionHealthy[affected]; enabled {
+					projectionHealthy[affected] = false
+				}
+			}
+		}
 		if e := s.fenced(ctx, token, func(tx *gorm.DB, _ *model.NotionSyncControl) error {
 			return tx.Model(&model.NotionSyncRun{}).Where("run_id = ?", run.ID).Update("counts_json", jsonText(counts)).Error
 		}); e != nil {
 			return e
 		}
 	}
-	if run.Mode == "sync" && globalComplete && counts.Failed == 0 && counts.Blocked == 0 {
-		if e := s.fenced(ctx, token, func(tx *gorm.DB, c *model.NotionSyncControl) error {
-			if e := tx.Model(c).Update("last_success_at", now).Error; e != nil {
+	if run.Mode == "sync" && globalComplete {
+		healthyIDs := []string{}
+		for id, healthy := range projectionHealthy {
+			if healthy {
+				healthyIDs = append(healthyIDs, id)
+			}
+		}
+		if len(healthyIDs) > 0 {
+			if e := s.fenced(ctx, token, func(tx *gorm.DB, c *model.NotionSyncControl) error {
+				if len(healthyIDs) == len(projectionHealthy) {
+					if e := tx.Model(c).Update("last_success_at", now).Error; e != nil {
+						return e
+					}
+				}
+				return tx.Model(&model.NotionSyncSource{}).Where("source_id IN ?", healthyIDs).Update("last_success_at", now).Error
+			}); e != nil {
 				return e
 			}
-			return tx.Model(&model.NotionSyncSource{}).Where("source_id IN ?", AllowedSources()).Update("last_success_at", now).Error
-		}); e != nil {
-			return e
 		}
 	}
 	return errors.Join(scanErrors...)
@@ -469,6 +502,11 @@ func (s *Service) readLatest(ctx context.Context, pageID string, sources map[str
 		}
 		return Snapshot{PageID: pageID, SourceID: previous.SourceID, DesiredState: previous.DesiredState, PageURL: page.URL, PublicURL: page.PublicURL, NativeArchived: page.IsArchived, InTrash: page.InTrash, LastEditedAt: page.LastEditedTime, Reason: "out_of_scope"}, nil
 	}
+	// A successful page read does not turn a failed target-schema request into
+	// evidence of a broken target. Retain the prior projection until its schema is readable.
+	if src.Schema.ID == "" {
+		return Snapshot{PageID: pageID, SourceID: previous.SourceID, DesiredState: previous.DesiredState, Reason: "transport_error"}, errors.New("current parent schema is unavailable")
+	}
 	return snapshotOf(page, src.Row.ID, src.Config)
 }
 func (s *Service) recordPageError(ctx context.Context, token store.LeaseToken, p model.NotionPageBinding, err error) error {
@@ -506,6 +544,8 @@ func (s *Service) processObservation(ctx context.Context, run model.NotionSyncRu
 		if obs.Error != nil {
 			reason = obs.Error.Error()
 			counts.Failed++
+		} else if outcome == "baseline_pending" {
+			counts.Pending++
 		} else if reason != "" {
 			counts.Blocked++
 		} else {
@@ -527,6 +567,16 @@ func (s *Service) processObservation(ctx context.Context, run model.NotionSyncRu
 					return tx.Model(&p).Update("last_error", obs.Error.Error()).Error
 				}
 				return nil
+			}
+			// An interrupted bootstrap owns an immutable review checkpoint. Ordinary
+			// scans may audit observations but cannot pair a new snapshot with its old
+			// confirmation fingerprint. Explicit re-review updates both elsewhere.
+			if p.ManagementState == model.NotionManagementBaselinePending && (p.BootstrapState == "write_requested" || p.BootstrapState == "verified") {
+				updates := map[string]interface{}{"last_seen_run_id": run.ID}
+				if obs.Error != nil {
+					updates["last_error"] = obs.Error.Error()
+				}
+				return tx.Model(&p).Updates(updates).Error
 			}
 			// A failed read never replaces the last successful metadata/visibility snapshot.
 			if !obs.Seen && obs.Error != nil {
@@ -554,8 +604,33 @@ func (s *Service) processObservation(ctx context.Context, run model.NotionSyncRu
 		}
 		return s.recordItem(ctx, token, run.ID, snap.PageID, obs.Previous.ArticleID, outcome, reason, "", obs.Previous, snap)
 	}
-	if !src.Row.Enabled {
+	// Confirmed unusable destinations withdraw existing managed articles through
+	// a narrow command. Failed reads, preview and unregistered pages cannot enter it.
+	isolationReason := article.TargetIsolationReason("")
+	if !src.Row.Enabled && snap.SourceID != obs.Previous.SourceID {
+		isolationReason = article.TargetDisabled
+	} else if src.Row.Enabled && src.SchemaError != nil {
+		isolationReason = article.TargetSchemaChanged
+	}
+	if isolationReason != "" && obs.Fresh && obs.Previous.ManagementState == model.NotionManagementManaged && obs.Previous.ArticleID != nil && snap.Reason != "out_of_scope" && snap.Reason != "transport_error" && snap.Reason != "source_unavailable" {
+		result, e := article.NewForSync(s.ds, s.opts.Author).IsolateSyncedTarget(ctx, article.TargetIsolationInput{
+			Lease: token, RunID: run.ID, PageID: snap.PageID, TargetSourceID: src.Row.ID, DataSourceID: src.Row.DataSourceID,
+			Reason: isolationReason, DesiredState: snap.DesiredState, PublicURLWithdrawn: snap.PublicURL == nil || strings.TrimSpace(*snap.PublicURL) == "",
+			NativeArchived: snap.NativeArchived, InTrash: snap.InTrash, NotionLastEditedAt: &snap.LastEditedAt,
+			ExpectedConfigRevision: src.Row.ConfigRevision, ExpectedBindingRevision: obs.Previous.Revision,
+		})
+		if e != nil {
+			return e
+		}
 		counts.Blocked++
+		return s.recordItem(ctx, token, run.ID, snap.PageID, &result.ArticleID, result.Outcome, result.Reason, "", obs.Previous, snap)
+	}
+	if !src.Row.Enabled {
+		if obs.Error != nil {
+			counts.Failed++
+		} else {
+			counts.Frozen++
+		}
 		return s.recordItem(ctx, token, run.ID, snap.PageID, obs.Previous.ArticleID, "blocked", "source_disabled", "", obs.Previous, snap)
 	}
 
@@ -584,6 +659,12 @@ func (s *Service) processObservation(ctx context.Context, run model.NotionSyncRu
 		counts.Unchanged++
 	case "retained":
 		counts.Failed++
+	case "pending":
+		if obs.Error == nil && result.ArticleID == 0 && result.Reason == "not_published" && snap.DesiredState >= 1 && snap.DesiredState <= 4 && snap.DesiredState != model.ArticleStatusPublished {
+			counts.Pending++
+		} else {
+			counts.Blocked++
+		}
 	default:
 		counts.Blocked++
 	}

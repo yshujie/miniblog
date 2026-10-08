@@ -17,6 +17,7 @@ import (
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/pkg/db"
 	"github.com/yshujie/miniblog/scripts/internal/mysqlconfig"
+	"github.com/yshujie/miniblog/scripts/internal/safereport"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -67,13 +68,19 @@ func run() int {
 	backfillTags := flag.Bool("backfill-tags", false, "配合 -apply，在维护窗口无损回填旧CSV标签为JSON")
 	output := flag.String("report", "-", "JSON 审计报告路径；- 为标准输出（不包含原始链接或凭据）")
 	flag.Parse()
+	if *output != "-" {
+		if err := safereport.CheckDestination(*output); err != nil {
+			fmt.Fprintln(os.Stderr, "报告路径不安全:", err)
+			return 1
+		}
+	}
 	if *backfillTags && !*apply {
 		fmt.Fprintln(os.Stderr, "-backfill-tags 须配合 -apply，默认审计始终只读")
 		return 1
 	}
 	gdb, err := db.NewMySQL(config.DBOptions(1))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "连接数据库失败:", err)
+		fmt.Fprintln(os.Stderr, "连接数据库失败")
 		return 1
 	}
 	sqlDB, err := gdb.DB()
@@ -103,7 +110,7 @@ func run() int {
 	if *output == "-" {
 		_, err = os.Stdout.Write(data)
 	} else {
-		err = os.WriteFile(*output, data, 0600)
+		err = safereport.Write(*output, data)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "写报告失败:", err)

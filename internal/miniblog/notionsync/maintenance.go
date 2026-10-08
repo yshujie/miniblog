@@ -71,7 +71,10 @@ func (s *Service) recordCatalogItem(ctx context.Context, token store.LeaseToken,
 func (s *Service) pruneResolvedRuns(ctx context.Context, token store.LeaseToken) error {
 	return s.fenced(ctx, token, func(tx *gorm.DB, _ *model.NotionSyncControl) error {
 		var ids []string
-		if e := tx.Model(&model.NotionSyncRun{}).Where("started_at < ? AND status = ? AND mode IN ?", time.Now().UTC().Add(-90*24*time.Hour), "completed", []string{"dry_run", "sync"}).Pluck("run_id", &ids).Error; e != nil {
+		if e := tx.Model(&model.NotionSyncRun{}).
+			Where("started_at < ? AND status = ? AND mode IN ?", time.Now().UTC().Add(-90*24*time.Hour), "completed", []string{"dry_run", "sync"}).
+			Where("NOT EXISTS (SELECT 1 FROM notion_sync_run_items AS pending_item JOIN notion_page_bindings AS pending_page ON pending_page.page_id = pending_item.page_id WHERE pending_item.run_id = notion_sync_runs.run_id AND pending_page.management_state = ?)", model.NotionManagementBaselinePending).
+			Pluck("run_id", &ids).Error; e != nil {
 			return e
 		}
 		if len(ids) == 0 {

@@ -77,9 +77,45 @@ func (s *Service) BootstrapPreview(ctx context.Context, review ...BootstrapRevie
 			if e := json.Unmarshal([]byte(p.SnapshotJSON), &snap); e != nil {
 				return e
 			}
+			journal := p.BootstrapState == "write_requested" || p.BootstrapState == "verified"
+			var freshPage source.NotionPage
+			if journal {
+				// Ordinary scans freeze an interrupted write's reviewed metadata.
+				// Explicit review must independently read the page before replacing it.
+				var e error
+				freshPage, e = s.client.RetrievePage(ctx, p.PageID)
+				if e != nil {
+					return e
+				}
+				target := normalizeID(freshPage.Parent.DataSourceID)
+				if freshPage.Parent.Type != "data_source_id" {
+					return conflict("待审核页面已移出文章子库")
+				}
+				if _, ok := allowedSources[target]; !ok {
+					return conflict("待审核页面已移出五库范围")
+				}
+				p.SourceID = target
+			}
 			var src model.NotionSyncSource
 			if e := s.ds.DB().WithContext(ctx).Where("source_id = ?", p.SourceID).First(&src).Error; e != nil {
 				return e
+			}
+			if journal {
+				schema, e := s.client.RetrieveDataSource(ctx, p.SourceID)
+				if e != nil {
+					return e
+				}
+				cfg := configOf(src)
+				if e = validateConfig(schema, cfg); e != nil {
+					return e
+				}
+				snap, e = snapshotOf(freshPage, p.SourceID, cfg)
+				if e != nil {
+					return e
+				}
+				if e = validateBootstrapTopic(schema, cfg, snap); e != nil {
+					return e
+				}
 			}
 			c := BootstrapCandidate{PageID: p.PageID, SourceID: p.SourceID, Title: snap.Title, Topic: snap.TopicOptionName, NotionState: stateName(snap.DesiredState), CandidateArticleIDs: []string{}, TitleHintArticleIDs: []string{}, MatchMethod: "unmatched", NewPage: true, PublicCondition: "public_url_missing", PlacementChange: "目标主题章节直属"}
 			if snap.PublicURL != nil && *snap.PublicURL != "" {
@@ -199,13 +235,48 @@ func (s *Service) BootstrapPreview(ctx context.Context, review ...BootstrapRevie
 			if snap.NativeArchived || snap.InTrash {
 				c.Reason = "native_archived_requires_review"
 			}
+			if snap.StateOptionID != "" && snap.DesiredState == 0 {
+				c.Reason = "unknown_state"
+			}
 			if c.MatchMethod != "ambiguous" {
 				c.ExpectedFingerprint = bootstrapFingerprint(local, snap, src.ConfigRevision)
 				if e := s.fenced(ctx, token, func(tx *gorm.DB, _ *model.NotionSyncControl) error {
-					return tx.Model(&model.NotionPageBinding{}).Where("page_id = ? AND management_state = ?", p.PageID, model.NotionManagementBaselinePending).Update("bootstrap_expected_fingerprint", c.ExpectedFingerprint).Error
+					var currentSource model.NotionSyncSource
+					if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("source_id = ?", src.ID).First(&currentSource).Error; e != nil {
+						return e
+					}
+					if currentSource.ConfigRevision != src.ConfigRevision {
+						return conflict("审核中来源配置已变化，请重新预览")
+					}
+					var currentPage model.NotionPageBinding
+					if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("page_id = ?", p.PageID).First(&currentPage).Error; e != nil {
+						return e
+					}
+					if currentPage.ManagementState != model.NotionManagementBaselinePending || currentPage.Revision != p.Revision {
+						return conflict("审核页面绑定已变化，请重新预览")
+					}
+					// The new fingerprint and reviewed snapshot are one fenced write.
+					// A failed/interrupted preview can never pair old approval with new metadata.
+					result := tx.Model(&model.NotionPageBinding{}).Where("page_id = ? AND management_state = ? AND revision = ?", p.PageID, model.NotionManagementBaselinePending, p.Revision).Updates(map[string]interface{}{
+						"bootstrap_expected_fingerprint": c.ExpectedFingerprint, "snapshot_json": jsonText(snap), "source_id": snap.SourceID,
+						"metadata_hash": metadataHash(snap), "desired_state": snap.DesiredState, "page_url": snap.PageURL, "public_url": snap.PublicURL,
+						"native_archived": snap.NativeArchived, "in_trash": snap.InTrash, "notion_last_edited_at": snap.LastEditedAt,
+					})
+					if result.Error != nil {
+						return result.Error
+					}
+					return nil
 				}); e != nil {
 					return e
 				}
+			}
+			var matchedID *uint64
+			if selected != nil {
+				id := selected.ID
+				matchedID = &id
+			}
+			if e := s.recordItem(ctx, token, run.ID, p.PageID, matchedID, "bootstrap_preview", c.Reason, "", nil, map[string]interface{}{"bootstrap_preview": c}); e != nil {
+				return e
 			}
 			result.Items = append(result.Items, c)
 		}
@@ -420,6 +491,9 @@ func (s *Service) bootstrapOne(ctx context.Context, run model.NotionSyncRun, tok
 		if p.BootstrapExpectedState == nil || *p.BootstrapExpectedState != desired || bootstrapMetadataFingerprint(beforeSnapshot) != bootstrapMetadataFingerprint(fresh) {
 			return ItemDTO{}, conflict("接管恢复状态或元数据核验不一致")
 		}
+	}
+	if fresh.StateOptionID != "" && fresh.DesiredState == 0 {
+		return ItemDTO{}, conflict("Notion 状态为未映射的非空值，请先人工核对")
 	}
 	if fresh.DesiredState != 0 && fresh.DesiredState != desired {
 		return ItemDTO{}, conflict("Notion 状态已有其他值，禁止覆盖")

@@ -9,6 +9,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     ArticleListPanel: typeof import('./src/components/content/ArticleListPanel.vue')['default']
+    BootstrapPreviewList: typeof import('./src/components/content/BootstrapPreviewList.vue')['default']
     Breadcrumb: typeof import('./src/components/Breadcrumb/index.vue')['default']
     DirectoryPicker: typeof import('./src/components/content/DirectoryPicker.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']

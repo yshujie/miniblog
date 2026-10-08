@@ -51,6 +51,9 @@ func EnsureSyncedTheme(ds store.IStore, src *model.NotionSyncSource, propertyID,
 		if p.Module.ID != module.ID {
 			return nil, catalogConflict("主题绑定不属于当前模块")
 		}
+		if e = CheckSyncedThemeSectionAvailable(ds, p.Section.Code, binding.ID); e != nil {
+			return nil, e
+		}
 		var collision int64
 		if e = ds.DB().Model(&model.Section{}).Where("module_code = ? AND title = ? AND id <> ?", module.Code, optionName, p.Section.ID).Count(&collision).Error; e != nil {
 			return nil, e
@@ -142,4 +145,28 @@ func RecordBlockedSyncedTheme(ds store.IStore, src *model.NotionSyncSource, prop
 	}
 	binding := model.NotionCatalogBinding{SourceID: src.ID, DataSourceID: src.DataSourceID, ThemePropertyID: propertyID, OptionID: optionID, OptionName: optionName, Status: model.NotionCatalogBlocked, Reason: reason}
 	return ds.DB().Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "data_source_id"}, {Name: "theme_property_id"}, {Name: "option_id"}}, DoUpdates: clause.Assignments(map[string]interface{}{"status": model.NotionCatalogBlocked, "reason": reason, "option_name": optionName})}).Create(&binding).Error
+}
+
+// CheckSyncedThemeSectionAvailable requires the caller to hold the section's module lock.
+// Compare through the SQL relationship so historical code collation remains canonical.
+func CheckSyncedThemeSectionAvailable(ds store.IStore, sectionCode string, bindingID uint64) error {
+	section, e := ds.Sections().GetByCode(sectionCode)
+	if e != nil {
+		return e
+	}
+	if section == nil {
+		return errno.ErrSectionNotFound
+	}
+	var occupied int64
+	e = ds.DB().Model(&model.NotionCatalogBinding{}).
+		Joins("JOIN section AS bound_section ON bound_section.code = notion_catalog_bindings.section_code").
+		Where("bound_section.id = ? AND notion_catalog_bindings.status = ? AND notion_catalog_bindings.id <> ?", section.ID, model.NotionCatalogBound, bindingID).
+		Count(&occupied).Error
+	if e != nil {
+		return e
+	}
+	if occupied > 0 {
+		return catalogConflict("章节已由其他主题占用，请先审核绑定")
+	}
+	return nil
 }
