@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import shlex
 import signal
 import subprocess
 import tempfile
@@ -22,6 +23,78 @@ def private_write(path, value):
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as output:
         output.write(value)
+
+
+def write_validated_key(path, value):
+    # OpenSSH rejects otherwise valid private keys without the final LF.
+    # Normalize pasted Windows line endings without altering key body contents.
+    normalized = value.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n") + "\n"
+    private_write(path, normalized)
+    try:
+        parsed = subprocess.run(["ssh-keygen", "-y", "-P", "", "-f", str(path)],
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.PIPE, timeout=20, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        raise SafeError("local SSH key validation could not complete") from None
+    if parsed.returncode:
+        message = (parsed.stderr or b"").decode("utf-8", errors="replace").lower()
+        if "passphrase" in message or "encrypted" in message:
+            raise SafeError("SSH private key requires an unsupported passphrase")
+        raise SafeError("SSH private key format is invalid")
+
+
+def ssh_error_category(stderr, returncode, fallback):
+    # Classify in memory, never return an excerpt, host, path or credential.
+    message = (stderr or b"").decode("utf-8", errors="replace").lower()
+    if any(value in message for value in ("load key", "invalid format", "error in libcrypto", "unprotected private key", "bad permissions")):
+        return "SSH private key could not be loaded"
+    if any(value in message for value in ("host key verification failed", "remote host identification has changed", "host key has changed")):
+        return "SSH host verification failed"
+    if any(value in message for value in ("could not resolve hostname", "name or service not known", "temporary failure in name resolution", "nodename nor servname")):
+        return "SSH destination could not be resolved"
+    if any(value in message for value in ("connection timed out", "operation timed out", "connection refused", "network is unreachable", "no route to host", "connection reset", "connection closed", "broken pipe")):
+        # An authentication error may also be followed by 'Connection closed'.
+        if "permission denied" not in message and "authentication failed" not in message:
+            return "SSH connection failed"
+    if returncode == 255 and any(value in message for value in ("permission denied", "authentication failed", "no more authentication methods")):
+        return "SSH authentication was rejected"
+    return fallback
+
+
+STAGE_CREATE_CODE = r"""import os, sys
+stage, run = sys.argv[1:]
+os.umask(0o077)
+os.mkdir(stage, 0o700)
+fd = os.open(stage + '/.owner', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+with os.fdopen(fd, 'w', encoding='ascii') as output:
+    output.write(run + '\n')
+"""
+STAGE_CLEANUP_CODE = r"""import os, shutil, stat, sys
+stage, run = sys.argv[1:]
+try:
+    info = os.lstat(stage)
+except FileNotFoundError:
+    sys.exit(0)
+if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+    sys.exit(1)
+try:
+    fd = os.open(stage + '/.owner', os.O_RDONLY | os.O_NOFOLLOW)
+except OSError:
+    sys.exit(1)
+with os.fdopen(fd, 'rb') as marker:
+    info = os.fstat(marker.fileno())
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
+        sys.exit(1)
+    expected_marker = (run + '\n').encode('ascii')
+    if marker.read(len(expected_marker) + 1) != expected_marker:
+        sys.exit(1)
+shutil.rmtree(stage)
+"""
+
+
+def stage_command(operation, stage, run):
+    code = STAGE_CREATE_CODE if operation == "create" else STAGE_CLEANUP_CODE
+    return "python3 -c " + shlex.quote(code) + " " + shlex.quote(stage) + " " + shlex.quote(run)
 
 
 class SafeParser(argparse.ArgumentParser):
@@ -60,7 +133,7 @@ def main():
         os.umask(0o077)
         with tempfile.TemporaryDirectory(prefix="miniblog-notion-", dir=os.environ.get("RUNNER_TEMP")) as temporary:
             temp = Path(temporary)
-            private_write(temp / "key", key)
+            write_validated_key(temp / "key", key)
             private_write(temp / "known_hosts", "")
             destination = user + "@" + host
             # Current deployment actions do not require a fingerprint. An optional
@@ -86,39 +159,51 @@ def main():
                       "-o", "ConnectTimeout=15", "-o", "LogLevel=ERROR", "-o", "StrictHostKeyChecking=" + ("yes" if fingerprint else "accept-new"),
                       "-o", "UserKnownHostsFile=" + str(temp / "known_hosts")]
             stage = "/tmp/miniblog-notion-" + ("deploy-" if args.mode in ("deploy_token", "cleanup_deploy") else "ops-") + run
-            def ssh(command, timeout=1800):
-                result = subprocess.run(["ssh", *common, "-p", port, destination, command],
-                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=timeout, check=False)
-                return result.returncode
+            def ssh(command, timeout=1800, failure="remote SSH command failed"):
+                try:
+                    result = subprocess.run(["ssh", *common, "-p", port, destination, command],
+                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, check=False)
+                except subprocess.TimeoutExpired:
+                    raise SafeError("SSH operation timed out") from None
+                if result.returncode:
+                    raise SafeError(ssh_error_category(result.stderr, result.returncode, failure))
+                return 0
             if args.mode in ("cleanup_deploy", "cleanup_ops"):
-                if ssh("rm -rf -- " + stage, 60):
+                if ssh(stage_command("cleanup", stage, run), 60, "remote private staging cleanup failed"):
                     raise SafeError("remote private staging cleanup failed")
                 print("Private operation staging removed.")
                 return 0
+            stage_created = False
+            deployment_handoff = False
             try:
                 # Refuse to reuse an existing directory, including a symlink.
-                if ssh("umask 077; mkdir -- " + stage, 60):
+                if ssh(stage_command("create", stage, run), 60, "remote private staging creation failed"):
                     raise SafeError("remote private staging creation failed")
+                stage_created = True
                 private_write(temp / "credential", token)
                 shutil.copyfile(Path(__file__).with_name("remote.py"), temp / "remote.py")
                 os.chmod(temp / "remote.py", 0o600)
                 for name in ("remote.py", "credential"):
-                    result = subprocess.run(["scp", *common, "-P", port, str(temp / name), destination + ":" + stage + "/" + name],
-                                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120, check=False)
+                    try:
+                        result = subprocess.run(["scp", *common, "-P", port, str(temp / name), destination + ":" + stage + "/" + name],
+                                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=120, check=False)
+                    except subprocess.TimeoutExpired:
+                        raise SafeError("SSH file transfer timed out") from None
                     if result.returncode:
-                        raise SafeError("private operation files could not be transferred")
+                        raise SafeError(ssh_error_category(result.stderr, result.returncode, "private operation files could not be transferred"))
                 if args.mode == "deploy_token":
+                    deployment_handoff = True
                     print("Read credential staged privately for deployment.")
                     return 0  # The next deployment step consumes it; always() cleanup removes staging.
                 print("Restricted server reports: /opt/miniblog/ops/notion/" + run, flush=True)
                 command = ("python3 " + stage + "/remote.py read-only --app-dir /opt/miniblog --credential " +
                            stage + "/credential --mode " + args.mode + " --run-id " + run)
-                if ssh(command):
+                if ssh(command, failure="read maintenance failed; inspect restricted server reports"):
                     raise SafeError("read maintenance failed; inspect restricted server reports")
                 print("Read maintenance completed: " + args.mode)
             finally:
-                if args.mode != "deploy_token":
-                    if ssh("rm -rf -- " + stage, 60):
+                if stage_created and not deployment_handoff:
+                    if ssh(stage_command("cleanup", stage, run), 60, "remote private staging cleanup failed"):
                         raise SafeError("remote private staging cleanup failed")
     except SafeError as error:
         print("Notion operation blocked: " + str(error), file=sys.stderr)

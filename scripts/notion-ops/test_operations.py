@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 from pathlib import Path
 import stat
 import subprocess
@@ -271,6 +272,136 @@ class ContainerCleanupTests(unittest.TestCase):
                 remote.docker_task('image',Path(directory),Path(directory)/'env','/app/notion-sync',[],'result')
             self.assertEqual(run.call_count,1)
 
+@unittest.skipUnless(shutil.which('ssh-keygen'), 'OpenSSH key parser is required')
+class SSHKeyTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temp=tempfile.TemporaryDirectory(prefix='miniblog-throwaway-key-')
+        cls.directory=Path(cls.temp.name)
+        cls.directory.chmod(0o700)
+        key=cls.directory/'fixture'
+        result=subprocess.run(['ssh-keygen','-q','-t','ed25519','-N','','-f',str(key)],
+                              stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
+        if result.returncode: raise RuntimeError('throwaway SSH key generation failed')
+        cls.key=key.read_text()
+    @classmethod
+    def tearDownClass(cls): cls.temp.cleanup()
+    def parse(self,path):
+        return subprocess.run(['ssh-keygen','-y','-P','','-f',str(path)],stdin=subprocess.DEVNULL,
+                              stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False).returncode
+    def test_unterminated_and_crlf_keys_fail_before_normalization(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'key'
+            for value in (self.key.rstrip('\n'),self.key.replace('\n','\r\n')):
+                transport.private_write(path,value)
+                self.assertNotEqual(self.parse(path),0)
+                path.unlink()
+    def test_normalized_keys_parse_without_key_contents_in_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'key'
+            for value in (self.key.rstrip('\n'),self.key.replace('\n','\r\n'),self.key+'\n'):
+                output=io.StringIO()
+                with contextlib.redirect_stdout(output),contextlib.redirect_stderr(output):
+                    transport.write_validated_key(path,value)
+                self.assertEqual(self.parse(path),0)
+                self.assertEqual(output.getvalue(),'')
+                self.assertTrue(path.read_bytes().endswith(b'\n'))
+                self.assertFalse(b'\r' in path.read_bytes())
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode),0o600)
+                path.unlink()
+    def test_invalid_key_is_rejected_before_network_with_constant_message(self):
+        env={'GITHUB_REF':'refs/heads/main','GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1',
+             'SVRD_HOST':'host.private.test','SVRD_USER':'deploy','SVRD_PORT':'22','SVRD_SSH_KEY':TOKEN,
+             'SVRD_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
+        output=io.StringIO()
+        actual=subprocess.run
+        calls=[]
+        def run(command,**kwargs):
+            calls.append(command)
+            self.assertEqual(command[0],'ssh-keygen')
+            return actual(command,**kwargs)
+        with mock.patch.dict(os.environ,env),mock.patch.object(transport.subprocess,'run',side_effect=run), \
+             mock.patch.object(transport.sys,'argv',['transport.py','--mode','schema_check']), \
+             contextlib.redirect_stdout(output),contextlib.redirect_stderr(output):
+            self.assertEqual(transport.main(),1)
+        self.assertEqual(len(calls),1)
+        self.assertIn('SSH private key format is invalid',output.getvalue())
+        self.assertNotIn(TOKEN,output.getvalue())
+        self.assertNotIn('host.private.test',output.getvalue())
+    def test_encrypted_key_has_fixed_noninteractive_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'key'
+            result=subprocess.CompletedProcess([],255,stderr=('incorrect passphrase '+TOKEN).encode())
+            with mock.patch.object(transport.subprocess,'run',return_value=result):
+                with self.assertRaises(transport.SafeError) as error: transport.write_validated_key(path,TOKEN)
+            self.assertEqual(str(error.exception),'SSH private key requires an unsupported passphrase')
+
+class SSHErrorTests(unittest.TestCase):
+    def test_error_categories_do_not_echo_host_path_or_credentials(self):
+        cases=[('Load key',255,'SSH private key could not be loaded'),
+               ('Permission denied (publickey). Connection closed',255,'SSH authentication was rejected'),
+               ('Host key verification failed',255,'SSH host verification failed'),
+               ('Could not resolve hostname',255,'SSH destination could not be resolved'),
+               ('Connection refused',255,'SSH connection failed'),
+               ('mkdir: permission denied',1,'remote command failed'),
+               ('unrecognized failure',255,'remote command failed')]
+        for raw,code,expected in cases:
+            with self.subTest(category=expected):
+                value=transport.ssh_error_category((raw+' '+TOKEN+' '+PASSWORD+' host.private.test').encode(),code,'remote command failed')
+                self.assertEqual(value,expected)
+                self.assertNotIn(TOKEN,value);self.assertNotIn(PASSWORD,value)
+                self.assertNotIn('host.private.test',value)
+
+class StageOwnershipTests(unittest.TestCase):
+    def invoke(self, operation, path, run='123-1'):
+        code=transport.STAGE_CREATE_CODE if operation=='create' else transport.STAGE_CLEANUP_CODE
+        return subprocess.run(['python3','-c',code,str(path),run],stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL,check=False).returncode
+    def test_own_marker_cleanup_and_absent_stage_are_successful(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'stage'
+            self.assertEqual(self.invoke('cleanup',path),0)
+            self.assertEqual(self.invoke('create',path),0)
+            self.assertEqual((path/'.owner').read_bytes(),b'123-1\n')
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode),0o700)
+            self.assertEqual(stat.S_IMODE((path/'.owner').stat().st_mode),0o600)
+            self.assertEqual(self.invoke('cleanup',path),0)
+            self.assertFalse(path.exists())
+    def test_existing_stage_without_marker_or_with_wrong_marker_is_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'stage';path.mkdir()
+            value=path/'sentinel';value.write_text('unrelated')
+            self.assertNotEqual(self.invoke('create',path),0)
+            self.assertNotEqual(self.invoke('cleanup',path),0)
+            self.assertEqual(value.read_text(),'unrelated')
+            (path/'.owner').write_text('another-run\n')
+            self.assertNotEqual(self.invoke('cleanup',path),0)
+            (path/'.owner').write_text('123-1\nextra')
+            self.assertNotEqual(self.invoke('cleanup',path),0)
+            self.assertTrue(value.exists())
+    def test_valid_marker_with_any_suffix_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'stage';path.mkdir()
+            (path/'sentinel').write_text('unrelated')
+            for suffix in (b'x',b'\n',b'\x00',b'extra'*1024):
+                with self.subTest(suffix_length=len(suffix)):
+                    (path/'.owner').write_bytes(b'123-1\n'+suffix)
+                    self.assertNotEqual(self.invoke('cleanup',path),0)
+                    self.assertTrue((path/'sentinel').exists())
+            (path/'.owner').write_bytes(b'123-1\\n')
+            self.assertNotEqual(self.invoke('cleanup',path),0)
+    def test_stage_or_marker_symlink_never_removes_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target=Path(directory)/'target';target.mkdir()
+            (target/'.owner').write_text('123-1\n')
+            stage=Path(directory)/'stage';stage.symlink_to(target)
+            self.assertNotEqual(self.invoke('cleanup',stage),0)
+            self.assertTrue(target.exists());self.assertTrue(stage.is_symlink())
+            stage.unlink();stage.mkdir()
+            (stage/'.owner').symlink_to(target/'.owner')
+            self.assertNotEqual(self.invoke('cleanup',stage),0)
+            self.assertTrue(stage.exists());self.assertTrue(target.exists())
+
 class TransportAndWorkflowTests(unittest.TestCase):
     def test_transport_uses_private_file_never_token_argv(self):
         commands = []
@@ -292,7 +423,41 @@ class TransportAndWorkflowTests(unittest.TestCase):
             self.assertEqual(transport.main(),0)
         self.assertNotIn(TOKEN,output.getvalue())
         self.assertTrue(any('mkdir' in ' '.join(c) for c in commands))
-        self.assertTrue(any('rm -rf' in ' '.join(c) for c in commands))
+        self.assertTrue(any('shutil.rmtree(stage)' in ' '.join(c) for c in commands))
+    def test_ssh_authentication_failure_is_classified_without_raw_output(self):
+        env={'GITHUB_REF':'refs/heads/main','GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1',
+             'SVRD_HOST':'host.private.test','SVRD_USER':'deploy','SVRD_PORT':'22','SVRD_SSH_KEY':'PRIVATEKEY',
+             'SVRD_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
+        def run(command,**kwargs):
+            if command[0]=='ssh':
+                return subprocess.CompletedProcess(command,255,stdout=b'',stderr=('Permission denied (publickey) '+TOKEN+' host.private.test').encode())
+            return subprocess.CompletedProcess(command,0,stdout=b'',stderr=b'')
+        output=io.StringIO()
+        with mock.patch.dict(os.environ,env),mock.patch.object(transport.subprocess,'run',side_effect=run), \
+             mock.patch.object(transport.sys,'argv',['transport.py','--mode','schema_check']), \
+             contextlib.redirect_stdout(output),contextlib.redirect_stderr(output):
+            self.assertEqual(transport.main(),1)
+        self.assertIn('SSH authentication was rejected',output.getvalue())
+        self.assertNotIn(TOKEN,output.getvalue());self.assertNotIn('host.private.test',output.getvalue())
+    def test_stage_creation_failure_does_not_automatically_cleanup(self):
+        env={'GITHUB_REF':'refs/heads/main','GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1',
+             'SVRD_HOST':'server','SVRD_USER':'deploy','SVRD_PORT':'22','SVRD_SSH_KEY':'PRIVATEKEY',
+             'SVRD_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
+        calls=[]
+        def run(command,**kwargs):
+            calls.append(command)
+            if command[0]=='ssh':
+                return subprocess.CompletedProcess(command,1,stdout=b'',stderr=b'directory exists')
+            return subprocess.CompletedProcess(command,0,stdout=b'',stderr=b'')
+        output=io.StringIO()
+        with mock.patch.dict(os.environ,env),mock.patch.object(transport.subprocess,'run',side_effect=run), \
+             mock.patch.object(transport.sys,'argv',['transport.py','--mode','schema_check']), \
+             contextlib.redirect_stdout(output),contextlib.redirect_stderr(output):
+            self.assertEqual(transport.main(),1)
+        ssh_calls=[call for call in calls if call[0]=='ssh']
+        self.assertEqual(len(ssh_calls),1)
+        self.assertNotIn('shutil.rmtree(stage)',ssh_calls[0][-1])
+        self.assertNotIn(TOKEN,output.getvalue())
     def test_transport_cancellation_cleans_private_staging(self):
         commands=[]
         def run(command,**kwargs):
@@ -309,7 +474,7 @@ class TransportAndWorkflowTests(unittest.TestCase):
              contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
             self.assertEqual(transport.main(),1)
         self.assertNotIn(TOKEN,output.getvalue())
-        self.assertIn('rm -rf -- /tmp/miniblog-notion-ops-123-1',commands[-1][-1])
+        self.assertEqual(commands[-1][-1],transport.stage_command('cleanup','/tmp/miniblog-notion-ops-123-1','123-1'))
     def test_invalid_transport_never_connects_or_echoes_secret(self):
         for env in ({'GITHUB_REF':'refs/heads/feature'},
                     {'GITHUB_REF':'refs/heads/main','MINIBLOG_NOTION_TOKEN':TOKEN+'\nBAD=true',
