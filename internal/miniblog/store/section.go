@@ -48,12 +48,12 @@ func (s *sections) GetByCode(code string) (*model.Section, error) {
 // GetSections 获取章节列表
 func (s *sections) GetSections(moduleCode string) ([]*model.Section, error) {
 	var sections []*model.Section
-	return sections, s.db.Where("module_code = ?", moduleCode).Order("sort asc").Find(&sections).Error
+	return sections, s.db.Where("module_code = ?", moduleCode).Order("sort asc, id asc").Find(&sections).Error
 }
 
 func (s *sections) GetNormalSections(moduleCode string) ([]*model.Section, error) {
 	var sections []*model.Section
-	return sections, s.db.Where("module_code = ?", moduleCode).Where("status = ?", model.SectionStatusNormal).Order("sort asc").Find(&sections).Error
+	return sections, s.db.Where("module_code = ?", moduleCode).Where("status = ?", model.SectionStatusNormal).Order("sort asc, id asc").Find(&sections).Error
 }
 
 // Update 更新章节

@@ -38,7 +38,9 @@ func (a *Article) TableName() string {
 
 // BeforeCreate 在创建前设置信息
 func (a *Article) BeforeCreate(tx *gorm.DB) (err error) {
-	a.ID = idutil.GetIntID()
+	if a.ID == 0 {
+		a.ID = idutil.GetIntID()
+	}
 	a.CreatedAt = time.Now()
 	a.UpdatedAt = time.Now()
 	return

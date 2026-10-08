@@ -49,7 +49,7 @@ func (a *articles) GetList(filter interface{}, page int, limit int) ([]*model.Ar
 	var articles []*model.Article
 
 	query := a.db.Where(filter)
-	query = query.Order("pos asc")
+	query = query.Order("pos asc, id asc")
 
 	// 分页查询
 	query = query.Offset((page - 1) * limit).Limit(limit)

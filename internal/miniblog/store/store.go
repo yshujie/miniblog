@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 
 	"gorm.io/gorm"
 )
@@ -39,7 +40,7 @@ func InTransaction(ctx context.Context, ds IStore, fn func(IStore) error) error 
 	if ds.DB() == nil {
 		return fn(ds)
 	}
-	return ds.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error { return fn(NewStore(tx)) })
+	return ds.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error { return fn(NewStore(tx)) }, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 }
 
 // DB 返回一个实现了 UserStore 接口的实例
