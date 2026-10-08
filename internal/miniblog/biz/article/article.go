@@ -131,49 +131,55 @@ func save(ds store.IStore, a *model.Article) error {
 }
 func (b *articleBiz) withLocked(ctx context.Context, id uint64, targetSection, targetSub string, fn func(store.IStore, *model.Article, *catalog.Placement) error) error {
 	return store.InTransaction(ctx, b.ds, func(ds store.IStore) error {
-		a, e := ds.Articles().GetOne(id)
-		if e != nil {
-			if errors.Is(e, gorm.ErrRecordNotFound) {
-				return errno.ErrArticleNotFound
-			}
-			return e
-		}
-		old, e := catalog.Resolve(ds, a.SectionCode, a.SubsectionCode)
-		if e != nil {
-			return e
-		}
-		target := old
-		if targetSection != "" {
-			target, e = catalog.Resolve(ds, targetSection, targetSub)
-			if e != nil {
-				return e
-			}
-		}
-		if e = catalog.LockModules(ds, old.Module.Code, target.Module.Code); e != nil {
-			return e
-		}
-		if ds.DB() != nil {
-			if e = ds.DB().Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&a).Error; e != nil {
-				return e
-			}
-		}
-		current, e := catalog.Resolve(ds, a.SectionCode, a.SubsectionCode)
-		if e != nil {
-			return e
-		}
-		if current.Module.ID != old.Module.ID {
-			return conflict("文章位置已变更，请刷新后重试")
-		}
-		target = current
-		if targetSection != "" {
-			target, e = catalog.Resolve(ds, targetSection, targetSub)
-			if e != nil {
-				return e
-			}
-		}
-		return fn(ds, a, target)
+		return withLockedOnStore(ds, id, targetSection, targetSub, fn)
 	})
 }
+
+// withLockedOnStore borrows the caller's transaction and never starts or completes it.
+func withLockedOnStore(ds store.IStore, id uint64, targetSection, targetSub string, fn func(store.IStore, *model.Article, *catalog.Placement) error) error {
+	a, e := ds.Articles().GetOne(id)
+	if e != nil {
+		if errors.Is(e, gorm.ErrRecordNotFound) {
+			return errno.ErrArticleNotFound
+		}
+		return e
+	}
+	old, e := catalog.Resolve(ds, a.SectionCode, a.SubsectionCode)
+	if e != nil {
+		return e
+	}
+	target := old
+	if targetSection != "" {
+		target, e = catalog.Resolve(ds, targetSection, targetSub)
+		if e != nil {
+			return e
+		}
+	}
+	if e = catalog.LockModules(ds, old.Module.Code, target.Module.Code); e != nil {
+		return e
+	}
+	if ds.DB() != nil {
+		if e = ds.DB().Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&a).Error; e != nil {
+			return e
+		}
+	}
+	current, e := catalog.Resolve(ds, a.SectionCode, a.SubsectionCode)
+	if e != nil {
+		return e
+	}
+	if current.Module.ID != old.Module.ID {
+		return conflict("文章位置已变更，请刷新后重试")
+	}
+	target = current
+	if targetSection != "" {
+		target, e = catalog.Resolve(ds, targetSection, targetSub)
+		if e != nil {
+			return e
+		}
+	}
+	return fn(ds, a, target)
+}
+
 func (b *articleBiz) Preview(ctx context.Context, r *v1.PreviewSourceRequest) (*v1.PreviewSourceResponse, error) {
 	identity, e := source.Parse(r.ExternalLink)
 	if e != nil {
