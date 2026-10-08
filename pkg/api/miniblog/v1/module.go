@@ -4,6 +4,7 @@ package v1
 type CreateModuleRequest struct {
 	Code  string `json:"code" valid:"required,stringlength(1|255)"`
 	Title string `json:"title" valid:"required,stringlength(1|255)"`
+	Sort  *int   `json:"sort,omitempty"`
 }
 
 // CreateModuleResponse 创建模块响应
@@ -14,6 +15,7 @@ type CreateModuleResponse struct {
 // UpdateModuleRequest 更新模块请求
 type UpdateModuleRequest struct {
 	Title string `json:"title" valid:"required,stringlength(1|255)"`
+	Sort  *int   `json:"sort,omitempty"`
 }
 
 // UpdateModuleResponse 更新模块响应
@@ -42,4 +44,5 @@ type ModuleInfo struct {
 	Code   string `json:"code"`
 	Title  string `json:"title"`
 	Status int    `json:"status"`
+	Sort   int    `json:"sort"`
 }

@@ -28,7 +28,7 @@ func New(ds store.IStore) *BlogController {
 func (c *BlogController) GetModuleList(ctx *gin.Context) {
 	log.C(ctx).Infow("Get module list function called")
 
-	moduleListResp, err := c.biz.BlogBiz().GetModuleList()
+	moduleListResp, err := c.biz.BlogBiz().GetModuleList(ctx.Request.Context())
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
@@ -57,7 +57,7 @@ func (c *BlogController) GetModuleDetail(ctx *gin.Context) {
 	log.C(ctx).Infow("Get module detail function called", "req", req)
 
 	// 调用 Biz 层处理业务
-	moduleDetailResp, err := c.biz.BlogBiz().GetModuleDetail(req)
+	moduleDetailResp, err := c.biz.BlogBiz().GetModuleDetail(ctx.Request.Context(), req)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
@@ -84,7 +84,7 @@ func (c *BlogController) GetArticleDetail(ctx *gin.Context) {
 	}
 
 	// 调用 Biz 层处理业务
-	articleDetailResp, err := c.biz.BlogBiz().GetArticleDetail(req)
+	articleDetailResp, err := c.biz.BlogBiz().GetArticleDetail(ctx.Request.Context(), req)
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return

@@ -14,6 +14,9 @@ import (
 // Create 创建 article 记录
 func (c *ArticleController) Create(ctx *gin.Context) {
 	log.C(ctx).Infow("Create article function called")
+	if !c.registrationAllowed(ctx) {
+		return
+	}
 
 	request := &v1.CreateArticleRequest{}
 	if err := ctx.ShouldBindJSON(request); err != nil {
@@ -24,11 +27,11 @@ func (c *ArticleController) Create(ctx *gin.Context) {
 
 	if _, err := govalidator.ValidateStruct(request); err != nil {
 		log.C(ctx).Errorw("invalid request parameters", "error", err)
-		core.WriteResponse(ctx, errno.ErrInvalidParameter.SetMessage("%s", err.Error()), nil)
+		core.WriteResponse(ctx, &errno.Errno{HTTP: 400, Code: errno.ErrInvalidParameter.Code, Message: err.Error()}, nil)
 		return
 	}
 
-	response, err := c.biz.ArticleBiz().Create(ctx, request)
+	response, err := c.biz.ArticleBiz().Create(ctx.Request.Context(), request)
 	if err != nil {
 		log.C(ctx).Errorw("create article failed", "error", err, "title", request.Title, "section_code", request.SectionCode, "error_type", fmt.Sprintf("%T", err))
 		core.WriteResponse(ctx, err, nil)

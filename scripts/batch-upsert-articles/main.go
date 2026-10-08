@@ -7,25 +7,25 @@
 //	go run ./scripts/batch-upsert-articles -file ./scripts/batch-upsert-articles/articles.example.json
 //	./scripts/batch-upsert-articles.sh -file articles.json -dry-run
 //
-// 匹配规则（决定更新还是新建）:
-//  1. 指定 id 且库中已存在 → 更新
-//  2. 指定 section_code + external_link（非空）→ 更新
-//  3. 指定 section_code + title → 更新
-//  4. 否则 → 新建
+// 指定 id 时按 ID 更新/创建；其余外链按来源身份匹配。
+// 标题不作为身份。目录、状态、顺序和事务共用后台文章用例。
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
+	articlebiz "github.com/yshujie/miniblog/internal/miniblog/biz/article"
 	"github.com/yshujie/miniblog/internal/miniblog/model"
+	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/pkg/db"
 	"github.com/yshujie/miniblog/scripts/internal/mysqlconfig"
 	"gorm.io/gorm"
@@ -43,10 +43,36 @@ type articleInput struct {
 	Author         string   `json:"author"`
 	Tags           []string `json:"tags"`
 	ExternalLink   string   `json:"external_link"`
-	Content        string   `json:"content"`
+	Content        *string  `json:"content"`
 	ContentFile    string   `json:"content_file"`
 	Pos            *int     `json:"pos"`
 	Status         string   `json:"status"`
+}
+
+func (item *articleInput) UnmarshalJSON(data []byte) error {
+	type alias articleInput
+	raw := struct {
+		ID json.RawMessage `json:"id"`
+		*alias
+	}{alias: (*alias)(item)}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if len(raw.ID) == 0 || string(raw.ID) == "null" {
+		return nil
+	}
+	text := strings.TrimSpace(string(raw.ID))
+	if strings.HasPrefix(text, "\"") {
+		if err := json.Unmarshal(raw.ID, &text); err != nil {
+			return err
+		}
+	}
+	id, err := strconv.ParseUint(text, 10, 64)
+	if err != nil || id > math.MaxInt64 {
+		return errors.New("id 必须是 signed BIGINT 范围内的十进制整数")
+	}
+	item.ID = id
+	return nil
 }
 
 func main() {
@@ -82,6 +108,12 @@ func run() int {
 		fmt.Fprintf(os.Stderr, "error: 连接数据库失败: %v\n", err)
 		return 1
 	}
+	sqlDB, err := gdb.DB()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer sqlDB.Close()
 
 	created, updated, failed := 0, 0, 0
 	for i, item := range items {
@@ -105,6 +137,8 @@ func run() int {
 		case "dry-run-update":
 			updated++
 			fmt.Printf("%s DRY-RUN update title=%q section=%s\n", label, item.Title, item.SectionCode)
+		case "already_registered":
+			fmt.Printf("%s EXISTS id=%d title=%q\n", label, articleID, item.Title)
 		}
 	}
 
@@ -137,91 +171,37 @@ func upsertArticle(gdb *gorm.DB, baseDir string, item articleInput, dryRun bool)
 	if err := validateInput(item); err != nil {
 		return "", 0, err
 	}
-	if err := validateRelations(gdb, item); err != nil {
-		return "", 0, err
-	}
-
 	content, err := resolveContent(baseDir, item)
 	if err != nil {
 		return "", 0, err
 	}
-
 	status, err := parseStatus(item.Status)
 	if err != nil {
 		return "", 0, err
 	}
-
-	existing, matchBy, err := findExisting(gdb, item)
+	var explicitStatus *int
+	if strings.TrimSpace(item.Status) != "" {
+		explicitStatus = &status
+	}
+	result, err := articlebiz.New(store.NewStore(gdb)).Import(context.Background(), articlebiz.ImportRequest{
+		ID: item.ID, Title: item.Title, ExternalLink: item.ExternalLink, Content: content,
+		SectionCode: item.SectionCode, SubsectionCode: item.SubsectionCode,
+		Author: item.Author, Tags: item.Tags, Pos: item.Pos, Status: explicitStatus,
+	}, dryRun)
 	if err != nil {
 		return "", 0, err
 	}
-
-	if dryRun {
-		if existing != nil {
-			return "dry-run-update", existing.ID, nil
-		}
-		return "dry-run-create", item.ID, nil
+	action := result.Outcome
+	if action == "created" {
+		action = "create"
 	}
-
-	now := time.Now()
-	tags := strings.Join(item.Tags, ",")
-
-	if existing != nil {
-		existing.Title = item.Title
-		existing.Author = item.Author
-		existing.Tags = tags
-		existing.ExternalLink = item.ExternalLink
-		existing.SectionCode = item.SectionCode
-		existing.SubsectionCode = item.SubsectionCode
-		existing.Content = content
-		existing.Status = status
-		if item.Pos != nil {
-			existing.Pos = *item.Pos
-		}
-		existing.UpdatedAt = now
-
-		if err := gdb.Save(existing).Error; err != nil {
-			return "", 0, fmt.Errorf("更新失败（match=%s）: %w", matchBy, err)
-		}
-		return "update", existing.ID, nil
+	if action == "updated" {
+		action = "update"
 	}
-
-	pos := 0
-	if item.Pos != nil {
-		pos = *item.Pos
-	} else {
-		pos, err = nextPos(gdb, item.SectionCode, item.SubsectionCode)
-		if err != nil {
-			return "", 0, err
-		}
+	if dryRun && action != "already_registered" {
+		action = "dry-run-" + action
 	}
-
-	article := &model.Article{
-		Title:          item.Title,
-		Content:        content,
-		ExternalLink:   item.ExternalLink,
-		SectionCode:    item.SectionCode,
-		SubsectionCode: item.SubsectionCode,
-		Author:         item.Author,
-		Tags:           tags,
-		Pos:            pos,
-		Status:         status,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-	}
-
-	if item.ID > 0 {
-		article.ID = item.ID
-		if err := gdb.Session(&gorm.Session{SkipHooks: true}).Create(article).Error; err != nil {
-			return "", 0, fmt.Errorf("按指定 id 创建失败: %w", err)
-		}
-		return "create", article.ID, nil
-	}
-
-	if err := gdb.Create(article).Error; err != nil {
-		return "", 0, fmt.Errorf("创建失败: %w", err)
-	}
-	return "create", article.ID, nil
+	return action, result.ID, nil
 }
 
 func validateInput(item articleInput) error {
@@ -231,53 +211,21 @@ func validateInput(item articleInput) error {
 	if strings.TrimSpace(item.SectionCode) == "" {
 		return errors.New("section_code 不能为空")
 	}
-	if strings.TrimSpace(item.Author) == "" {
-		return errors.New("author 不能为空")
-	}
-	if strings.TrimSpace(item.ExternalLink) == "" {
-		return errors.New("external_link 不能为空")
-	}
-	if len(item.Tags) == 0 {
-		return errors.New("tags 不能为空")
+	if item.ID > math.MaxInt64 {
+		return errors.New("id 超出 signed BIGINT 范围")
 	}
 	return nil
 }
 
-func validateRelations(gdb *gorm.DB, item articleInput) error {
-	var section model.Section
-	if err := gdb.Where("code = ?", item.SectionCode).First(&section).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("章节不存在: section_code=%s", item.SectionCode)
-		}
-		return err
-	}
-
-	if item.SubsectionCode == "" {
-		return nil
-	}
-
-	var subsection model.Subsection
-	if err := gdb.Where("code = ?", item.SubsectionCode).First(&subsection).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("子章节不存在: subsection_code=%s", item.SubsectionCode)
-		}
-		return err
-	}
-	if subsection.SectionCode != item.SectionCode {
-		return fmt.Errorf("子章节 %s 不属于章节 %s", item.SubsectionCode, item.SectionCode)
-	}
-	return nil
-}
-
-func resolveContent(baseDir string, item articleInput) (string, error) {
-	if strings.TrimSpace(item.Content) != "" {
+func resolveContent(baseDir string, item articleInput) (*string, error) {
+	if item.Content != nil {
 		return item.Content, nil
 	}
 	if strings.TrimSpace(item.ContentFile) == "" {
 		if strings.TrimSpace(item.ExternalLink) != "" {
-			return "content from local", nil
+			return nil, nil
 		}
-		return "", errors.New("content、content_file、external_link 至少提供一个有效内容来源")
+		return nil, errors.New("content、content_file、external_link 至少提供一个有效内容来源")
 	}
 
 	path := item.ContentFile
@@ -286,62 +234,10 @@ func resolveContent(baseDir string, item articleInput) (string, error) {
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", fmt.Errorf("读取 content_file 失败: %w", err)
+		return nil, fmt.Errorf("读取 content_file 失败: %w", err)
 	}
-	return string(data), nil
-}
-
-func findExisting(gdb *gorm.DB, item articleInput) (*model.Article, string, error) {
-	if item.ID > 0 {
-		var article model.Article
-		err := gdb.Where("id = ?", item.ID).First(&article).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, "", nil
-		}
-		if err != nil {
-			return nil, "", err
-		}
-		return &article, "id", nil
-	}
-
-	if item.ExternalLink != "" {
-		var article model.Article
-		err := gdb.Where("section_code = ? AND external_link = ?", item.SectionCode, item.ExternalLink).First(&article).Error
-		if err == nil {
-			return &article, "section_code+external_link", nil
-		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, "", err
-		}
-	}
-
-	var article model.Article
-	err := gdb.Where("section_code = ? AND title = ?", item.SectionCode, item.Title).First(&article).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, "", nil
-	}
-	if err != nil {
-		return nil, "", err
-	}
-	return &article, "section_code+title", nil
-}
-
-func nextPos(gdb *gorm.DB, sectionCode, subsectionCode string) (int, error) {
-	query := gdb.Model(&model.Article{}).Where("section_code = ?", sectionCode)
-	if subsectionCode != "" {
-		query = query.Where("subsection_code = ?", subsectionCode)
-	} else {
-		query = query.Where("subsection_code = '' OR subsection_code IS NULL")
-	}
-
-	var maxPos *int
-	if err := query.Select("MAX(pos)").Scan(&maxPos).Error; err != nil {
-		return 0, err
-	}
-	if maxPos == nil {
-		return 1, nil
-	}
-	return *maxPos + 1, nil
+	content := string(data)
+	return &content, nil
 }
 
 func parseStatus(raw string) (int, error) {
@@ -352,13 +248,15 @@ func parseStatus(raw string) (int, error) {
 		return model.ArticleStatusPublished, nil
 	case "unpublished", "unpublish":
 		return model.ArticleStatusUnpublished, nil
+	case "archived", "archive", "deleted":
+		return model.ArticleStatusDeleted, nil
 	default:
 		n, err := strconv.Atoi(raw)
 		if err != nil {
-			return 0, fmt.Errorf("无效 status: %q（支持 draft/published/unpublished 或 1/2/3）", raw)
+			return 0, fmt.Errorf("无效 status: %q（支持 draft/published/unpublished/archived 或 1/2/3/4）", raw)
 		}
 		switch n {
-		case model.ArticleStatusDraft, model.ArticleStatusPublished, model.ArticleStatusUnpublished:
+		case model.ArticleStatusDraft, model.ArticleStatusPublished, model.ArticleStatusUnpublished, model.ArticleStatusDeleted:
 			return n, nil
 		default:
 			return 0, fmt.Errorf("无效 status 数值: %d", n)

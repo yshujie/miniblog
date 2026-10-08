@@ -10,7 +10,7 @@ import (
 func (c *SectionController) GetList(ctx *gin.Context) {
 	log.C(ctx).Infow("Get all sections function called")
 
-	sections, err := c.biz.SectionBiz().GetList(ctx, ctx.Param("module_code"))
+	sections, err := c.biz.SectionBiz().GetList(ctx.Request.Context(), ctx.Param("module_code"))
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return
@@ -23,7 +23,7 @@ func (c *SectionController) GetList(ctx *gin.Context) {
 func (c *SectionController) GetOne(ctx *gin.Context) {
 	log.C(ctx).Infow("Get one section function called")
 
-	section, err := c.biz.SectionBiz().GetOne(ctx, ctx.Param("code"))
+	section, err := c.biz.SectionBiz().GetOne(ctx.Request.Context(), ctx.Param("code"))
 	if err != nil {
 		core.WriteResponse(ctx, err, nil)
 		return

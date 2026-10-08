@@ -53,15 +53,18 @@ type SubsectionDetail struct {
 
 // ArticleDetail 文章详情
 type ArticleDetail struct {
-	ID           uint64    `json:"id,string"`
-	Title        string    `json:"title"`
-	Content      string    `json:"content"`
+	ID             uint64    `json:"id,string"`
+	Title          string    `json:"title"`
+	Content        string    `json:"content"`
+	ReadingURL     string    `json:"reading_url"`
 	ExternalLink   string    `json:"external_link"`
 	SectionCode    string    `json:"section_code"`
 	SubsectionCode string    `json:"subsection_code"`
 	Author         string    `json:"author"`
-	Tags         []string  `json:"tags"`
-	Pos          int       `json:"pos"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	Tags           []string  `json:"tags"`
+	Pos            int       `json:"pos"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	ModuleCode     string    `json:"module_code"`
+	Provider       *string   `json:"provider,omitempty"`
 }

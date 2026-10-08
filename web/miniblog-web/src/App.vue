@@ -1,13 +1,5 @@
 <template>
   <div class="app-wrapper">
-    <!-- 阅读进度条 -->
-    <div class="reading-progress" v-if="isBlogPage">
-      <div 
-        class="reading-progress-bar" 
-        :style="{ width: readingProgress + '%' }"
-      ></div>
-    </div>
-
     <el-container
       direction="vertical"
       class="app-container"
@@ -39,7 +31,7 @@
 import Header from './components/Header.vue'
 import BlogHeader from './components/blog/BlogHeader.vue'
 import Footer from './components/Footer.vue'
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
@@ -65,17 +57,6 @@ const isBlogPage = computed(() => {
   return route.path.startsWith('/blog')
 })
 
-// 阅读进度
-const readingProgress = ref(0)
-
-// 更新阅读进度
-const updateReadingProgress = () => {
-  const scrollY = window.scrollY
-  const docHeight = document.documentElement.scrollHeight - window.innerHeight
-  const progress = docHeight > 0 ? (scrollY / docHeight) * 100 : 0
-  readingProgress.value = Math.min(100, Math.max(0, progress))
-}
-
 // 博客页时给 body 加 overflow: hidden，避免整页滚动导致上下窜动
 watch(
   isBlogPage,
@@ -89,16 +70,8 @@ watch(
   { immediate: true }
 )
 
-onMounted(() => {
-  if (isBlogPage.value) {
-    window.addEventListener('scroll', updateReadingProgress)
-    updateReadingProgress()
-  }
-})
-
 onUnmounted(() => {
   document.body.classList.remove(BLOG_PAGE_BODY_CLASS)
-  window.removeEventListener('scroll', updateReadingProgress)
 })
 
 </script>
@@ -108,22 +81,6 @@ onUnmounted(() => {
   position: relative;
   background: var(--page-bg);
   min-height: 100vh;
-}
-
-.reading-progress {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 3px;
-  z-index: 60;
-  background: var(--border-color);
-
-  .reading-progress-bar {
-    height: 100%;
-    background: var(--blog-header-active);
-    transition: width 0.2s ease-out;
-  }
 }
 
 .app-container {

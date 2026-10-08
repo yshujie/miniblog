@@ -36,6 +36,11 @@ export const constantRoutes: RouteRecordRaw[] = [
 
 export const asyncRoutes: RouteRecordRaw[] = [
   {
+    path: '/content', component: Layout, redirect: '/content/workbench', name: 'Content',
+    meta: { title: '内容工作台', icon: 'tree', roles: ['admin'] },
+    children: [{ path: 'sync', component: () => import('@/views/content/sync.vue'), name: 'ContentSync', meta: { title: 'Notion 同步', icon: 'tree', noCache: true }}, { path: 'workbench', component: () => import('@/views/content/workbench.vue'), name: 'ContentWorkbench', meta: { title: '目录与收录', icon: 'tree', noCache: true }}]
+  },
+  {
     path: '/module',
     component: Layout,
     redirect: '/module/list',
@@ -109,7 +114,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
   }
 ];
 
-const dynamicRouteNames = ['Article', 'ArticleList', 'CreateArticle', 'EditArticle', 'Module', 'ModuleList', 'Section', 'SectionList', 'Subsection', 'SubsectionList'];
+const dynamicRouteNames = ['Content', 'ContentSync', 'ContentWorkbench', 'Article', 'ArticleList', 'CreateArticle', 'EditArticle', 'Module', 'ModuleList', 'Section', 'SectionList', 'Subsection', 'SubsectionList'];
 
 const createTheRouter = (): Router => createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),

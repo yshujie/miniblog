@@ -113,12 +113,12 @@ type fakeStore struct {
 	modules  *fakeModuleStore
 }
 
-func (f *fakeStore) DB() *gorm.DB                 { return nil }
-func (f *fakeStore) Users() store.UserStore       { return nil }
-func (f *fakeStore) Modules() store.ModuleStore   { return f.modules }
-func (f *fakeStore) Sections() store.SectionStore     { return f.sections }
+func (f *fakeStore) DB() *gorm.DB                       { return nil }
+func (f *fakeStore) Users() store.UserStore             { return nil }
+func (f *fakeStore) Modules() store.ModuleStore         { return f.modules }
+func (f *fakeStore) Sections() store.SectionStore       { return f.sections }
 func (f *fakeStore) Subsections() store.SubsectionStore { return &fakeSubsectionStore{} }
-func (f *fakeStore) Articles() store.ArticleStore     { return nil }
+func (f *fakeStore) Articles() store.ArticleStore       { return nil }
 
 func TestSectionBizPublish(t *testing.T) {
 	sections := newFakeSectionStore()
@@ -211,12 +211,12 @@ type composedSectionStore struct {
 	art store.ArticleStore
 }
 
-func (c *composedSectionStore) DB() *gorm.DB                 { return nil }
-func (c *composedSectionStore) Users() store.UserStore       { return nil }
-func (c *composedSectionStore) Modules() store.ModuleStore   { return c.mod }
-func (c *composedSectionStore) Sections() store.SectionStore     { return c.sec }
+func (c *composedSectionStore) DB() *gorm.DB                       { return nil }
+func (c *composedSectionStore) Users() store.UserStore             { return nil }
+func (c *composedSectionStore) Modules() store.ModuleStore         { return c.mod }
+func (c *composedSectionStore) Sections() store.SectionStore       { return c.sec }
 func (c *composedSectionStore) Subsections() store.SubsectionStore { return &fakeSubsectionStore{} }
-func (c *composedSectionStore) Articles() store.ArticleStore     { return c.art }
+func (c *composedSectionStore) Articles() store.ArticleStore       { return c.art }
 
 type fakeSubsectionStore struct{}
 

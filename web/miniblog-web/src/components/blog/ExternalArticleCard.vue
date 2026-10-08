@@ -1,150 +1,54 @@
 <template>
-  <div ref="containerRef" class="article-container">
-    <div v-show="!hasArticle" class="no-article-card">
-      <el-empty description="请选择一篇文章" />
+  <section class="article-container" :aria-label="title">
+    <div class="article-toolbar">
+      <h1>{{ title }}</h1>
+      <a v-if="sourceURL" :href="sourceURL" target="_blank" rel="noopener noreferrer">打开原文</a>
     </div>
-
-    <div v-show="hasArticle" class="article-card">
-      <div class="article-card-content">
-        <iframe
-          :key="currentArticle?.externalLink"
-          :src="currentArticle?.externalLink"
-          frameborder="0"
-          class="article-iframe"
-          title="文章内容"
-        />
+    <div v-if="!sourceURL" class="link-message" role="status">
+      文章链接不可用，请稍后再试或联系作者。
+    </div>
+    <template v-else>
+      <div v-if="frameState === 'loading'" class="link-message" role="status">正在打开文章，可随时打开原文阅读。</div>
+      <div v-else-if="frameState === 'waiting'" class="link-message" role="status">
+        文章仍在加载。如无法显示，请打开原文阅读。
       </div>
-    </div>
-  </div>
+      <iframe :key="frameKey" :data-frame-key="frameKey" :src="sourceURL" :title="title" class="article-iframe"
+        referrerpolicy="no-referrer" @load="onFrameLoad" />
+    </template>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted, nextTick } from 'vue'
-import { Article } from '@/types/article'
-import { fetchArticleDetail } from '@/api/blog'
-import { ElLoading } from 'element-plus'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import type { Article } from '@/types/article'
+import { articleTitle, safeExternalURL } from '@/util/reading'
 
-const props = defineProps<{ articleId: string | null }>()
-
-const containerRef = ref<HTMLElement | null>(null)
-const currentArticle = ref<Article | null>(null)
-
-let loadingInstance: ReturnType<typeof ElLoading.service> | null = null
-
-const hasArticle = computed(() => {
-  return Boolean(
-    currentArticle.value?.externalLink &&
-    currentArticle.value.externalLink.trim() !== ''
-  )
-})
-
-watch(
-  () => props.articleId,
-  async (newId) => {
-    if (newId !== currentArticle.value?.id) {
-      await fetchCurrentArticle(newId)
-    }
-  },
-  { immediate: true }
-)
-
-onUnmounted(() => {
-  hideLoading()
-})
-
-async function fetchCurrentArticle(articleId: string | null) {
-  try {
-    await nextTick()
-    showLoading()
-
-    if (!articleId) {
-      currentArticle.value = null
-      return
-    }
-
-    const article = await fetchArticleDetail(articleId)
-    currentArticle.value = article ?? null
-  } catch {
-    currentArticle.value = null
-  } finally {
-    hideLoading()
-  }
+const props = defineProps<{ article: Article }>()
+const title = computed(() => articleTitle(props.article))
+const sourceURL = computed(() => safeExternalURL(props.article.readingURL) || safeExternalURL(props.article.externalLink))
+const frameKey = computed(() => props.article.id + ':' + sourceURL.value)
+const frameState = ref<'loading' | 'load_event' | 'waiting'>('loading')
+let timeout: ReturnType<typeof setTimeout> | undefined
+function clearTimer() { clearTimeout(timeout); timeout = undefined }
+watch(frameKey, () => {
+  clearTimer()
+  frameState.value = 'loading'
+  if (sourceURL.value) timeout = setTimeout(() => { frameState.value = 'waiting' }, 10000)
+}, { immediate: true })
+// A cross-origin load event does not prove its document is readable.
+function onFrameLoad(event: Event) {
+  if ((event.target as HTMLIFrameElement).dataset.frameKey !== frameKey.value) return
+  clearTimer()
+  frameState.value = 'load_event'
 }
-
-function showLoading() {
-  if (loadingInstance) {
-    loadingInstance.close()
-  }
-
-  loadingInstance = ElLoading.service({
-    target: containerRef.value ?? undefined,
-    text: '正在加载文章内容...',
-  })
-}
-
-function hideLoading() {
-  loadingInstance?.close()
-  loadingInstance = null
-}
+onUnmounted(clearTimer)
 </script>
 
-<style scoped lang="less">
-.article-container {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-}
-
-.no-article-card {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-  min-height: 320px;
-}
-
-.article-card {
-  height: 100%;
-  padding: 0;
-
-  .article-card-content {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    overflow: hidden;
-    background: var(--card-bg);
-
-    // 遮挡 Notion 嵌入页右上角操作按钮
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 50%;
-      height: 40px;
-      background: transparent;
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    &::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 50%;
-      height: 40px;
-      background: var(--card-bg);
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    .article-iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-      display: block;
-    }
-  }
-}
+<style scoped>
+.article-container { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--card-bg); }
+.article-toolbar { display: flex; align-items: center; gap: 1rem; padding: .75rem 1rem; border-bottom: 1px solid var(--border-color); }
+.article-toolbar h1 { flex: 1; min-width: 0; font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+.article-toolbar a { flex-shrink: 0; color: var(--sidebar-active-color); }
+.link-message { padding: .75rem 1rem; color: var(--text-secondary); font-size: .875rem; }
+.article-iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: var(--card-bg); }
 </style>

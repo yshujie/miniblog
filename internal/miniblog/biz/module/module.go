@@ -2,189 +2,86 @@ package module
 
 import (
 	"context"
-
+	"github.com/yshujie/miniblog/internal/miniblog/biz/catalog"
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/errno"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
 )
 
-// ModuleBiz 模块业务接口
 type IModuleBiz interface {
-	Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.CreateModuleResponse, error)
-	Update(ctx context.Context, code string, r *v1.UpdateModuleRequest) (*v1.UpdateModuleResponse, error)
-	Publish(ctx context.Context, code string) (*v1.ModuleStatusResponse, error)
-	Unpublish(ctx context.Context, code string) (*v1.ModuleStatusResponse, error)
-	GetAll(ctx context.Context) (*v1.GetModuleListResponse, error)
-	GetOne(ctx context.Context, code string) (*v1.GetOneModuleResponse, error)
-	// Delete physically deletes a module by code
-	Delete(ctx context.Context, code string) error
+	Create(context.Context, *v1.CreateModuleRequest) (*v1.CreateModuleResponse, error)
+	Update(context.Context, string, *v1.UpdateModuleRequest) (*v1.UpdateModuleResponse, error)
+	Publish(context.Context, string) (*v1.ModuleStatusResponse, error)
+	Unpublish(context.Context, string) (*v1.ModuleStatusResponse, error)
+	GetAll(context.Context) (*v1.GetModuleListResponse, error)
+	GetOne(context.Context, string) (*v1.GetOneModuleResponse, error)
+	Delete(context.Context, string) error
 }
+type moduleBiz struct{ ds store.IStore }
 
-// moduleBiz 模块业务实现
-type moduleBiz struct {
-	ds store.IStore
+func New(ds store.IStore) *moduleBiz { return &moduleBiz{ds: ds} }
+func (b *moduleBiz) contextStore(ctx context.Context) store.IStore {
+	if b.ds.DB() == nil {
+		return b.ds
+	}
+	return store.NewStore(b.ds.DB().WithContext(ctx))
 }
-
-// 确保 moduleBiz 实现了 ModuleBiz 接口
-var _ IModuleBiz = (*moduleBiz)(nil)
-
-// New 简单工程函数，创建 moduleBiz 实例
-func New(ds store.IStore) *moduleBiz {
-	return &moduleBiz{ds}
-}
-
-// Create 创建模块
 func (b *moduleBiz) Create(ctx context.Context, r *v1.CreateModuleRequest) (*v1.CreateModuleResponse, error) {
-	// 检查 code 是否已存在
-	module, err := b.ds.Modules().GetByCode(r.Code)
-	if err != nil {
-		return nil, err
+	m, e := catalog.New(b.ds).CreateModule(ctx, catalog.ModuleInput{Code: r.Code, Title: r.Title, Sort: r.Sort})
+	if e != nil {
+		return nil, e
 	}
-	if module != nil {
-		return nil, errno.ErrModuleAlreadyExists
-	}
-	// 创建 module 记录
-	module = &model.Module{
-		Code:  r.Code,
-		Title: r.Title,
-	}
-	if err = b.ds.Modules().Create(module); err != nil {
-		return nil, err
-	}
-
-	// 返回响应 CreateModuleResponse
-	response := &v1.CreateModuleResponse{
-		Module: toModuleInfo(module),
-	}
-
-	return response, nil
+	return &v1.CreateModuleResponse{Module: toModuleInfo(m)}, nil
 }
-
-// Delete 物理删除模块，删除前检查是否存在关联的 section 或 article
-func (b *moduleBiz) Delete(ctx context.Context, code string) error {
-	module, err := b.ds.Modules().GetByCode(code)
-	if err != nil {
-		return err
-	}
-	if module == nil {
-		return errno.ErrModuleNotFound
-	}
-
-	// 检查是否存在关联的 sections
-	sections, err := b.ds.Sections().GetSections(code)
-	if err != nil {
-		return err
-	}
-	if len(sections) > 0 {
-		return errno.ErrModuleHasDependents
-	}
-
-	// 如果没有关联的 sections，则可以安全删除模块。
-	// 历史上可能存在 article.module_code 的设计，但当前数据库中 article 表没有 module_code 字段，
-	// 因此我们通过 sections 检查依赖：只要没有 sections，文章不应属于该模块。
-	return b.ds.Modules().DeleteByCode(code)
-}
-
-// Update 更新模块
 func (b *moduleBiz) Update(ctx context.Context, code string, r *v1.UpdateModuleRequest) (*v1.UpdateModuleResponse, error) {
-	module, err := b.ds.Modules().GetByCode(code)
-	if err != nil {
-		return nil, err
+	m, e := catalog.New(b.ds).UpdateModule(ctx, code, catalog.UpdateInput{Title: r.Title, Sort: r.Sort})
+	if e != nil {
+		return nil, e
 	}
-	if module == nil {
-		return nil, errno.ErrModuleNotFound
-	}
-
-	module.Title = r.Title
-
-	if err = b.ds.Modules().Update(module); err != nil {
-		return nil, err
-	}
-
-	return &v1.UpdateModuleResponse{Module: toModuleInfo(module)}, nil
+	return &v1.UpdateModuleResponse{Module: toModuleInfo(m)}, nil
 }
-
-// Publish 上架模块
 func (b *moduleBiz) Publish(ctx context.Context, code string) (*v1.ModuleStatusResponse, error) {
-	module, err := b.ds.Modules().GetByCode(code)
-	if err != nil {
-		return nil, err
+	m, e := catalog.New(b.ds).ModuleStatus(ctx, code, model.ModuleStatusNormal)
+	if e != nil {
+		return nil, e
 	}
-	if module == nil {
-		return nil, errno.ErrModuleNotFound
-	}
-
-	module.Publish()
-
-	if err = b.ds.Modules().Update(module); err != nil {
-		return nil, err
-	}
-
-	return &v1.ModuleStatusResponse{Module: toModuleInfo(module)}, nil
+	return &v1.ModuleStatusResponse{Module: toModuleInfo(m)}, nil
 }
-
-// Unpublish 下架模块
 func (b *moduleBiz) Unpublish(ctx context.Context, code string) (*v1.ModuleStatusResponse, error) {
-	module, err := b.ds.Modules().GetByCode(code)
-	if err != nil {
-		return nil, err
+	m, e := catalog.New(b.ds).ModuleStatus(ctx, code, model.ModuleStatusDeleted)
+	if e != nil {
+		return nil, e
 	}
-	if module == nil {
-		return nil, errno.ErrModuleNotFound
-	}
-
-	module.Unpublish()
-
-	if err = b.ds.Modules().Update(module); err != nil {
-		return nil, err
-	}
-
-	return &v1.ModuleStatusResponse{Module: toModuleInfo(module)}, nil
+	return &v1.ModuleStatusResponse{Module: toModuleInfo(m)}, nil
 }
-
-// GetAll 获取所有模块
+func (b *moduleBiz) Delete(ctx context.Context, code string) error {
+	return catalog.New(b.ds).DeleteModule(ctx, code)
+}
 func (b *moduleBiz) GetAll(ctx context.Context) (*v1.GetModuleListResponse, error) {
-	modules, err := b.ds.Modules().GetAll()
-	if err != nil {
-		return nil, err
+	rows, e := b.contextStore(ctx).Modules().GetAll()
+	if e != nil {
+		return nil, e
 	}
-
-	// 将 modules 追加到 GetAllModulesResponse.Modules 中
-	response := &v1.GetModuleListResponse{
-		Modules: make([]*v1.ModuleInfo, 0, len(modules)),
+	out := &v1.GetModuleListResponse{Modules: make([]*v1.ModuleInfo, 0, len(rows))}
+	for _, m := range rows {
+		out.Modules = append(out.Modules, toModuleInfo(m))
 	}
-	for _, module := range modules {
-		response.Modules = append(response.Modules, toModuleInfo(module))
-	}
-
-	return response, nil
+	return out, nil
 }
-
-// GetOne 获取模块详情
 func (b *moduleBiz) GetOne(ctx context.Context, code string) (*v1.GetOneModuleResponse, error) {
-	module, err := b.ds.Modules().GetByCode(code)
-	if err != nil {
-		return nil, err
+	m, e := b.contextStore(ctx).Modules().GetByCode(code)
+	if e != nil {
+		return nil, e
 	}
-	if module == nil {
+	if m == nil {
 		return nil, errno.ErrModuleNotFound
 	}
-
-	return &v1.GetOneModuleResponse{
-		Module: toModuleInfo(module),
-	}, nil
+	return &v1.GetOneModuleResponse{Module: toModuleInfo(m)}, nil
 }
-
-func toModuleInfo(module *model.Module) *v1.ModuleInfo {
-	if module == nil {
+func toModuleInfo(m *model.Module) *v1.ModuleInfo {
+	if m == nil {
 		return nil
 	}
-
-	return &v1.ModuleInfo{
-		ID:     int(module.ID),
-		Code:   module.Code,
-		Title:  module.Title,
-		Status: module.Status,
-	}
+	return &v1.ModuleInfo{ID: int(m.ID), Code: m.Code, Title: m.Title, Status: m.Status, Sort: m.Sort}
 }

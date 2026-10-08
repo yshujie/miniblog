@@ -2,9 +2,14 @@ import axios from 'axios';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import store from '@/store';
 import { getToken } from '@/utils/auth';
+import { ApiError } from '@/utils/api-error';
 
-const AUTH_BASE_URL = 'https://api.yangshujie.com/v1';
-const ADMIN_BASE_URL = 'https://api.yangshujie.com/v1/admin';
+const apiRoot = (import.meta.env.VITE_API_ROOT || 'http://localhost:8080/v1').replace(/\/$/, '');
+const AUTH_BASE_URL = apiRoot;
+const ADMIN_BASE_URL = `${apiRoot}/admin`;
+
+// Content pages own their inline errors; legacy login and user screens keep notifications.
+const isContentRequest = config => /^\/(articles|article-sources|catalog|modules|sections|subsections|notion-sync)(\/|$)/.test(config?.url || '');
 
 const service = axios.create({
   timeout: 5000,
@@ -48,12 +53,7 @@ service.interceptors.response.use(
     const res = response.data || {};
 
     if (res.code !== 'ok') {
-      ElMessage({
-        message: res.message || '请求失败',
-        type: 'error',
-        duration: 5 * 1000
-      });
-
+      if (!isContentRequest(response.config)) ElMessage.error(res.message || '请求失败');
       if (res.code === 'unauthorized') {
         ElMessageBox.confirm('登录状态失效，请重新登录', '提示', {
           confirmButtonText: '重新登录',
@@ -65,19 +65,15 @@ service.interceptors.response.use(
         });
       }
 
-      return Promise.reject(new Error(res.message || '请求失败'));
+      return Promise.reject(new ApiError(res.message || '请求失败', res.code, response.status));
     }
 
     return res.payload;
   },
   error => {
-    console.error('request error:', error);
-    ElMessage({
-      message: error.message,
-      type: 'error',
-      duration: 5 * 1000
-    });
-    return Promise.reject(error);
+    const data = error.response?.data || {};
+    if (!isContentRequest(error.config)) ElMessage.error(data.message || error.message || '网络请求失败');
+    return Promise.reject(new ApiError(data.message || error.message || '网络请求失败', data.code || error.code, error.response?.status || 0));
   }
 );
 

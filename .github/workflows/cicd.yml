@@ -252,7 +252,8 @@ jobs:
             image: ghcr.io/yshujie/miniblog-frontend-admin
             context: .
             file: build/docker/miniblog/Dockerfile.prod.frontend.admin
-            build_args: ""
+            build_args: |
+              VITE_CONTENT_REGISTER_ENABLED=${{ vars.MINIBLOG_CONTENT_REGISTER_ENABLED || 'false' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -424,6 +425,15 @@ jobs:
             # ----------------------------------------------------------------
             echo "⚙️ Creating .env file..."
 
+            # Keep server-only feature configuration across routine releases.
+            # Never print these values: the Notion token is a runtime credential.
+            FEATURE_ENV=$(mktemp)
+            chmod 600 "$FEATURE_ENV"
+            if [ -f .env ]; then
+              cp -p .env .env.previous
+              awk '/^(MINIBLOG_NOTION_TOKEN|MINIBLOG_NOTION_SYNC_ENABLED|MINIBLOG_NOTION_SYNC_INTERVAL|MINIBLOG_NOTION_SYNC_AUTHOR|MINIBLOG_CONTENT_REGISTER_ENABLED)=/' .env > "$FEATURE_ENV"
+            fi
+
             cat > .env <<EOF
             BACKEND_IMAGE_TAG=${_IMG_BACKEND}
             FRONTEND_BLOG_IMAGE_TAG=${_IMG_FE_BLOG}
@@ -448,6 +458,8 @@ jobs:
             FEISHU_DOCREADER_APPSECRET=${_FEISHU_SECRET}
             EOF
 
+            cat "$FEATURE_ENV" >> .env
+            rm -f "$FEATURE_ENV"
             chmod 600 .env
             echo "✅ .env file created."
 
@@ -513,8 +525,21 @@ jobs:
 
             if ! docker compose ${COMPOSE_FILES} pull; then
               echo "❌ Failed to pull images." >&2
-              echo "📋 Compose config:"
-              docker compose ${COMPOSE_FILES} config || true
+              # Validate without rendering resolved credentials into CI logs.
+              docker compose ${COMPOSE_FILES} config --quiet || true
+              exit 1
+            fi
+
+            # ----------------------------------------------------------------
+            # Read-only schema gate before replacing any running application.
+            # Migration and historical audit are deliberately separate operations.
+            # ----------------------------------------------------------------
+            echo "🔎 Checking database compatibility..."
+            if ! docker compose ${COMPOSE_FILES} run --rm --no-deps --entrypoint /app/content-preflight miniblog-backend; then
+              echo "❌ Database compatibility check failed; running containers were not replaced." >&2
+              if [ -f .env.previous ]; then
+                mv .env.previous .env
+              fi
               exit 1
             fi
 

@@ -47,7 +47,7 @@ func (m *modules) GetByCode(code string) (*model.Module, error) {
 // GetAll 获取所有模块
 func (m *modules) GetAll() ([]*model.Module, error) {
 	var modules []*model.Module
-	if err := m.db.Find(&modules).Error; err != nil {
+	if err := m.db.Order("sort asc, id asc").Find(&modules).Error; err != nil {
 		return nil, err
 	}
 	return modules, nil
@@ -56,7 +56,7 @@ func (m *modules) GetAll() ([]*model.Module, error) {
 // GetNormalModules 获取正常状态的模块
 func (m *modules) GetNormalModules() ([]*model.Module, error) {
 	var modules []*model.Module
-	if err := m.db.Where("status = ?", model.ModuleStatusNormal).Find(&modules).Error; err != nil {
+	if err := m.db.Where("status = ?", model.ModuleStatusNormal).Order("sort asc, id asc").Find(&modules).Error; err != nil {
 		return nil, err
 	}
 	return modules, nil

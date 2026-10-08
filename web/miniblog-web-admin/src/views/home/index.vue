@@ -6,7 +6,7 @@
           <h2 class="welcome-title">欢迎回来，{{ userName }}</h2>
           <p class="welcome-subtitle">当前角色：{{ rolesDisplay }}</p>
           <div class="quick-actions">
-            <el-button type="primary" icon="Edit" @click="goCreate">新增文章</el-button>
+            <el-button type="primary" icon="Edit" :disabled="!contentRegistrationEnabled" @click="goCreate">收录文章</el-button>
             <el-button type="default" icon="List" @click="goList">文章列表</el-button>
           </div>
         </el-card>
@@ -46,6 +46,7 @@
 </template>
 
 <script setup lang="ts">
+import { contentRegistrationEnabled } from '@/utils/content-flags';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import userStore from '@/store/modules/user';
@@ -58,7 +59,7 @@ const rolesDisplay = computed(() => store.roles?.join('、') || '未分配');
 const introduction = computed(() => store.introduction);
 
 const goCreate = () => {
-  router.push({ path: '/article/create' });
+  router.push({ path: '/content/workbench', query: { collect: '1' }});
 };
 
 const goList = () => {

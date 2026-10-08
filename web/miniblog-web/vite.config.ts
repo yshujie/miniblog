@@ -1,7 +1,7 @@
 import { fileURLToPath, URL } from 'node:url'
 import { webcrypto } from 'node:crypto'
 
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
 // Provide missing browser-ish globals when Vite loads this config in Node.
@@ -39,7 +39,8 @@ const ensureNodeGlobals = () => {
 }
 
 // https://vite.dev/config/
-export default defineConfig(async () => {
+export default defineConfig(async ({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
   ensureNodeGlobals()
   const { default: vueDevTools } = await import('vite-plugin-vue-devtools')
 
@@ -57,7 +58,7 @@ export default defineConfig(async () => {
       proxy: {
         // Forward API calls to the backend to dodge CORS in dev.
         '/api': {
-          target: 'https://api.yangshujie.com',
+          target: env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:8080',
           changeOrigin: true,
           rewrite: (path: any) => path.replace(/^\/api/, ''),
         },

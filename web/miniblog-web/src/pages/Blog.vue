@@ -1,150 +1,66 @@
 <template>
-  <!-- 加载状态 -->
-  <div v-if="isLoading" class="loading-container">
-    <el-loading :loading="true" text="正在加载模块数据..." />
-  </div>
-  
-  <!-- 错误状态 -->
-  <div v-else-if="hasError" class="error-container">
-    <el-result
-      icon="warning"
-      title="模块不存在"
-      :sub-title="`找不到模块 '${route.params.module}'，请检查URL是否正确`">
-      <template #extra>
-        <el-button type="primary" @click="$router.push('/')">返回首页</el-button>
-      </template>
-    </el-result>
-  </div>
-  
-  <!-- 正常内容 -->
-  <BlogLayout v-else>
+  <BlogLayout>
     <template #sidebar>
-      <Sidebar :sections="sections" :moduleCode="moduleCode" :moduleTitle="moduleTitle" />
+      <Sidebar :sections="state.module?.sections || []"
+        :module-code="state.module?.code || String(route.params.module)"
+        :module-title="state.module?.title" />
+    </template>
+    <template #drawer>
+      <Sidebar drawer :sections="state.module?.sections || []"
+        :module-code="state.module?.code || String(route.params.module)"
+        :module-title="state.module?.title" />
     </template>
     <template #main>
-      <ExternalArticleCard :articleId="chosenArticleId" />
+      <div v-if="state.status === 'loading'" class="reading-state" role="status" aria-live="polite">
+        正在加载{{ state.resource === 'article' ? '文章' : '目录' }}…
+      </div>
+      <div v-else-if="state.status === 'empty'" class="reading-state" role="status">
+        <h1>{{ state.module?.title }}</h1>
+        <p>暂无已发布文章</p>
+        <el-button @click="retry">刷新目录</el-button>
+      </div>
+      <div v-else-if="state.status === 'not_found' || state.status === 'error'"
+        class="reading-state" role="alert">
+        <h1>{{ state.status === 'not_found' ? (state.resource === 'article' ? '文章不可用' : '模块不可用') : '加载失败' }}</h1>
+        <p>{{ state.message }}</p>
+        <el-button type="primary" @click="retry">重试</el-button>
+        <router-link to="/">返回首页</router-link>
+      </div>
+      <div v-else-if="state.article" class="reading-content">
+        <div v-if="state.refreshError" class="refresh-warning" role="alert">{{ state.refreshError }} <button @click="retry">重试更新</button></div>
+        <ExternalArticleCard :article="state.article" />
+      </div>
     </template>
   </BlogLayout>
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch, computed, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { useModuleStore } from '@/stores/module'
+import { useReaderPage } from '@/composables/useReaderPage'
+import BlogLayout from '@/components/blog/BlogLayout.vue'
+import Sidebar from '@/components/blog/Sidebar.vue'
+import ExternalArticleCard from '@/components/blog/ExternalArticleCard.vue'
 
-import BlogLayout from '../components/blog/BlogLayout.vue'
-import Sidebar from '../components/blog/Sidebar.vue'
-import ExternalArticleCard from '../components/blog/ExternalArticleCard.vue'
-
-// 获取路由对象
 const route = useRoute()
-
-// module store
-const moduleStore = useModuleStore()
-
-// 加载状态
-const isLoading = ref(false)
-const hasError = ref(false)
-
-// 计算属性 sections
-const sections = computed(() => {
-  return moduleStore.currentModule?.sections || []
-})
-
-// 计算属性 moduleCode
-const moduleCode = computed(() => {
-  return moduleStore.currentModule?.code || ''
-})
-
-const moduleTitle = computed(() => {
-  return moduleStore.currentModule?.title || ''
-})
-
-// 计算属性 chosenArticleId
-const chosenArticleId = computed(() => {
-  return queryArticleId()
-})
-
-// 组件挂载时，设置当前模块
-onMounted(async () => {
-  await setCurrentModule(queryModuleCode()) 
-})
-
-// 监听路由变化
-watch(() => route.params.module, async (newModuleCode) => {
-  if (newModuleCode && typeof newModuleCode === 'string') {
-    await setCurrentModule(newModuleCode)
-  }
-}, { immediate: true })
-
-// 组件卸载时，清除当前模块
-onUnmounted(() => {
-  moduleStore.clearCurrentModule()
-})
-
-// 设置当前模块
-async function setCurrentModule(moduleCode: string) {
-  try {
-    isLoading.value = true
-    hasError.value = false
-    
-    // 先确保模块列表已加载
-    if (moduleStore.modules.length === 0) {
-      await moduleStore.loadModules()
-    }
-    
-    let module = moduleStore.getModuleByCode(moduleCode)
-    if (!module) {
-      // 如果还是找不到，可能是模块代码不存在
-      console.error(`❌ 模块 "${moduleCode}" 不存在`)
-      hasError.value = true
-      isLoading.value = false
-      return
-    }
-    
-    // 如果模块存在但没有详细信息，加载详细信息
-    if (!module.sections || module.sections.length === 0) {
-      await moduleStore.loadModuleDetail(moduleCode)
-      module = moduleStore.getModuleByCode(moduleCode)!
-    }
-
-    moduleStore.setCurrentModule(module)
-    isLoading.value = false
-  } catch (error) {
-    console.error(`❌ 设置模块失败:`, error)
-    hasError.value = true
-    isLoading.value = false
-  }
-}
-
-// 获取 moduleCode
-function queryModuleCode() {
-  const moduleCode = route.params.module as string
-  if (!moduleCode) {
-    throw new Error('moduleCode is required')
-  }
-  return moduleCode
-}
-
-// 获取 articleId
-function queryArticleId(): string | null {
-  const articleId = route.params.article as string
-  if (!articleId) {
-    return null
-  }
-  return articleId
-}
-
+const { state, retry } = useReaderPage()
 </script>
 
 <style scoped>
-.loading-container,
-.error-container {
+.reading-state {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: 1rem;
   height: 100%;
   min-height: 320px;
-  background-color: var(--card-bg);
+  padding: 2rem;
+  text-align: center;
+  background: var(--card-bg);
 }
+.reading-content { display:flex; flex-direction:column; height:100%; min-height:0; }
+.reading-content :deep(.article-container) { flex:1; height:auto; }
+.refresh-warning { padding: .5rem 1rem; background: var(--card-bg); color: var(--text-secondary); }
+.reading-state h1 { font-size: 1.5rem; font-weight: 600; }
+.reading-state a { color: var(--sidebar-active-color); }
 </style>

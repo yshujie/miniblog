@@ -14,6 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/yshujie/miniblog/internal/miniblog/notionsync"
+	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/known"
 	"github.com/yshujie/miniblog/internal/pkg/log"
 	mw "github.com/yshujie/miniblog/internal/pkg/middleware"
@@ -85,11 +87,24 @@ func run() error {
 	mws := []gin.HandlerFunc{gin.Recovery(), mw.NoCache, mw.Secure, mw.RequestID(), mw.Logger()}
 	g.Use(mws...)
 
+	// The application owns the worker lifecycle; provider failures never stop HTTP reading.
+	syncOptions, syncConfigErr := notionSyncOptions()
+	if syncConfigErr != nil {
+		log.Warnw("Notion sync configuration invalid; scheduling disabled", "reason", syncConfigErr.Error())
+		syncOptions.Enabled = false
+	}
+	syncService := notionsync.New(store.S, syncOptions)
+	workerContext, cancelWorker := context.WithCancel(context.Background())
+	defer cancelWorker()
+
 	// 安装路由
-	if err := installRouters(g); err != nil {
+	if err := installRouters(g, syncService); err != nil {
 		return err
 	}
 
+	if err := syncService.Start(workerContext); err != nil {
+		log.Warnw("Notion sync scheduling unavailable", "reason", err.Error())
+	}
 	// 启动 HTTP 服务器
 	httpSrv := startInsecureServer(g)
 
@@ -109,6 +124,11 @@ func run() error {
 	// 创建 ctx 用于通知服务器 goroutine, 它有 10 秒时间完成当前正在处理的请求
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	cancelWorker()
+	if err := syncService.Stop(ctx); err != nil {
+		log.Warnw("Notion sync shutdown did not finish within deadline", "reason", err.Error())
+	}
 
 	// 10 秒内优雅关闭服务（将未处理完的请求处理完再关闭服务），超过 10 秒就超时退出
 	if err := httpSrv.Shutdown(ctx); err != nil {

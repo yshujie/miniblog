@@ -41,14 +41,14 @@ func (s *subsections) GetByCode(code string) (*model.Subsection, error) {
 
 func (s *subsections) GetSubsections(sectionCode string) ([]*model.Subsection, error) {
 	var items []*model.Subsection
-	return items, s.db.Where("section_code = ?", sectionCode).Order("sort asc").Find(&items).Error
+	return items, s.db.Where("section_code = ?", sectionCode).Order("sort asc, id asc").Find(&items).Error
 }
 
 func (s *subsections) GetNormalSubsections(sectionCode string) ([]*model.Subsection, error) {
 	var items []*model.Subsection
 	return items, s.db.Where("section_code = ?", sectionCode).
 		Where("status = ?", model.SubsectionStatusNormal).
-		Order("sort asc").
+		Order("sort asc, id asc").
 		Find(&items).Error
 }
 

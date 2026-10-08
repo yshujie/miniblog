@@ -1,5 +1,9 @@
 # scripts 使用说明
 
+内容重构新增 audit-content（默认只读，-apply 显式回填），批量文章导入改用统一业务用例。执行前阅读 [迁移、审计与回退](../docs/content-refactor.md)，明确数据库连接并处理重复清单。
+
+Notion 首轮核对与一次性回填使用 [notion-sync 工具](notion-sync/README.md)，运行期只读；明确确认和独立写凭据仅在维护窗口使用。
+
 ## 目录定位
 
 `scripts/` 只保留两类脚本：

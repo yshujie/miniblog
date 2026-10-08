@@ -4,11 +4,11 @@ This template should help get you started developing with Vue 3 in Vite.
 
 ## Environment & Dependencies
 
-- **Node.js**: ≥ 18.0.0（推荐使用 Node 20 LTS 或 Node 22，便于兼容 Vite 6 与 TypeScript 5.8）。
+- **Node.js**: 推荐 Node 24；CI 使用 Node 24。请使用项目独立运行时，不修改系统默认 Node。
 - **npm**: 随 Node 自带的 npm ≥ 9（仓库使用 `package-lock.json`，默认包管理器为 npm）。
 - **核心依赖**：
  	- `vue@^3.5.13`
- 	- `vite@^6.2.4` 与 `@vitejs/plugin-vue`
+  - `vite@6.4.0` 与 `@vitejs/plugin-vue`
  	- `pinia@^3.0.2`
  	- `element-plus@^2.9.10`
  	- `axios@^1.9.0`
@@ -45,7 +45,7 @@ npm install
 npm run dev
 ```
 
-> 开发环境默认通过 Vite 代理把以 `/api` 开头的请求转发到 `https://api.yangshujie.com`，避免 CORS。可在 `.env.development` 修改 `VITE_API_BASE_URL`（默认 `/api/v1`）或在 `vite.config.ts` 调整代理目标。
+> 开发环境默认通过 Vite 代理把以 `/api` 开头的请求转发到 `http://127.0.0.1:8080`。可在 `.env.local` 修改 `VITE_API_PROXY_TARGET` 或 `VITE_API_BASE_URL`（默认 `/api/v1`）。
 
 - 生产环境默认 `VITE_API_BASE_URL=https://api.yangshujie.com/v1`（见 `.env.production`）；如需自定义后端域名，请在打包前覆盖该环境变量。
 
@@ -54,3 +54,26 @@ npm run dev
 ```sh
 npm run build
 ```
+
+## 阅读功能与本地验证
+
+开发和测试默认使用 `/api/v1`，开发代理指向 `http://127.0.0.1:8080`。需要另一个本地端口时复制 `.env.example` 为 `.env.local` 并设置 `VITE_API_PROXY_TARGET`。生产构建保留原 API 地址，也可用 `VITE_API_BASE_URL` 覆盖。
+
+```sh
+npm ci
+npm run lint:check
+npm run type-check
+npm run test:unit
+npm run build
+```
+
+阅读路由继续支持 `/blog/:module` 和 `/blog/:module/article/:article`。所有模块入口按目录显示顺序选择首篇（子章节文章先于章节直属文章）；空模块展示空态。文章深链接先按 ID 获取当前模块，跨模块移动后替换到当前路径，并保留 query/hash；指定文章不存在时不会跳到其他文章。公开 v1 文章响应可新增 `module_code`，旧字段及 ID 字符串契约保持不变。
+
+文章正文继续通过外链 iframe 阅读，始终提供打开原文。iframe 的 load 事件仅代表收到加载事件，十秒提示也只提供原文出口，不判断平台页面是否真正可读。小于 1280px 的屏幕通过目录抽屉选择文章。
+
+单元与组件测试使用本地替身，覆盖 v1 映射、大 ID、首篇、空目录、错误重试、历史链接、请求竞态、目录交互和 iframe 状态。它们不证明 Notion/飞书真实页面可访问；真实平台与 iOS/Android/Safari 的阅读验收需要单独记录。
+
+
+公开文章可提供 `reading_url`，正文优先使用该地址，再回退旧 `external_link`；两者只接受 HTTP(S)。文章 ID 与旧路由保持不变。模块摘要和完整目录缓存有效期为 60 秒；阅读页可见时每 60 秒刷新，重新回到前台或获得焦点时刷新。相同阅读地址保留 iframe，资料刷新失败保留已加载内容并显示重试提示，明确的 404 则移除正文。紧急下架与解除后的来源重新核验由后端判断。
+
+[管理端本机浏览器夹具](../miniblog-web-admin/docs/notion-sync-fixtures.md)同时覆盖阅读地址、跨模块历史链接、60 秒刷新和紧急下架。当前验证使用本机替身正文，仍不证明真实 Notion/飞书允许 iframe 阅读。

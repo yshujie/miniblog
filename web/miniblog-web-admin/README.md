@@ -1,215 +1,71 @@
-# Vue3 Element Admin Template
+# Miniblog 内容管理后台
 
-## Introduction
+基于现有 Vue 3、Element Plus、Pinia 和 Vue Router。文章正文在 Notion/飞书维护，后台管理来源链接、目录、标题、作者、标签和发布状态。
 
-This template is built with the latest Vue 3 framework and the Element Plus UI library. It uses Vite as the build tool, Pinia for state management, Vue Router for routing, Mock.js for data simulation, and integrates TypeScript.
-The functionality is ported from **Vue Element Admin**. For detailed usage instructions, please refer to [this documentation](https://vue3-element-admin-site.midfar.com/guide/essentials/router-and-nav.html).
+`/content/workbench` 提供目录树、当前目录文章、文章/目录上下排序及快速收录。旧模块、章节、子章节和文章路由保留；章节和子章节列表每行可直接在对应目录收录。同一来源仅有一条文章，重复收录只显示已有记录，移动/恢复需显式操作。
 
-## Features
+快速收录优先当前有效目录，其次最近有效目录；作者默认为昵称且可留空，标签也可留空；连续收录保留目录和作者。Notion 标题建议允许手改，迟到结果不会覆盖手改标题。飞书或预览失败可直接手填。失败保留输入，结果不确定时锁定原请求供原样重试。已发布文章保存资料保留发布状态，状态操作前先保存未保存的修改；状态成功但随后读取失败时可单独重新读取。
 
-- **Latest Technology Stack**: Developed using cutting-edge front-end technologies such as Vue 3 and Vite 3
-- **TypeScript**: A superset of JavaScript designed for application-scale development
-- **Mock Data**: Built-in mock data solution
-- **Permission System**: Comprehensive dynamic route and permission generation
-- **Components**: Multiple commonly used components are re-encapsulated for ease of use
+## 本地开发与开关
 
-## Live Demo
-
-[Vue3 Element Admin](https://vue3-element-admin.midfar.com/)
-
-## Prerequisites
-
-Before development, please ensure you are familiar with and proficient in the following technologies:
-
-- Vue: https://vuejs.org/
-- TypeScript: https://www.typescriptlang.org/
-- Element Plus: https://element-plus.org/
-- Pinia: https://pinia.vuejs.org/
-- Vue Router: https://router.vuejs.org/
-
-> Note: Make sure to read all of the above documentation before starting development.
-> For production projects, please update this README accordingly.
-
-## Recommended IDE & Plugins
-
-[VSCode](https://code.visualstudio.com/) + [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar)  
-(Disable old plugins such as Vetur and the legacy Volar)
-
-## Vite Build Tool Configuration
-
-Refer to the [Vite Configuration Guide](https://vitejs.dev/config/)
-
-## Project Structure
-
-```
-- mock               // Mock data
-- public
-- src
-  - components       // Common components
-  - views            // Views (pages)
-    - tableTemplates // Example module
-      - index.ts
-    - login          // Login module
-      - index.vue
-  - settings.ts      // Global configuration
-  - main.ts          // Entry file
-- types              // TypeScript types
-- package.json
-- CODE_OF_CONDUCT.md // Code of conduct for framework development
-- README.md          // User guide for the framework
-```
-
-## Usage
-
-### Ensure your local Node.js version is >= 20  
-This project is tested with Node.js v20.18.0.
+使用 Node 24，在本目录运行：
 
 ```sh
-node -v
-```
-
-### Install dependencies
-
-```sh
-npm install
-```
-
-### Development mode (connect to test server)
-
-```sh
+npm ci
 npm run dev:test
 ```
 
-### Build for test server
+本机后台页面默认 `http://localhost:8001/`，开发/测试 API 默认 `http://localhost:8080/v1`；通过 `VITE_API_ROOT` 可覆盖。不会自动加载旧模板 mock 或外部测试代理。
+
+`VITE_CONTENT_REGISTER_ENABLED` 本地默认开启。生产未显式开启时禁用收录入口；工作台与同步管理菜单仍保留，已有文章仍可管理。`.env.build_prod` 保留原生产 API 地址及关闭的收录开关；生产开启前须完成后端来源回填、唯一索引和 `MINIBLOG_CONTENT_REGISTER_ENABLED=true` 切换。后端返回 `ContentRegistrationUnavailable` 时，页面说明切换尚未完成并保留输入。
 
 ```sh
+npm run type-check
+npm run lint:check
+npm run test:unit
 npm run build:test
+npm run build
 ```
 
-### Code linting with [ESLint](https://eslint.org/)
+`lint:check` 仅覆盖本轮内容改造文件，避免格式化遗留模板。单元测试使用独立 Vitest 配置、jsdom 和本机 API 地址；store 自动注册明确排除测试文件。
+
+## 真实浏览器 fixture 验收
+
+`npm run test:browser:fixture` 使用 Playwright 驱动隔离的 Chrome/Chromium。全部 API 请求均被截获为测试数据，非本机页面网络被阻断，不使用真实账户或数据库。
+
+需要已安装的 Playwright 和 Chrome/Chromium。可用 `MINIBLOG_PLAYWRIGHT_MODULE` 指向工作区工具包内的 Playwright；`MINIBLOG_CHROMIUM_EXECUTABLE` 可指定浏览器路径。页面需事先运行，默认检查 `http://127.0.0.1:8001`，可用 `MINIBLOG_ADMIN_URL` 覆盖。
+
+生产开关验收另构建本机 API、关闭登记的 production mode 输出：
 
 ```sh
-npm run lint
+VITE_API_ROOT=http://localhost:8080/v1 VITE_CONTENT_REGISTER_ENABLED=false \
+  npx vite build --mode build_prod --outDir /tmp/miniblog-admin-gate
+npx vite preview --host 127.0.0.1 --port 8003 --strictPort --outDir /tmp/miniblog-admin-gate
 ```
 
-## Supported Browsers
-
-Modern browsers:
-
-| Chrome          | Edge            | Firefox         | Safari          | 
-| --------------- | --------------- | --------------- | --------------- | 
-| Chrome ≥ 85     | Edge ≥ 85       | Firefox ≥ 79    | Safari ≥ 14.1   | 
-
-## Contributing
-
-We warmly welcome your contributions! You can help improve this base framework in the following ways:
-
-- Contact the maintainer at **midfar@qq.com**
-- Submit a PR
-- Fix bugs
-- Share best practices and case studies
-
-
-## 简介
-
-这个模板使用了最新的 vue3 和 element-plus UI 框架，vite 构建工具、pinia 状态管理、vue-router 路由管理、mockjs 数据模拟，并集成了 typescript。功能从 Vue Element Admin 移植而来，详细使用可以参考[该文档](https://vue3-element-admin-site.midfar.com/zh/guide/essentials/router-and-nav.html)。
-
-## 特性
-
-- **最新技术栈**：使用 Vue3/vite3 等前端前沿技术开发
-- **TypeScript**: 应用程序级 JavaScript 的语言
-- **Mock 数据** 内置 Mock 数据方案
-- **权限** 内置完善的动态路由权限生成方案
-- **组件** 二次封装了多个常用的组件
-
-## 在线示例
-
-[vue3 element admin](https://vue3-element-admin.midfar.com/)
-
-## 准备
-开发前请确保熟悉并掌握以下技术栈：
-
-- vue: https://cn.vuejs.org/
-- TypeScript：https://www.tslang.cn/index.html
-- element-plus：https://cn.element-plus.org/
-- pinia: https://pinia.vuejs.org/zh/
-- vue-router: https://router.vuejs.org/zh/
-
-注：开发前请务必阅读上述所有文档。应用至实际项目开发请修改 readme 内容。
-
-## 推荐的 IDE 工具和插件
-
-[VSCode](https://code.visualstudio.com/) + [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (需禁用旧插件 Vetur、Volar )
-
-## Vite 构建工具配置
-
-参考 [Vite 配置](https://vitejs.dev/config/)
-
-## 主要结构
-
-```
-- mock // 模拟数据
-- public
-- src
-  - components // 组件
-  - views // 页面
-    - tableTemplates // 示例模块
-	  - index.ts
-   - login // 登录模块
-	  - index.vue
- - settings.ts // 全局配置
- - main.ts // 入口文件
--  types // TypeScript类型
-- package.json
-- CODE_OF_CONDUCT.md // 框架开发要求
-- README.md //框架使用手册
-```
-
-## 使用
-
-### 确定本地的node版本>=20。本地使用v20.18.0验证通过。
+在另一个终端运行：
 
 ```sh
-node -v
+MINIBLOG_ADMIN_GATE_URL=http://127.0.0.1:8003 npm run test:browser:fixture
 ```
 
-### 安装依赖
+2026-10-08 本地验证：57 个单元/组件用例通过；真实 Chrome fixture 通过以下场景：目录/昵称默认及连续发布、Notion 迟到建议保留手改标题、空作者发布、503 保留输入、不确定结果原请求重试、重复归档文章显式恢复、production mode 收录开关禁用（工作台菜单保留）。它证明本地 UI 与截获协议行为；实际 API/数据库联调、真实 Notion 接入和生产发布是另外的验收边界。
 
-```sh
-npm install
-```
+运行证据输出至 `test-results/browser-fixture/`（已忽略）：
 
-### 开发模式连接测试服
+- `report.json`：场景与请求统计。
+- `01-publish-and-continue.png`：继续收录保留目录/作者。
+- `02-late-title-keeps-manual.png`：手改标题保留。
+- `03-failure-retains-input.png`：失败输入保留。
+- `04-duplicate-explicit-restore.png`：重复文档恢复草稿。
+- `05-production-gate-disabled.png`：生产开关未开启。
 
-```sh
-npm run dev:test
-```
+## Notion 同步与托管文章
 
-### 打包到测试服
+`/content/sync` 显示同步健康、来源配置、主题绑定、页面问题、预览与同步运行及逐项变更。页面每 15 秒刷新可见页面的健康与列表；打开运行明细后，每 2 秒读取尚未结束的运行。分页默认每页 20 项。运行请求取得 ID 后只重试读取；响应不确定时先检查运行历史，不自动重发。
 
-```sh
-npm run build:test
-```
+服务总开关由后端配置控制。预览不写入文章或目录；手动同步重新扫描当前来源，不重放旧预览。历史文章的状态审核与回填接管通过受控命令完成，网页只展示待审核情况。配置与主题绑定带版本号提交，冲突或失败保留本次输入。
 
-### 代码检查 [ESLint](https://eslint.org/)
+托管文章以 `allowed_actions` 为准，来源管理字段只读；作者通过单字段 PATCH 保存，历史本地正文保留，目录内排序仍可操作。旧页面在编辑中途被接管时，409 后重新读取管理状态，并提供之前输入的副本；不再提交来源字段。紧急下架覆盖来源发布状态；解除后等待下一次同步重新核验，不立即恢复前台。手工飞书收录、编辑与状态操作仍使用原流程。
 
-```sh
-npm run lint
-```
-
-## 支持环境
-
-现代浏览器。
-
-| Chrome          | Edge            | Firefox         | Safari          | 
-| --------------- | --------------- | --------------- | --------------- | 
-| Chrome ≥ 85     | Edge ≥ 85       | Firefox ≥ 79    | Safari ≥ 14.1   | 
-
-## 参与贡献
-
-我们非常欢迎你的贡献，你可以通过以下方式和我们一起共建基线框架：
-
-- 联系维护人员 midfar@qq.com
-- 提交 pr
-- 修复 bug
-- 分享实践案例
+[同步浏览器夹具说明与截图](docs/notion-sync-fixtures.md)记录本机复现步骤及验收边界。

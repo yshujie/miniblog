@@ -1,120 +1,38 @@
 import { defineStore } from 'pinia';
 import { fetchSections, createSection, updateSection, publishSection, unpublishSection, deleteSection } from '@/api/section';
-
-export interface SectionItem {
-  code: string;
-  title: string;
-  module_code: string;
-  sort?: number;
-  status?: number;
-}
-
-interface FetchSectionsResponse {
-  sections?: SectionItem[];
-}
-
-interface SectionResponse {
-  section?: SectionItem;
-}
-
-interface SectionState {
-  sectionsByModule: Record<string, SectionItem[]>;
-  loadingModules: Record<string, boolean>;
-}
-
-const normalizeSection = (section?: SectionItem) => {
-  if (!section) {
-    return undefined;
-  }
-  return {
-    sort: 0,
-    status: 0,
-    ...section
-  } as SectionItem;
-};
-
-export default defineStore({
-  id: 'sectionStore',
-  state: (): SectionState => ({
-    sectionsByModule: {},
-    loadingModules: {}
-  }),
-  getters: {
-    getSectionsByModule: (state) => (moduleCode: string) => state.sectionsByModule[moduleCode] || []
-  },
+import { shareFetch, bySort } from '@/stores/shared-fetch';
+import type { SectionItem } from '@/types/content';
+export type { SectionItem } from '@/types/content';
+export default defineStore('sectionStore', {
+  state: () => ({ sectionsByModule: Object.create(null) as Record<string, SectionItem[]>, loadingModules: Object.create(null) as Record<string, boolean>, loadingVersions: Object.create(null) as Record<string, number>, loadedModules: Object.create(null) as Record<string, boolean>, revisionModules: Object.create(null) as Record<string, number> }),
+  getters: { getSectionsByModule: state => (code: string) => state.sectionsByModule[code] || [] },
   actions: {
-    setSections(moduleCode: string, sections: SectionItem[]) {
-      this.sectionsByModule = {
-        ...this.sectionsByModule,
-        [moduleCode]: sections.map((item) => normalizeSection(item) as SectionItem)
-      };
+    setSections(code: string, items: SectionItem[]) { this.sectionsByModule[code] = bySort(items); this.loadedModules[code] = true; },
+    invalidate(code: string) { this.loadedModules[code] = false; this.revisionModules[code] = (this.revisionModules[code] || 0) + 1; },
+    upsertSection(item?: SectionItem) {
+      if (!item) return;
+      const parent = item.module_code;
+      this.revisionModules[parent] = (this.revisionModules[parent] || 0) + 1;
+      this.sectionsByModule[parent] = bySort([...(this.sectionsByModule[parent] || []).filter(existing => existing.code !== item.code), item]);
     },
-    upsertSection(section?: SectionItem) {
-      const normalized = normalizeSection(section);
-      if (!normalized) {
-        return;
-      }
-      const list = [...(this.sectionsByModule[normalized.module_code] || [])];
-      const index = list.findIndex((item) => item.code === normalized.code);
-      if (index >= 0) {
-        list.splice(index, 1, { ...list[index], ...normalized });
-      } else {
-        list.push(normalized);
-      }
-      this.sectionsByModule = {
-        ...this.sectionsByModule,
-        [normalized.module_code]: list
-      };
+    fetchSections(code: string, force = false): Promise<void> {
+      if (!code || (this.loadedModules[code] && !force)) return Promise.resolve();
+      const version = this.revisionModules[code] || 0;
+      return shareFetch(this, `${code}:${version}`, async () => {
+        this.loadingModules[code] = true; this.loadingVersions[code] = version;
+        try {
+          const response = await fetchSections(code) as unknown as { sections?: SectionItem[] };
+          if (version === (this.revisionModules[code] || 0)) this.setSections(code, response.sections || []);
+        } finally { if (version === this.loadingVersions[code]) this.loadingModules[code] = false; }
+      });
     },
-    async fetchSections(moduleCode: string, force = false) {
-      if (!moduleCode) {
-        return;
-      }
-      if (this.loadingModules[moduleCode]) {
-        return;
-      }
-      const hasCached = Boolean(this.sectionsByModule[moduleCode]);
-      if (hasCached && !force) {
-        return;
-      }
-
-      this.loadingModules = { ...this.loadingModules, [moduleCode]: true };
-      try {
-        const response = await fetchSections(moduleCode) as FetchSectionsResponse;
-        this.setSections(moduleCode, response.sections ?? []);
-      } catch (error) {
-        throw error;
-      } finally {
-        const { [moduleCode]: _removed, ...rest } = this.loadingModules;
-        this.loadingModules = rest;
-      }
-    },
-    async createSection(payload: { module_code: string; code: string; title: string }) {
-      const response = await createSection(payload) as SectionResponse;
-      this.upsertSection(response.section);
-    },
-    async updateSection(code: string, payload: { title: string; sort?: number }) {
-      const response = await updateSection(code, payload) as SectionResponse;
-      this.upsertSection(response.section);
-    },
-    async publishSection(code: string) {
-      const response = await publishSection(code) as SectionResponse;
-      this.upsertSection(response.section);
-    },
-    async unpublishSection(code: string) {
-      const response = await unpublishSection(code) as SectionResponse;
-      this.upsertSection(response.section);
-    },
+    async createSection(payload: { module_code: string; code: string; title: string; sort?: number }) { const response = await createSection(payload) as unknown as { section?: SectionItem }; this.upsertSection(response.section); },
+    async updateSection(code: string, payload: { title: string; sort?: number }) { const response = await updateSection(code, payload) as unknown as { section?: SectionItem }; this.upsertSection(response.section); },
+    async publishSection(code: string) { const response = await publishSection(code) as unknown as { section?: SectionItem }; this.upsertSection(response.section); },
+    async unpublishSection(code: string) { const response = await unpublishSection(code) as unknown as { section?: SectionItem }; this.upsertSection(response.section); },
     async deleteSection(code: string) {
       await deleteSection(code);
-      // remove from local cache
-      const moduleCode = Object.keys(this.sectionsByModule).find((k) => (this.sectionsByModule[k] || []).some((s) => s.code === code));
-      if (moduleCode) {
-        this.sectionsByModule = {
-          ...this.sectionsByModule,
-          [moduleCode]: (this.sectionsByModule[moduleCode] || []).filter((s) => s.code !== code)
-        };
-      }
+      for (const parent of Object.keys(this.sectionsByModule)) { this.revisionModules[parent] = (this.revisionModules[parent] || 0) + 1; this.sectionsByModule[parent] = this.sectionsByModule[parent].filter(item => item.code !== code); }
     }
   }
 });

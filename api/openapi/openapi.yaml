@@ -1,7 +1,2080 @@
-
-
-
-
-
-
-
+openapi: 3.0.3
+info:
+  title: miniblog content API
+  version: 1.2.0
+  description: Content endpoints in the existing /v1 contract. Authentication and
+    other management APIs are unchanged. Registration requires MINIBLOG_CONTENT_REGISTER_ENABLED
+    and completed source cutover. Archived state remains legacy wire Deleted. Nullable
+    source identities are not accepted from clients.
+paths:
+  /v1/admin/article-sources/preview:
+    post:
+      summary: Best-effort title preview; provider failures still return manual_required
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewInput'
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/PreviewPayload'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /v1/admin/articles/register:
+    post:
+      summary: Atomic registration or publication; duplicates preserve existing record
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/RegisterPayload'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /v1/admin/articles/reorder:
+    put:
+      summary: Update one complete direct-section or subsection group
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderArticles'
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    nullable: true
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /v1/admin/catalog/reorder:
+    post:
+      summary: Update one complete hierarchy group
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderCatalog'
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    nullable: true
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /v1/admin/articles/{id}/move:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[1-9][0-9]{0,18}$
+        description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+    put:
+      summary: move
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Placement'
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      article:
+                        $ref: '#/components/schemas/ArticleDTO'
+                    required:
+                    - article
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /v1/admin/articles/{id}/archive:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[1-9][0-9]{0,18}$
+        description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+    put:
+      summary: archive
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      article:
+                        $ref: '#/components/schemas/ArticleDTO'
+                    required:
+                    - article
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /v1/admin/articles/{id}/restore:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[1-9][0-9]{0,18}$
+        description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+    put:
+      summary: restore
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      article:
+                        $ref: '#/components/schemas/ArticleDTO'
+                    required:
+                    - article
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /v1/admin/articles/{id}/publish:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[1-9][0-9]{0,18}$
+        description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+    put:
+      summary: publish
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    nullable: true
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /v1/admin/articles/{id}/unpublish:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[1-9][0-9]{0,18}$
+        description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+    put:
+      summary: unpublish
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    nullable: true
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /v1/admin/articles:
+    get:
+      summary: Legacy paginated list with real Count and filters
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      articles:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LegacyArticle'
+                      total:
+                        type: integer
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - name: module_code
+        in: query
+        schema:
+          type: string
+      - name: section_code
+        in: query
+        schema:
+          type: string
+      - name: subsection_code
+        in: query
+        schema:
+          type: string
+      - name: title
+        in: query
+        schema:
+          type: string
+      - name: status
+        in: query
+        schema:
+          type: string
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      - name: direct_only
+        in: query
+        schema:
+          type: boolean
+    post:
+      summary: Legacy create; delegates to unified registration
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LegacyCreate'
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      article:
+                        $ref: '#/components/schemas/LegacyArticle'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /v1/admin/articles/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[1-9][0-9]{0,18}$
+        description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+    get:
+      summary: Legacy article detail
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      article:
+                        $ref: '#/components/schemas/LegacyArticle'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+    put:
+      summary: Metadata edit preserves status; archived articles require explicit
+        restore
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LegacyEdit'
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      article:
+                        $ref: '#/components/schemas/LegacyArticle'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /v1/blog/modules:
+    get:
+      summary: Visible public modules
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      modules:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Module'
+                required:
+                - code
+                - msg
+                - payload
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /v1/blog/moduleDetail:
+    get:
+      summary: Visible public moduleDetail
+      parameters:
+      - name: module_code
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      module_detail:
+                        $ref: '#/components/schemas/PublicModule'
+                required:
+                - code
+                - msg
+                - payload
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /v1/blog/articleDetail:
+    get:
+      summary: Visible public articleDetail
+      parameters:
+      - name: article_id
+        in: query
+        required: true
+        schema:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum:
+                    - ok
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      article_detail:
+                        $ref: '#/components/schemas/PublicArticle'
+                required:
+                - code
+                - msg
+                - payload
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+  /v1/admin/notion-sync/status:
+    get:
+      summary: Sync health and controls
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncStatus'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /v1/admin/notion-sync/sources:
+    get:
+      summary: Paginated sources
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncSourceList'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - &id001
+        name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+          minimum: 1
+          maximum: 1000000
+      - &id002
+        name: limit
+        in: query
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+          maximum: 100
+  /v1/admin/notion-sync/pages:
+    get:
+      summary: Paginated pages
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncPageList'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - *id001
+      - *id002
+      - name: source_id
+        in: query
+        schema:
+          type: string
+      - name: management_state
+        in: query
+        schema:
+          type: string
+      - name: status
+        in: query
+        schema:
+          type: string
+      - name: title
+        in: query
+        schema:
+          type: string
+  /v1/admin/notion-sync/runs:
+    get:
+      summary: Paginated runs
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncRunList'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - *id001
+      - *id002
+    post:
+      summary: Start fresh dry_run or sync; bootstrap excluded
+      security:
+      - bearerAuth: []
+      responses:
+        '202':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      run_id:
+                        type: string
+                    required:
+                    - run_id
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncRunInput'
+  /v1/admin/notion-sync/runs/{run_id}:
+    get:
+      summary: Inspect one run
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncRun'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v1/admin/notion-sync/runs/{run_id}/items:
+    get:
+      summary: Paginated preview and application results
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncItemList'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      - *id002
+  /v1/admin/notion-sync/control:
+    patch:
+      summary: Pause and fence current work; runtime enabled is immutable
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncStatus'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncControlInput'
+  /v1/admin/notion-sync/sources/{source_id}:
+    patch:
+      summary: Configure a whitelisted source with revision check
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncSource'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncSourceInput'
+      parameters:
+      - name: source_id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v1/admin/notion-sync/catalog-bindings/{binding_id}:
+    put:
+      summary: Resolve a catalog conflict with revision check
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    $ref: '#/components/schemas/SyncTopicBinding'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncBindingInput'
+      parameters:
+      - name: binding_id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v1/admin/articles/{id}/local-fields:
+    patch:
+      summary: Save managed article local author
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      article:
+                        $ref: '#/components/schemas/LegacyArticle'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocalFieldsInput'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /v1/admin/articles/{id}/publication-hold:
+    put:
+      summary: Set local hold or require fresh revalidation after release
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: code/msg/payload envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  msg:
+                    type: string
+                  payload:
+                    type: object
+                    properties:
+                      article:
+                        $ref: '#/components/schemas/LegacyArticle'
+                required:
+                - code
+                - msg
+                - payload
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicationHoldInput'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    PreviewInput:
+      type: object
+      properties:
+        external_link:
+          type: string
+          format: uri
+      required:
+      - external_link
+    PreviewPayload:
+      type: object
+      properties:
+        provider:
+          type: string
+        canonical_url:
+          type: string
+        title:
+          type: string
+        metadata_status:
+          type: string
+          enum:
+          - resolved
+          - manual_required
+        reason:
+          type: string
+        existing_article:
+          $ref: '#/components/schemas/ArticleDTO'
+      required:
+      - provider
+      - canonical_url
+      - title
+      - metadata_status
+    RegisterInput:
+      type: object
+      properties:
+        title:
+          type: string
+        external_link:
+          type: string
+          format: uri
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        section_code:
+          type: string
+        subsection_code:
+          type: string
+        publish:
+          type: boolean
+          default: false
+      required:
+      - external_link
+      - title
+      - section_code
+    RegisterPayload:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum:
+          - created
+          - already_registered
+        article:
+          $ref: '#/components/schemas/ArticleDTO'
+      required:
+      - outcome
+      - article
+    Placement:
+      type: object
+      properties:
+        section_code:
+          type: string
+        subsection_code:
+          type: string
+      required:
+      - section_code
+    ReorderArticles:
+      type: object
+      properties:
+        section_code:
+          type: string
+        subsection_code:
+          type: string
+        article_ids:
+          type: array
+          items:
+            type: string
+            pattern: ^[1-9][0-9]{0,18}$
+            description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+          uniqueItems: true
+      required:
+      - section_code
+      - article_ids
+    ReorderCatalog:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - module
+          - section
+          - subsection
+        parent_code:
+          type: string
+        codes:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+      required:
+      - kind
+      - codes
+    LegacyArticle:
+      type: object
+      properties:
+        title:
+          type: string
+        external_link:
+          type: string
+          format: uri
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        id:
+          type: integer
+          format: int64
+          description: Legacy numeric contract; admin uses id_text.
+        id_text:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+        content:
+          type: string
+        module:
+          $ref: '#/components/schemas/Module'
+        section:
+          $ref: '#/components/schemas/Section'
+        subsection:
+          $ref: '#/components/schemas/Subsection'
+          nullable: true
+        pos:
+          type: integer
+        status:
+          type: string
+          enum:
+          - Draft
+          - Published
+          - Unpublished
+          - Deleted
+        provider:
+          type: string
+          nullable: true
+        canonical_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        management:
+          $ref: '#/components/schemas/ArticleManagement'
+        allowed_actions:
+          type: array
+          items:
+            type: string
+        publication_hold:
+          $ref: '#/components/schemas/PublicationHold'
+        effective_visibility:
+          type: boolean
+        reading_url:
+          type: string
+      required:
+      - id
+      - id_text
+      - status
+    ArticleDTO:
+      type: object
+      properties:
+        title:
+          type: string
+        external_link:
+          type: string
+          format: uri
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+        id_text:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+        content:
+          type: string
+        module:
+          $ref: '#/components/schemas/Module'
+        section:
+          $ref: '#/components/schemas/Section'
+        subsection:
+          $ref: '#/components/schemas/Subsection'
+          nullable: true
+        pos:
+          type: integer
+        status:
+          type: string
+          enum:
+          - Draft
+          - Published
+          - Unpublished
+          - Deleted
+        provider:
+          type: string
+          nullable: true
+        canonical_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        management:
+          $ref: '#/components/schemas/ArticleManagement'
+        allowed_actions:
+          type: array
+          items:
+            type: string
+        publication_hold:
+          $ref: '#/components/schemas/PublicationHold'
+        effective_visibility:
+          type: boolean
+        reading_url:
+          type: string
+      required:
+      - id
+      - id_text
+      - status
+    LegacyCreate:
+      type: object
+      properties:
+        title:
+          type: string
+        external_link:
+          type: string
+          format: uri
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        section_code:
+          type: string
+        subsection_code:
+          type: string
+        module_code:
+          type: string
+        content:
+          type: string
+      required:
+      - title
+      - module_code
+      - section_code
+      - external_link
+    LegacyEdit:
+      type: object
+      properties:
+        title:
+          type: string
+        external_link:
+          type: string
+          format: uri
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        section_code:
+          type: string
+        subsection_code:
+          type: string
+        id:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+        module_code:
+          type: string
+        content:
+          type: string
+          description: Omitted preserves historical body; empty explicitly clears.
+      required:
+      - title
+      - module_code
+      - section_code
+    Module:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        code:
+          type: string
+        title:
+          type: string
+        sort:
+          type: integer
+        status:
+          type: integer
+    Section:
+      type: object
+      properties:
+        code:
+          type: string
+        title:
+          type: string
+        module_code:
+          type: string
+        sort:
+          type: integer
+        status:
+          type: integer
+    Subsection:
+      type: object
+      properties:
+        code:
+          type: string
+        title:
+          type: string
+        section_code:
+          type: string
+        sort:
+          type: integer
+        status:
+          type: integer
+    PublicArticle:
+      type: object
+      properties:
+        title:
+          type: string
+        external_link:
+          type: string
+          format: uri
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+        content:
+          type: string
+        module_code:
+          type: string
+        section_code:
+          type: string
+        subsection_code:
+          type: string
+        pos:
+          type: integer
+        provider:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        reading_url:
+          type: string
+          description: Current effective HTTP(S) reading address; external_link remains
+            the historical original.
+      required:
+      - id
+      - module_code
+      - section_code
+    PublicModule:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+        code:
+          type: string
+        title:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicSection'
+    PublicSection:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+        code:
+          type: string
+        title:
+          type: string
+        module_code:
+          type: string
+        sort:
+          type: integer
+        articles:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicArticle'
+        subsections:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicSubsection'
+    PublicSubsection:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Decimal signed BIGINT, 1..9223372036854775807. Keep as string.
+        code:
+          type: string
+        title:
+          type: string
+        section_code:
+          type: string
+        sort:
+          type: integer
+        articles:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicArticle'
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        msg:
+          type: string
+        payload:
+          nullable: true
+      required:
+      - code
+      - msg
+      - payload
+    ArticleManagement:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+          - manual
+          - notion_sync
+        source_id:
+          type: string
+        managed_fields:
+          type: array
+          items:
+            type: string
+      required:
+      - mode
+      - managed_fields
+    PublicationHold:
+      type: object
+      properties:
+        held:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - held
+    SyncConfig:
+      type: object
+      properties:
+        title_property_id:
+          type: string
+        state_property_id:
+          type: string
+        topic_property_id:
+          type: string
+        tags_property_id:
+          type: string
+        description_property_id:
+          type: string
+        difficulty_property_id:
+          type: string
+        date_property_id:
+          type: string
+        state_option_ids:
+          type: object
+          additionalProperties: false
+          properties:
+            draft:
+              type: string
+            published:
+              type: string
+            unpublished:
+              type: string
+            archived:
+              type: string
+          required:
+          - draft
+          - published
+          - unpublished
+          - archived
+    SyncTopicBinding:
+      type: object
+      properties:
+        id:
+          type: string
+        source_id:
+          type: string
+        option_id:
+          type: string
+        option_name:
+          type: string
+        section_code:
+          type: string
+        status:
+          type: string
+        reason:
+          type: string
+    SyncSource:
+      type: object
+      properties:
+        source_id:
+          type: string
+        label:
+          type: string
+        module_code:
+          type: string
+        health:
+          type: string
+        last_error:
+          type: string
+        enabled:
+          type: boolean
+        config_revision:
+          type: integer
+        config:
+          $ref: '#/components/schemas/SyncConfig'
+        catalog_bindings:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncTopicBinding'
+        last_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_complete_scan_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_success_at:
+          type: string
+          format: date-time
+          nullable: true
+    SyncPage:
+      type: object
+      properties:
+        page_id:
+          type: string
+        source_id:
+          type: string
+        title:
+          type: string
+        desired_state:
+          type: string
+        status:
+          type: string
+        management_state:
+          type: string
+        publish_block_reason:
+          type: string
+        last_error:
+          type: string
+        page_url:
+          type: string
+        publication_hold_reason:
+          type: string
+        bootstrap_state:
+          type: string
+        article_id:
+          type: string
+          nullable: true
+        public_url:
+          type: string
+          nullable: true
+        publication_hold:
+          type: boolean
+        revision:
+          type: integer
+    SyncRun:
+      type: object
+      properties:
+        run_id:
+          type: string
+        mode:
+          type: string
+        status:
+          type: string
+        phase:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        counts:
+          type: object
+          properties:
+            seen:
+              type: integer
+            created:
+              type: integer
+            updated:
+              type: integer
+            unchanged:
+              type: integer
+            blocked:
+              type: integer
+            failed:
+              type: integer
+        error:
+          type: string
+    SyncItem:
+      type: object
+      properties:
+        item_id:
+          type: string
+        page_id:
+          type: string
+        article_id:
+          type: string
+          nullable: true
+        outcome:
+          type: string
+        reason:
+          type: string
+        before: {}
+        after: {}
+        error:
+          type: string
+    SyncStatus:
+      type: object
+      properties:
+        last_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+        enabled:
+          type: boolean
+        paused:
+          type: boolean
+        source_writes_paused:
+          type: boolean
+        baseline_frozen:
+          type: boolean
+        current_run_id:
+          type: string
+          nullable: true
+        health:
+          type: string
+        pending_count:
+          type: integer
+        error_count:
+          type: integer
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncSource'
+        last_complete_scan_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_success_at:
+          type: string
+          format: date-time
+          nullable: true
+    SyncControlInput:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Runtime switch; requests may echo the current value but cannot change it. Use paused.
+        paused:
+          type: boolean
+        source_writes_paused:
+          type: boolean
+      additionalProperties: false
+    SyncSourceInput:
+      type: object
+      properties:
+        label:
+          type: string
+        module_code:
+          type: string
+        enabled:
+          type: boolean
+        config:
+          $ref: '#/components/schemas/SyncConfig'
+        expected_config_revision:
+          type: integer
+          minimum: 0
+      additionalProperties: false
+    SyncBindingInput:
+      type: object
+      properties:
+        source_id:
+          type: string
+        option_id:
+          type: string
+        section_code:
+          type: string
+        expected_config_revision:
+          type: integer
+          minimum: 0
+      required:
+      - source_id
+      - option_id
+      - section_code
+      - expected_config_revision
+      additionalProperties: false
+    SyncRunInput:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+          - dry_run
+          - sync
+      required:
+      - mode
+      additionalProperties: false
+    LocalFieldsInput:
+      type: object
+      properties:
+        author:
+          type: string
+          maxLength: 128
+      required:
+      - author
+      additionalProperties: false
+    PublicationHoldInput:
+      type: object
+      properties:
+        held:
+          type: boolean
+        reason:
+          type: string
+          maxLength: 255
+      required:
+      - held
+      additionalProperties: false
+    SyncSourceList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncSource'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+      - items
+      - total
+      - page
+      - limit
+    SyncPageList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncPage'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+      - items
+      - total
+      - page
+      - limit
+    SyncRunList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncRun'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+      - items
+      - total
+      - page
+      - limit
+    SyncItemList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncItem'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+      - items
+      - total
+      - page
+      - limit
+  responses:
+    Error:
+      description: Business or database failure; never an empty-directory substitute
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

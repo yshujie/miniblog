@@ -35,6 +35,11 @@ services:
       - MINIBLOG_JWT_SECRET=${JWT_SECRET:-miniblog_jwt_secret_key_change_in_production}
       - MINIBLOG_FEISHU_DOCREADER_APPID=${FEISHU_DOCREADER_APPID:-}
       - MINIBLOG_FEISHU_DOCREADER_APPSECRET=${FEISHU_DOCREADER_APPSECRET:-}
+      - MINIBLOG_NOTION_TOKEN=${MINIBLOG_NOTION_TOKEN:-}
+      - MINIBLOG_NOTION_SYNC_ENABLED=${MINIBLOG_NOTION_SYNC_ENABLED:-false}
+      - MINIBLOG_NOTION_SYNC_INTERVAL=${MINIBLOG_NOTION_SYNC_INTERVAL:-5m}
+      - MINIBLOG_NOTION_SYNC_AUTHOR=${MINIBLOG_NOTION_SYNC_AUTHOR:-}
+      - MINIBLOG_CONTENT_REGISTER_ENABLED=${MINIBLOG_CONTENT_REGISTER_ENABLED:-false}
     volumes:
       - ./configs:/app/configs:ro
       - /data/logs/miniblog/backend:/data/logs/miniblog
@@ -74,6 +79,8 @@ services:
       dockerfile: ../../build/docker/miniblog/Dockerfile.prod.frontend.admin
       args:
         - NODE_ENV=production
+        - VITE_CONTENT_REGISTER_ENABLED=${VITE_CONTENT_REGISTER_ENABLED:-false}
+        - VITE_API_ROOT=${VITE_API_ROOT:-https://api.yangshujie.com/v1}
     container_name: miniblog-frontend-admin
     restart: unless-stopped
     networks:

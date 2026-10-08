@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "cases": [
+    "context/defaults/continue",
+    "late-title/manual",
+    "optional-author/empty",
+    "503/input-retention",
+    "uncertain/frozen-retry",
+    "duplicate/explicit-restore",
+    "production/registration-gate"
+  ],
+  "apiRequests": 33,
+  "productionNetworkRequests": 0,
+  "screenshotDirectory": "/Users/yangshujie/.codex/worktrees/miniblog-content-refactor/miniblog/web/miniblog-web-admin/test-results/browser-fixture"
+}

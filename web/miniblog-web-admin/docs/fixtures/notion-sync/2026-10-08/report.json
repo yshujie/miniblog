@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "cases": [
+    "sync-health-and-baseline",
+    "dry-run-and-paged-items",
+    "distinct-empty-topic-plans",
+    "config-conflict-retains-input",
+    "catalog-binding",
+    "managed-author-PATCH-and-failure",
+    "historic-moved-URL",
+    "reading-url",
+    "mobile-periodic-refresh-stable-iframe",
+    "hold-removes-iframe",
+    "release-requires-revalidation",
+    "admin-small-screen"
+  ],
+  "requests": 51,
+  "productionNetworkRequests": 0,
+  "screenshotDirectory": "/private/tmp/miniblog-sync-browser"
+}

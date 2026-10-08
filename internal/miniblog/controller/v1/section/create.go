@@ -26,12 +26,12 @@ func (c *SectionController) Create(ctx *gin.Context) {
 	// 验证请求参数
 	if _, err := govalidator.ValidateStruct(request); err != nil {
 		log.C(ctx).Errorw("invalid request parameters", "error", err)
-		core.WriteResponse(ctx, errno.ErrInvalidParameter.SetMessage("%s", err.Error()), nil)
+		core.WriteResponse(ctx, &errno.Errno{HTTP: 400, Code: errno.ErrInvalidParameter.Code, Message: err.Error()}, nil)
 		return
 	}
 
 	// 调用 Biz 层，创建 section
-	response, err := c.biz.SectionBiz().Create(ctx, request)
+	response, err := c.biz.SectionBiz().Create(ctx.Request.Context(), request)
 	if err != nil {
 		log.C(ctx).Errorw("create section failed", "error", err, "code", request.Code, "title", request.Title, "module_code", request.ModuleCode, "error_type", fmt.Sprintf("%T", err))
 		core.WriteResponse(ctx, err, nil)

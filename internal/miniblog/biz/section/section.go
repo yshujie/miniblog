@@ -2,210 +2,86 @@ package section
 
 import (
 	"context"
-
+	"github.com/yshujie/miniblog/internal/miniblog/biz/catalog"
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"github.com/yshujie/miniblog/internal/pkg/errno"
 	v1 "github.com/yshujie/miniblog/pkg/api/miniblog/v1"
 )
 
-// ISectionBiz 模块业务接口
 type ISectionBiz interface {
-	Create(ctx context.Context, r *v1.CreateSectionRequest) (*v1.CreateSectionResponse, error)
-	Update(ctx context.Context, code string, r *v1.UpdateSectionRequest) (*v1.UpdateSectionResponse, error)
-	Publish(ctx context.Context, code string) (*v1.SectionStatusResponse, error)
-	Unpublish(ctx context.Context, code string) (*v1.SectionStatusResponse, error)
-	GetList(ctx context.Context, moduleCode string) (*v1.GetSectionListResponse, error)
-	GetOne(ctx context.Context, code string) (*v1.GetSectionResponse, error)
-	// Delete physically deletes a section by code
-	Delete(ctx context.Context, code string) error
+	Create(context.Context, *v1.CreateSectionRequest) (*v1.CreateSectionResponse, error)
+	Update(context.Context, string, *v1.UpdateSectionRequest) (*v1.UpdateSectionResponse, error)
+	Publish(context.Context, string) (*v1.SectionStatusResponse, error)
+	Unpublish(context.Context, string) (*v1.SectionStatusResponse, error)
+	GetList(context.Context, string) (*v1.GetSectionListResponse, error)
+	GetOne(context.Context, string) (*v1.GetSectionResponse, error)
+	Delete(context.Context, string) error
 }
+type sectionBiz struct{ ds store.IStore }
 
-// sectionBiz 模块业务实现
-type sectionBiz struct {
-	ds store.IStore
+func New(ds store.IStore) *sectionBiz { return &sectionBiz{ds: ds} }
+func (b *sectionBiz) contextStore(ctx context.Context) store.IStore {
+	if b.ds.DB() == nil {
+		return b.ds
+	}
+	return store.NewStore(b.ds.DB().WithContext(ctx))
 }
-
-// 确保 sectionBiz 实现了 ISectionBiz 接口
-var _ ISectionBiz = (*sectionBiz)(nil)
-
-// New 简单工程函数，创建 sectionBiz 实例
-func New(ds store.IStore) *sectionBiz {
-	return &sectionBiz{ds}
-}
-
-// Create 创建 section 记录
 func (b *sectionBiz) Create(ctx context.Context, r *v1.CreateSectionRequest) (*v1.CreateSectionResponse, error) {
-	// 检查 code 是否已存在
-	existingSection, err := b.ds.Sections().GetByCode(r.Code)
-	if err != nil {
-		return nil, err
+	m, e := catalog.New(b.ds).CreateSection(ctx, catalog.SectionInput{Code: r.Code, Title: r.Title, ModuleCode: r.ModuleCode, Sort: r.Sort})
+	if e != nil {
+		return nil, e
 	}
-	if existingSection != nil {
-		return nil, errno.ErrSectionAlreadyExists
-	}
-
-	// 检查 module_code 是否已存在
-	existingModule, err := b.ds.Modules().GetByCode(r.ModuleCode)
-	if err != nil {
-		return nil, err
-	}
-	if existingModule == nil {
-		return nil, errno.ErrModuleNotFound
-	}
-
-	// 创建 section 记录
-	section := &model.Section{
-		Code:       r.Code,
-		Title:      r.Title,
-		ModuleCode: r.ModuleCode,
-	}
-	if r.Sort != nil {
-		section.Sort = *r.Sort
-	}
-	if err = b.ds.Sections().Create(section); err != nil {
-		return nil, err
-	}
-
-	return &v1.CreateSectionResponse{
-		Section: toSectionInfo(section),
-	}, nil
+	return &v1.CreateSectionResponse{Section: toSectionInfo(m)}, nil
 }
-
-// Update 更新 section 记录
 func (b *sectionBiz) Update(ctx context.Context, code string, r *v1.UpdateSectionRequest) (*v1.UpdateSectionResponse, error) {
-	section, err := b.ds.Sections().GetByCode(code)
-	if err != nil {
-		return nil, err
+	m, e := catalog.New(b.ds).UpdateSection(ctx, code, catalog.UpdateInput{Title: r.Title, Sort: r.Sort})
+	if e != nil {
+		return nil, e
 	}
-	if section == nil {
-		return nil, errno.ErrSectionNotFound
-	}
-
-	section.Title = r.Title
-	if r.Sort != nil {
-		section.Sort = *r.Sort
-	}
-
-	if err = b.ds.Sections().Update(section); err != nil {
-		return nil, err
-	}
-
-	return &v1.UpdateSectionResponse{Section: toSectionInfo(section)}, nil
+	return &v1.UpdateSectionResponse{Section: toSectionInfo(m)}, nil
 }
-
-// Publish 上架 section
 func (b *sectionBiz) Publish(ctx context.Context, code string) (*v1.SectionStatusResponse, error) {
-	section, err := b.ds.Sections().GetByCode(code)
-	if err != nil {
-		return nil, err
+	m, e := catalog.New(b.ds).SectionStatus(ctx, code, model.SectionStatusNormal)
+	if e != nil {
+		return nil, e
 	}
-	if section == nil {
-		return nil, errno.ErrSectionNotFound
-	}
-
-	section.Publish()
-
-	if err = b.ds.Sections().Update(section); err != nil {
-		return nil, err
-	}
-
-	return &v1.SectionStatusResponse{Section: toSectionInfo(section)}, nil
+	return &v1.SectionStatusResponse{Section: toSectionInfo(m)}, nil
 }
-
-// Unpublish 下架 section
 func (b *sectionBiz) Unpublish(ctx context.Context, code string) (*v1.SectionStatusResponse, error) {
-	section, err := b.ds.Sections().GetByCode(code)
-	if err != nil {
-		return nil, err
+	m, e := catalog.New(b.ds).SectionStatus(ctx, code, model.SectionStatusDeleted)
+	if e != nil {
+		return nil, e
 	}
-	if section == nil {
-		return nil, errno.ErrSectionNotFound
-	}
-
-	section.Unpublish()
-
-	if err = b.ds.Sections().Update(section); err != nil {
-		return nil, err
-	}
-
-	return &v1.SectionStatusResponse{Section: toSectionInfo(section)}, nil
+	return &v1.SectionStatusResponse{Section: toSectionInfo(m)}, nil
 }
-
-// GetList 获取所有模块
-func (b *sectionBiz) GetList(ctx context.Context, moduleCode string) (*v1.GetSectionListResponse, error) {
-	sections, err := b.ds.Sections().GetSections(moduleCode)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &v1.GetSectionListResponse{
-		Sections: make([]*v1.SectionInfo, 0, len(sections)),
-	}
-	for _, section := range sections {
-		response.Sections = append(response.Sections, toSectionInfo(section))
-	}
-
-	return response, nil
-}
-
-// GetOne 获取模块详情
-func (b *sectionBiz) GetOne(ctx context.Context, code string) (*v1.GetSectionResponse, error) {
-	section, err := b.ds.Sections().GetByCode(code)
-	if err != nil {
-		return nil, err
-	}
-	if section == nil {
-		return nil, errno.ErrSectionNotFound
-	}
-
-	return &v1.GetSectionResponse{
-		Section: toSectionInfo(section),
-	}, nil
-}
-
-// Delete 物理删除章节
 func (b *sectionBiz) Delete(ctx context.Context, code string) error {
-	section, err := b.ds.Sections().GetByCode(code)
-	if err != nil {
-		return err
-	}
-	if section == nil {
-		return errno.ErrSectionNotFound
-	}
-
-	// 检查是否存在关联的 subsections
-	subsections, err := b.ds.Subsections().GetSubsections(code)
-	if err != nil {
-		return err
-	}
-	if len(subsections) > 0 {
-		return errno.ErrSectionHasSubsections
-	}
-
-	// 检查是否存在关联的 articles
-	filter := map[string]interface{}{"section_code": code}
-	articles, err := b.ds.Articles().GetList(filter, 1, 1)
-	if err != nil {
-		return err
-	}
-	if len(articles) > 0 {
-		return errno.ErrSectionHasArticles
-	}
-
-	return b.ds.Sections().DeleteByCode(code)
+	return catalog.New(b.ds).DeleteSection(ctx, code)
 }
-
-func toSectionInfo(section *model.Section) *v1.SectionInfo {
-	if section == nil {
+func (b *sectionBiz) GetList(ctx context.Context, parent string) (*v1.GetSectionListResponse, error) {
+	rows, e := b.contextStore(ctx).Sections().GetSections(parent)
+	if e != nil {
+		return nil, e
+	}
+	out := &v1.GetSectionListResponse{Sections: make([]*v1.SectionInfo, 0, len(rows))}
+	for _, m := range rows {
+		out.Sections = append(out.Sections, toSectionInfo(m))
+	}
+	return out, nil
+}
+func (b *sectionBiz) GetOne(ctx context.Context, code string) (*v1.GetSectionResponse, error) {
+	m, e := b.contextStore(ctx).Sections().GetByCode(code)
+	if e != nil {
+		return nil, e
+	}
+	if m == nil {
+		return nil, errno.ErrSectionNotFound
+	}
+	return &v1.GetSectionResponse{Section: toSectionInfo(m)}, nil
+}
+func toSectionInfo(m *model.Section) *v1.SectionInfo {
+	if m == nil {
 		return nil
 	}
-
-	return &v1.SectionInfo{
-		Code:       section.Code,
-		Title:      section.Title,
-		ModuleCode: section.ModuleCode,
-		Sort:       section.Sort,
-		Status:     section.Status,
-	}
+	return &v1.SectionInfo{Code: m.Code, Title: m.Title, ModuleCode: m.ModuleCode, Sort: m.Sort, Status: m.Status}
 }

@@ -1,5 +1,7 @@
 <template>
-  <aside id="sidebar" class="sidebar-root" :class="{ 'sidebar-hidden': !sidebarOpen }">
+  <aside :id="drawer ? 'drawer-sidebar' : 'sidebar'" class="sidebar-root"
+    :class="{ 'sidebar-hidden': !sidebarOpen, 'sidebar-drawer': drawer }"
+    :inert="!sidebarOpen ? true : undefined">
     <div class="sidebar-content">
       <div class="sidebar-doc-title">{{ moduleLabel }}</div>
       <nav class="section-list" aria-label="文章目录">
@@ -12,6 +14,7 @@
             type="button"
             class="section-header"
             :class="{ 'section-header-expanded': isSectionExpanded(section.id) }"
+            :aria-expanded="isSectionExpanded(section.id)"
             @click="toggleSection(section.id)"
           >
             <span class="section-title">{{ section.title }}</span>
@@ -43,6 +46,7 @@
                 type="button"
                 class="group-header"
                 :class="{ 'group-header-expanded': isSubsectionExpanded(section.id, subsection.code) }"
+                :aria-expanded="isSubsectionExpanded(section.id, subsection.code)"
                 @click="toggleSubsection(section.id, subsection.code)"
               >
                 <span class="group-title">{{ subsection.title }}</span>
@@ -74,6 +78,7 @@
                   type="button"
                   class="article-item"
                   :class="{ 'article-item-active': article.id === currentArticleId }"
+                  :aria-current="article.id === currentArticleId ? 'page' : undefined"
                   :title="article.title"
                   @click="handleArticleClick(article.id)"
                 >
@@ -89,7 +94,8 @@
                 type="button"
                 class="article-item"
                 :class="{ 'article-item-active': article.id === currentArticleId }"
-                :title="article.title"
+                :aria-current="article.id === currentArticleId ? 'page' : undefined"
+                  :title="article.title"
                 @click="handleArticleClick(article.id)"
               >
                 <span class="article-title">{{ displayTitle(article.title) }}</span>
@@ -112,6 +118,7 @@ const props = defineProps<{
   sections: Section[]
   moduleCode: string
   moduleTitle?: string
+  drawer?: boolean
 }>()
 
 const router = useRouter()
@@ -120,7 +127,7 @@ const uiStore = useUiStore()
 const expandedSectionIds = ref<Set<string>>(new Set())
 const expandedSubsectionKeys = ref<Set<string>>(new Set())
 
-const sidebarOpen = computed(() => uiStore.sidebarOpen)
+const sidebarOpen = computed(() => props.drawer || uiStore.sidebarOpen)
 
 const moduleLabel = computed(() => {
   if (props.moduleTitle?.trim()) {
@@ -140,7 +147,7 @@ function subsectionExpandKey(sectionId: string, subsectionCode: string) {
 }
 
 function displayTitle(title: string) {
-  const trimmed = title.trim()
+  const trimmed = title?.trim() || '未命名文章'
   if (trimmed.length <= 28) return trimmed
   return `${trimmed.slice(0, 27)}…`
 }
@@ -219,7 +226,8 @@ watch(
 watch(currentArticleId, expandForCurrentArticle)
 
 function handleArticleClick(articleId: string) {
-  router.push(`/blog/${props.moduleCode}/article/${articleId}`)
+  uiStore.closeDrawer()
+  void router.push({ name: 'BlogArticle', params: { module: props.moduleCode, article: articleId } })
 }
 </script>
 
@@ -238,6 +246,13 @@ function handleArticleClick(articleId: string) {
 
   @media (min-width: 1280px) {
     display: block;
+  }
+
+  &.sidebar-drawer {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    .sidebar-content { width: 100%; min-width: 0; }
   }
 
   &.sidebar-hidden {

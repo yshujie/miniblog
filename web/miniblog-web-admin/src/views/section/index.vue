@@ -16,6 +16,7 @@
         />
       </el-select>
       <el-button type="primary" :disabled="!moduleOptions.length" @click="openCreateDialog">新增章节</el-button>
+      <el-button @click="goCollect()" :disabled="!selectedModuleCode || !contentRegistrationEnabled">收录文章</el-button>
       <el-button :loading="loading" @click="() => loadSections(true)">刷新</el-button>
     </div>
 
@@ -36,9 +37,10 @@
           <el-tag :type="statusType(row.status)">{{ statusText(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="260" align="center">
+      <el-table-column label="操作" width="340" align="center">
         <template #default="{ row }">
           <el-button size="small" type="primary" @click="openEditDialog(row)">编辑</el-button>
+          <el-button size="small" :disabled="!contentRegistrationEnabled" @click="goCollect(row)">收录</el-button>
           <el-button size="small" type="danger" @click="handleDelete(row)" style="margin-left:8px">删除</el-button>
           <el-button
             v-if="row.status !== NORMAL_STATUS"
@@ -96,6 +98,8 @@
 </template>
 
 <script setup lang="ts">
+import { contentRegistrationEnabled } from '@/utils/content-flags';
+import { useRouter } from 'vue-router';
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import 'element-plus/es/components/message-box/style/css';
@@ -105,6 +109,8 @@ import type { ModuleItem } from '@/store/modules/module';
 import useSectionStore from '@/store/modules/section';
 import type { SectionItem } from '@/store/modules/section';
 
+const router = useRouter();
+const goCollect = (section?: SectionItem) => router.push({ path: '/content/workbench', query: { module_code: selectedModuleCode.value, section_code: section?.code, collect: '1' }});
 const moduleStore = useModuleStore();
 const sectionStore = useSectionStore();
 const moduleOptions = computed<ModuleItem[]>(() => moduleStore.modules);
@@ -142,11 +148,6 @@ const formRules: FormRules = {
     { required: true, message: '请输入章节标题', trigger: 'blur' },
     { min: 1, max: 255, message: '标题长度需在 1-255 个字符之间', trigger: 'blur' }
   ]
-};
-
-const moduleLabel = (moduleCode: string) => {
-  const target = moduleOptions.value.find((item) => item.code === moduleCode);
-  return target?.title ?? moduleCode ?? '';
 };
 
 const emptyDescription = computed(() => (selectedModuleCode.value ? '暂无章节' : '请选择模块查看章节'));
@@ -226,7 +227,8 @@ const handleFormSubmit = async () => {
       await sectionStore.createSection({
         module_code: formModel.module_code,
         code: formModel.code,
-        title: formModel.title
+        title: formModel.title,
+        sort: formModel.sort
       });
       ElMessage.success('新增章节成功');
     } else {
@@ -316,9 +318,9 @@ const handleDelete = async (section: SectionItem) => {
     await sectionStore.deleteSection(section.code);
     ElMessage.success('删除章节成功');
     await loadSections(true);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (!error) return;
-    if (error === 'cancel' || error === 'close' || error?.code === 'cancel' || error?.code === 'close' || error?.message === 'cancel' || error?.message === 'close') return;
+    if (error === 'cancel' || error === 'close' || (error as { code?: string })?.code === 'cancel' || (error as { code?: string })?.code === 'close' || (error as { message?: string })?.message === 'cancel' || (error as { message?: string })?.message === 'close') return;
     const message = error instanceof Error ? error.message : String(error);
     ElMessage.error(message || '删除章节失败');
   }

@@ -72,12 +72,12 @@ type fakeModuleBizStore struct {
 	modules *fakeModuleStore
 }
 
-func (f *fakeModuleBizStore) DB() *gorm.DB                 { return nil }
-func (f *fakeModuleBizStore) Users() store.UserStore       { return nil }
-func (f *fakeModuleBizStore) Modules() store.ModuleStore   { return f.modules }
-func (f *fakeModuleBizStore) Sections() store.SectionStore     { return nil }
+func (f *fakeModuleBizStore) DB() *gorm.DB                       { return nil }
+func (f *fakeModuleBizStore) Users() store.UserStore             { return nil }
+func (f *fakeModuleBizStore) Modules() store.ModuleStore         { return f.modules }
+func (f *fakeModuleBizStore) Sections() store.SectionStore       { return nil }
 func (f *fakeModuleBizStore) Subsections() store.SubsectionStore { return nil }
-func (f *fakeModuleBizStore) Articles() store.ArticleStore     { return nil }
+func (f *fakeModuleBizStore) Articles() store.ArticleStore       { return nil }
 
 func TestModuleBizCreateAndGet(t *testing.T) {
 	fakeStore := &fakeModuleBizStore{modules: newFakeModuleStore()}
@@ -156,12 +156,12 @@ type composedStore struct {
 	art store.ArticleStore
 }
 
-func (c *composedStore) DB() *gorm.DB                 { return nil }
-func (c *composedStore) Users() store.UserStore       { return nil }
-func (c *composedStore) Modules() store.ModuleStore   { return c.mod }
-func (c *composedStore) Sections() store.SectionStore     { return c.sec }
+func (c *composedStore) DB() *gorm.DB                       { return nil }
+func (c *composedStore) Users() store.UserStore             { return nil }
+func (c *composedStore) Modules() store.ModuleStore         { return c.mod }
+func (c *composedStore) Sections() store.SectionStore       { return c.sec }
 func (c *composedStore) Subsections() store.SubsectionStore { return nil }
-func (c *composedStore) Articles() store.ArticleStore     { return c.art }
+func (c *composedStore) Articles() store.ArticleStore       { return c.art }
 
 // Test: module delete fails when there are dependent sections or articles
 func TestModuleDelete_WhenHasDependents_ShouldFail(t *testing.T) {
