@@ -393,11 +393,14 @@ func (s *Service) bootstrapOne(ctx context.Context, run model.NotionSyncRun, tok
 	if e = json.Unmarshal([]byte(p.SnapshotJSON), &beforeSnapshot); e != nil {
 		return ItemDTO{}, e
 	}
-	resuming := p.BootstrapState == "write_requested" || p.BootstrapState == "verified"
+	// A new preview and explicit confirmation may restart a stale journal only
+	// when every freshly read input exactly matches that newly reviewed fingerprint.
+	reviewedFresh := bootstrapFingerprint(local, fresh, src.ConfigRevision) == confirm.ExpectedFingerprint
+	resuming := (p.BootstrapState == "write_requested" || p.BootstrapState == "verified") && !reviewedFresh
 	if p.BootstrapExpectedFingerprint != confirm.ExpectedFingerprint {
 		return ItemDTO{}, conflict("审核指纹已变化，请重新预览")
 	}
-	if !resuming && bootstrapFingerprint(local, fresh, src.ConfigRevision) != confirm.ExpectedFingerprint {
+	if !resuming && !reviewedFresh {
 		return ItemDTO{}, conflict("核对后元数据或配置已变化，请重新预览")
 	}
 	if resuming {

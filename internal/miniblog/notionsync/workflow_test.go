@@ -583,3 +583,39 @@ func TestBootstrapPreviewShowsCatalogConflictAndPublicCondition(t *testing.T) {
 		t.Fatalf("incomplete review %+v", c)
 	}
 }
+
+func TestInterruptedBootstrapRequiresNewReviewAfterConfigurationChanges(t *testing.T) {
+	s, _, f := syncFixture(t)
+	id := AllowedSources()[0]
+	s.UpdateSource(context.Background(), id, SourceInput{ModuleCode: "m1"})
+	f.pages[firstPage] = fixturePage(firstPage, id, "")
+	preview, e := s.BootstrapPreview(context.Background())
+	if e != nil {
+		t.Fatal(e)
+	}
+	confirm := BootstrapConfirm{PageID: firstPage, NewPage: true, ExpectedState: "draft", ExpectedFingerprint: preview.Items[0].ExpectedFingerprint, ConfirmedBy: "fixture"}
+	yes := true
+	s.UpdateControl(context.Background(), ControlInput{Paused: &yes, SourceWritesPaused: &yes})
+	f.writeErr = &source.NotionAPIError{StatusCode: 503, Code: "service_unavailable"}
+	first, e := s.BootstrapApply(context.Background(), BootstrapInput{Confirmations: []BootstrapConfirm{confirm}}, f)
+	if e != nil || first.Items[0].Outcome != "failed" || f.writes != 1 {
+		t.Fatalf("expected interrupted journal %+v %v writes=%d", first, e, f.writes)
+	}
+	f.writeErr = nil
+	if _, e := s.UpdateSource(context.Background(), id, SourceInput{Label: "Reconfirmed mapping revision"}); e != nil {
+		t.Fatal(e)
+	}
+	stale, e := s.BootstrapApply(context.Background(), BootstrapInput{Confirmations: []BootstrapConfirm{confirm}}, f)
+	if e != nil || stale.Items[0].Outcome != "failed" || f.writes != 1 {
+		t.Fatalf("stale confirmation proceeded %+v %v writes=%d", stale, e, f.writes)
+	}
+	reviewed, e := s.BootstrapPreview(context.Background())
+	if e != nil {
+		t.Fatal(e)
+	}
+	confirm.ExpectedFingerprint = reviewed.Items[0].ExpectedFingerprint
+	final, e := s.BootstrapApply(context.Background(), BootstrapInput{Confirmations: []BootstrapConfirm{confirm}}, f)
+	if e != nil || final.Items[0].Outcome != "adopted" || f.writes != 2 {
+		t.Fatalf("explicit new review cannot recover %+v %v writes=%d", final, e, f.writes)
+	}
+}
