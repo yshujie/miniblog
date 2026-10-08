@@ -24,4 +24,13 @@ describe('saved historical baseline review', () => {
     const view = open([{ page_id: 'old', outcome: 'preview', reason: 'historical_match_requires_confirmation', after: { legacy: true }}]);
     expect(view.text()).toContain('旧审核记录没有完整对照清单'); expect(view.text()).toContain('等待审核当前博客状态'); expect(view.text()).not.toContain('来源期望状态'); view.unmount();
   });
+  it('identifies the saved run, exposes the exact audit fingerprint and warns when a new preview is required', async () => {
+    const view = open([{ page_id: 'page', outcome: 'preview', after: { bootstrap_preview: candidate({ expected_fingerprint: 'sha256:exact-review-fingerprint' }) }}]);
+    await view.setProps({ run: { run_id: '9007199254740993', mode: 'bootstrap_preview', status: 'completed', phase: 'finished', counts: { seen: 1, created: 0, updated: 0, unchanged: 0, blocked: 0, failed: 0 }, started_at: '2026-10-09T00:00:00Z', finished_at: '2026-10-09T00:01:00Z' }});
+    expect(view.get('[data-test="preview-run"]').text()).toContain('9007199254740993');
+    expect(view.get('[data-test="preview-run"]').text()).toContain('完成');
+    expect(view.get('code').text()).toBe('sha256:exact-review-fingerprint');
+    expect(view.get('[data-test="preview-validity"]').text()).toContain('主题绑定、来源启用或文章资料变化后，需要重新生成清单');
+    expect(view.find('button').exists()).toBe(false); view.unmount();
+  });
 });

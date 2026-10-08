@@ -43,4 +43,11 @@ describe('Notion sync HTTP contract', () => {
     vi.mocked(request).mockResolvedValue({ items: [{ source_id: 's' }], total: 1, page: 1, limit: 20 } as never);
     expect((await getSyncSources()).items[0].catalog_bindings).toEqual([]);
   });
+  it('passes read cancellation through list and detail requests without changing their wire shape', async () => {
+    vi.mocked(request).mockResolvedValue({ items: [] } as never); const signal = new AbortController().signal;
+    await getSyncSources({ page: 1, limit: 20 }, signal);
+    expect(request).toHaveBeenLastCalledWith({ url: '/notion-sync/sources', method: 'get', params: { page: 1, limit: 20 }, signal });
+    await getSyncItems('run', { page: 2, limit: 20 }, signal);
+    expect(request).toHaveBeenLastCalledWith(expect.objectContaining({ url: '/notion-sync/runs/run/items', signal }));
+  });
 });
