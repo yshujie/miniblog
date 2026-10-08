@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -96,7 +97,7 @@ func TestMySQLSyncedStatesHoldAndIdempotency(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatal(ok, err)
 	}
-	url := "https://example.notion.site/Public-1234567890abcdef1234567890abcdef"
+	url := "https://example.notion.site/Public-Slug?section=Go#Reading"
 	in := articlebiz.SyncInput{Lease: token, RunID: "test-run", SourceID: sourceID, DataSourceID: sourceID, PageID: "1234567890abcdef1234567890abcdef", ThemePropertyID: "topic", ThemeOptionID: "topic-one", ThemeOptionName: "New topic", Title: "Synced", Tags: []string{"comma,tag", "标签"}, PageURL: "https://notion.so/1234567890abcdef1234567890abcdef", PublicURL: &url, DesiredState: 2, MetadataComplete: true, ExpectedConfigRevision: 1, MetadataHash: "first"}
 	r, err := b.ApplySyncedSource(ctx, in)
 	if err != nil {
@@ -142,6 +143,17 @@ func TestMySQLSyncedStatesHoldAndIdempotency(t *testing.T) {
 	if _, err = b.SetPublicationHold(ctx, id, articlebiz.HoldInput{Held: true, Reason: "local safety"}); err != nil {
 		t.Fatal(err)
 	}
+	// A known Notion Site slug has no PageID. Re-registering it must not create
+	// a manual article that escapes the original local publication hold.
+	duplicate, duplicateErr := b.RegisterSource(ctx, articlebiz.RegisterInput{ExternalLink: url, Title: "Must not duplicate", SectionCode: "s2", Publish: true})
+	if duplicateErr != nil || duplicate.Outcome != "already_registered" || duplicate.Article.ID != strconv.FormatUint(id, 10) {
+		t.Fatal("known slug escaped existing ownership", duplicate, duplicateErr)
+	}
+	var articleCount int64
+	db.Model(&model.Article{}).Count(&articleCount)
+	if articleCount != 1 {
+		t.Fatal("known reading address created duplicate", articleCount)
+	}
 	reader := blog.New(ds)
 	if _, err = reader.GetArticleDetail(ctx, &v1.GetArticleDetailRequest{ArticleID: id}); err == nil {
 		t.Fatal("held article visible")
@@ -181,13 +193,16 @@ func TestMySQLSyncedStatesHoldAndIdempotency(t *testing.T) {
 	}
 	failing := in
 	failing.PageID = "aabbccddeeff00112233445566778899"
+	failing.PageURL = "https://notion.so/aabbccddeeff00112233445566778899"
+	failingURL := "https://example.notion.site/SQL-Failure-Slug"
+	failing.PublicURL = &failingURL
 	failing.ThemeOptionID = "failure-option"
 	failing.ThemeOptionName = "Must roll back"
 	failing.RunID = "failed-new-page"
 	failing.ExpectedBindingRevision = 0
 	failing.MetadataHash = "rollback"
-	if _, err = b.ApplySyncedSource(ctx, failing); err == nil {
-		t.Fatal("SQL failure swallowed")
+	if _, err = b.ApplySyncedSource(ctx, failing); err == nil || !strings.Contains(err.Error(), "fixture page binding failure") {
+		t.Fatal("expected actual SQL trigger failure", err)
 	}
 	if err = db.Exec("DROP TRIGGER notion_test_binding_failure").Error; err != nil {
 		t.Fatal(err)
