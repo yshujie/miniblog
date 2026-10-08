@@ -6,7 +6,7 @@ import { Subsection } from '@/types/subsection'
 export interface ModuleSummaryDTO { id?: string | number | null; code: string; title: string }
 export interface ArticleDTO {
   id: string; title: string; module_code?: string; section_code?: string; subsection_code?: string
-  external_link?: string; author?: string; content?: string; tags?: string[] | null
+  external_link?: string; reading_url?: string; author?: string; content?: string; tags?: string[] | null
   pos?: number; created_at?: string; updated_at?: string
 }
 export interface SubsectionDTO {
@@ -33,7 +33,7 @@ export function mapArticle(data: ArticleDTO, moduleCode = ''): Article {
   return new Article({
     id: decimalID(data.id), title: data.title, moduleCode: data.module_code || moduleCode,
     sectionCode: data.section_code, subsectionCode: data.subsection_code,
-    externalLink: data.external_link, author: data.author, content: data.content,
+    externalLink: data.external_link, readingURL: data.reading_url, author: data.author, content: data.content,
     tags: data.tags ?? [], pos: data.pos, createdAt: data.created_at, updatedAt: data.updated_at,
   })
 }

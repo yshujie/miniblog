@@ -5,13 +5,15 @@ import { fetchModules } from '@/api/module'
 import { fetchModuleDetail } from '@/api/blog'
 
 type ListStatus = 'idle' | 'loading' | 'success' | 'empty' | 'error'
-type CacheEntry = { completeness: 'partial' | 'full'; module: Module }
+export const READING_TTL_MS = 60000
+type CacheEntry = { completeness: 'partial' | 'full'; module: Module; fetchedAt: number }
 
 export const useModuleStore = defineStore('module', () => {
   const modules = ref<Module[]>([])
   const listStatus = ref<ListStatus>('idle')
   const listError = ref('')
   const directoryCache = reactive<Record<string, CacheEntry>>(Object.create(null))
+  let listFetchedAt = -Infinity
   let listRequest: Promise<Module[]> | undefined
   const detailRequests = new Map<string, Promise<Module>>()
 
@@ -21,7 +23,7 @@ export const useModuleStore = defineStore('module', () => {
 
   async function loadModules(force = false): Promise<Module[]> {
     if (listRequest) return listRequest
-    if (!force && ['success', 'empty'].includes(listStatus.value)) return modules.value
+    if (!force && Date.now() - listFetchedAt < READING_TTL_MS && ['success', 'empty'].includes(listStatus.value)) return modules.value
     listStatus.value = 'loading'
     listError.value = ''
     listRequest = (async () => {
@@ -29,10 +31,17 @@ export const useModuleStore = defineStore('module', () => {
         const summaries = await fetchModules()
         modules.value = summaries.map(summary => {
           const cached = directoryCache[summary.code]
-          if (cached?.completeness === 'full') return cached.module
-          directoryCache[summary.code] = { completeness: 'partial', module: summary }
+          if (cached?.completeness === 'full') {
+            cached.module.title = summary.title
+            cached.module.id = summary.id || cached.module.id
+            return cached.module
+          }
+          directoryCache[summary.code] = { completeness: 'partial', module: summary, fetchedAt: Date.now() }
           return summary
         })
+        const codes = new Set(summaries.map(module => module.code))
+        for (const code of Object.keys(directoryCache)) if (!codes.has(code)) delete directoryCache[code]
+        listFetchedAt = Date.now()
         listStatus.value = modules.value.length ? 'success' : 'empty'
         return modules.value
       } catch (error) {
@@ -48,11 +57,11 @@ export const useModuleStore = defineStore('module', () => {
     const inflight = detailRequests.get(code)
     if (inflight) return inflight
     const cached = directoryCache[code]
-    if (!force && cached?.completeness === 'full') return cached.module
+    if (!force && cached?.completeness === 'full' && Date.now() - cached.fetchedAt < READING_TTL_MS) return cached.module
     const request = (async () => {
       try {
         const module = await fetchModuleDetail(code)
-        directoryCache[code] = { completeness: 'full', module }
+        directoryCache[code] = { completeness: 'full', module, fetchedAt: Date.now() }
         const index = modules.value.findIndex(item => item.code === code)
         if (index >= 0) modules.value[index] = module
         return module

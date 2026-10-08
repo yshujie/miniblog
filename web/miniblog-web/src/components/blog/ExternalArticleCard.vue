@@ -25,7 +25,7 @@ import { articleTitle, safeExternalURL } from '@/util/reading'
 
 const props = defineProps<{ article: Article }>()
 const title = computed(() => articleTitle(props.article))
-const sourceURL = computed(() => safeExternalURL(props.article.externalLink))
+const sourceURL = computed(() => safeExternalURL(props.article.readingURL) || safeExternalURL(props.article.externalLink))
 const frameKey = computed(() => props.article.id + ':' + sourceURL.value)
 const frameState = ref<'loading' | 'load_event' | 'waiting'>('loading')
 let timeout: ReturnType<typeof setTimeout> | undefined

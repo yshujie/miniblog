@@ -7,6 +7,7 @@ export class Article {
   title: string
   content: string
   externalLink: string
+  readingURL: string
   author: string
   tags: string[]
   pos: number
@@ -20,6 +21,7 @@ export class Article {
     subsectionCode?: string
     title: string
     externalLink?: string
+    readingURL?: string
     author?: string
     content?: string
     tags?: string[]
@@ -34,6 +36,7 @@ export class Article {
     this.title = data.title
     this.author = data.author || ''
     this.externalLink = data.externalLink || ''
+    this.readingURL = data.readingURL || ''
     this.content = data.content || ''
     this.tags = data.tags || []
     this.pos = data.pos || 0

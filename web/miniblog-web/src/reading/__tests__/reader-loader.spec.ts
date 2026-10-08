@@ -13,6 +13,31 @@ function setup() {
 }
 
 describe('single route reading coordinator', () => {
+  it('retains successful content during refresh failures, then removes it on an authoritative 404', async () => {
+    const { reader, loadArticle } = setup()
+    const location = { moduleCode: 'go', articleId: '9007199254740993' }
+    await reader.load(location)
+    const visible = reader.state.article
+    const pending = deferred<Article>(); loadArticle.mockReturnValueOnce(pending.promise)
+    const refresh = reader.load(location, true, true)
+    expect(reader.state.status).toBe('success'); expect(reader.state.article).toBe(visible)
+    pending.reject(new Error('offline')); await refresh
+    expect(reader.state.article).toBe(visible); expect(reader.state.refreshError).toContain('上次成功')
+    loadArticle.mockRejectedValueOnce(new ApiError('held', 404))
+    await reader.load(location, true, true)
+    expect(reader.state.status).toBe('not_found'); expect(reader.state.article).toBeNull()
+  })
+
+  it('does not let a refresh cancel an active navigation', async () => {
+    const { reader, loadArticle } = setup()
+    const pending = deferred<Article>(); loadArticle.mockReturnValueOnce(pending.promise)
+    const location = { moduleCode: 'go', articleId: '9007199254740993' }
+    const loading = reader.load(location)
+    await reader.load(location, true, true)
+    expect(loadArticle).toHaveBeenCalledTimes(1); expect(loadArticle.mock.calls[0][1].aborted).toBe(false)
+    pending.resolve(makeArticle()); await loading; expect(reader.state.status).toBe('success')
+  })
+
   it('resolves a moved article before the historical module and carries it across canonical replacement', async () => {
     const { reader, loadArticle, loadModule, replace } = setup()
     loadArticle.mockResolvedValue(makeArticle('9007199254740993', 'new'))

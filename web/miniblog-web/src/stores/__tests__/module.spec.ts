@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useModuleStore } from '../module'
 import { makeModule, deferred } from '@/__tests__/fixtures'
@@ -9,7 +9,27 @@ vi.mock('@/api/module', () => ({ fetchModules: summaries }))
 vi.mock('@/api/blog', () => ({ fetchModuleDetail: detail }))
 beforeEach(() => { setActivePinia(createPinia()); summaries.mockReset(); detail.mockReset() })
 
+afterEach(() => vi.useRealTimers())
+
 describe('module directory cache', () => {
+  it('expires full directories and lists after sixty seconds, while refreshing summary titles', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(0)
+    const store = useModuleStore()
+    detail.mockResolvedValue(makeModule())
+    summaries.mockResolvedValue([makeModule('go', [])])
+    await store.loadModuleDetail('go'); await store.loadModules()
+    vi.setSystemTime(59999)
+    await store.loadModuleDetail('go'); await store.loadModules()
+    expect(detail).toHaveBeenCalledTimes(1); expect(summaries).toHaveBeenCalledTimes(1)
+    vi.setSystemTime(60000)
+    await store.loadModuleDetail('go')
+    const renamed = makeModule('go', []); renamed.title = 'New title'
+    summaries.mockResolvedValue([renamed]); await store.loadModules()
+    expect(detail).toHaveBeenCalledTimes(2); expect(summaries).toHaveBeenCalledTimes(2)
+    expect(store.modules[0].title).toBe('New title')
+    expect(store.modules[0].sections).toHaveLength(1)
+  })
+
   it('shares inflight requests and does not confuse partial lists with full empty directories', async () => {
     const store = useModuleStore()
     const summary = makeModule('go', [])

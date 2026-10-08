@@ -26,7 +26,10 @@
         <el-button type="primary" @click="retry">重试</el-button>
         <router-link to="/">返回首页</router-link>
       </div>
-      <ExternalArticleCard v-else-if="state.article" :article="state.article" />
+      <div v-else-if="state.article" class="reading-content">
+        <div v-if="state.refreshError" class="refresh-warning" role="alert">{{ state.refreshError }} <button @click="retry">重试更新</button></div>
+        <ExternalArticleCard :article="state.article" />
+      </div>
     </template>
   </BlogLayout>
 </template>
@@ -55,6 +58,9 @@ const { state, retry } = useReaderPage()
   text-align: center;
   background: var(--card-bg);
 }
+.reading-content { display:flex; flex-direction:column; height:100%; min-height:0; }
+.reading-content :deep(.article-container) { flex:1; height:auto; }
+.refresh-warning { padding: .5rem 1rem; background: var(--card-bg); color: var(--text-secondary); }
 .reading-state h1 { font-size: 1.5rem; font-weight: 600; }
 .reading-state a { color: var(--sidebar-active-color); }
 </style>

@@ -6,6 +6,16 @@ let wrapper: VueWrapper | undefined
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => { wrapper?.unmount(); vi.useRealTimers() })
 describe('external article presentation', () => {
+  it('prefers the current reading URL and does not recreate the frame for title changes', async () => {
+    const article = makeArticle(); article.readingURL = 'https://example.com/current'
+    wrapper = mount(ExternalArticleCard, { props: { article } })
+    const frame = wrapper.get('iframe').element
+    expect(wrapper.get('a').attributes('href')).toBe(article.readingURL)
+    await wrapper.setProps({ article: { ...article, title: 'Changed title' } })
+    expect(wrapper.get('iframe').element).toBe(frame)
+    await wrapper.setProps({ article: { ...article, readingURL: 'javascript:bad' } })
+    expect(wrapper.get('iframe').attributes('src')).toBe(article.externalLink)
+  })
   it('keeps the original link available and offers only an advisory after ten seconds', async () => {
     wrapper = mount(ExternalArticleCard, { props: { article: makeArticle() } })
     expect(wrapper.get('a').attributes('href')).toBe('https://example.com/9007199254740993')

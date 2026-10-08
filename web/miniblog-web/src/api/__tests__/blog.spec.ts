@@ -41,13 +41,14 @@ describe('public v1 reading contract', () => {
 
   it('preserves a decimal ID beyond JavaScript number precision', async () => {
     get.mockResolvedValue({ payload: { article_detail: {
-      id: '9007199254740993', title: '文章', module_code: 'new', section_code: 's', external_link: 'https://example.com/a',
+      id: '9007199254740993', title: '文章', module_code: 'new', section_code: 's', external_link: 'https://example.com/a', reading_url: 'https://example.com/current',
     } } })
     const article = await fetchArticleDetail('9007199254740993')
     expect(article).toBeInstanceOf(Article)
     expect(article.id).toBe('9007199254740993')
     expect(article.moduleCode).toBe('new')
     expect(article.externalLink).toBe('https://example.com/a')
+    expect(article.readingURL).toBe('https://example.com/current')
     expect(article.tags).toEqual([])
   })
 

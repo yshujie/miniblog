@@ -41,6 +41,7 @@ export function createReaderLoader(deps: Dependencies) {
     module: null as Module | null,
     article: null as Article | null,
     message: '',
+    refreshError: '',
     resource: 'module' as 'module' | 'article',
   })
   let version = 0
@@ -48,7 +49,9 @@ export function createReaderLoader(deps: Dependencies) {
   // Carry only the freshly resolved article across its canonical replace.
   let canonicalArticle: { code: string; id: string; article: Article } | undefined
 
-  async function load(location: ReadingLocation, force = false): Promise<void> {
+  async function load(location: ReadingLocation, force = false, background = false): Promise<void> {
+    if (background && state.busy) return
+    const retain = background && state.status === 'success' && state.article?.id === location.articleId && state.module?.code === location.moduleCode
     const current = ++version
     controller?.abort()
     controller = new AbortController()
@@ -56,10 +59,13 @@ export function createReaderLoader(deps: Dependencies) {
     const latest = () => current === version && !signal.aborted
     const carried = canonicalArticle
     canonicalArticle = undefined
-    state.status = 'loading'
+    if (!retain) {
+      state.status = 'loading'
+      state.article = null
+      state.module = null
+    }
     state.busy = true
-    state.article = null
-    state.module = null
+    state.refreshError = ''
     state.message = ''
     state.resource = location.articleId ? 'article' : 'module'
     try {
@@ -93,7 +99,7 @@ export function createReaderLoader(deps: Dependencies) {
         state.article = article
         state.status = 'success'
       } else {
-        const module = await waitForShared(deps.loadModule(location.moduleCode, force), signal)
+        const module = await waitForShared(deps.loadModule(location.moduleCode, true), signal)
         if (!latest()) return
         state.module = module
         const first = firstArticle(module)
@@ -108,7 +114,14 @@ export function createReaderLoader(deps: Dependencies) {
       }
     } catch (error) {
       if (!latest()) return
-      state.status = error instanceof ApiError && error.status === 404 ? 'not_found' : 'error'
+      const missing = error instanceof ApiError && error.status === 404
+      if (retain && !missing) {
+        state.refreshError = '更新失败，正在显示上次成功读取的内容。请检查网络后重试'
+        return
+      }
+      state.article = null
+      state.module = null
+      state.status = missing ? 'not_found' : 'error'
       state.message = state.status === 'not_found'
         ? (state.resource === 'article' ? '文章不存在或已下架' : '模块不存在或不可用')
         : '加载失败，请检查网络后重试'
