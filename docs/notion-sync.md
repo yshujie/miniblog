@@ -82,6 +82,8 @@ provider=notion 不代表接管，生效绑定才取得管理权。托管标题�
 10. 基线冻结后每库创建明确标记的验收页，仅在 Notion 操作新增、标题、主题、标签、四态和撤销公开；跨库移动与故障恢复先使用验收页，不对历史文章注入故障。同步不修改 Notion 分享权限。公开需要博客状态已发布及有效 public_url；匿名可读与 iframe 能嵌入分别验收，拒绝嵌入时“打开原文”必须可用。
 11. Go 先手动同步后至少观察三十分钟/三次完整扫描；其余每库至少十五分钟/两次完整扫描；五库联合至少三十分钟/三次完整扫描。故障或身份冲突停止扩大范围，保留已验证库的结果。完成桌面/小屏浏览器及用户常用手机、未登录 Notion 的实际试读。回填结束撤销写连接，清理临时凭据，常驻只读。
 
+GitHub Actions 的 `Notion read operations (manual)` 提供 main 分支上的五库 `schema_check`、`dry_run` 和 `bootstrap_preview`；服务器受限报告、凭据传递、配置门槛与失败恢复见[只读维护入口](../scripts/notion-ops/README.md)。只读 Secret 仅部署时原子写入服务器 .env，未配置保留现值；一次性写 Secret 尚未接入流水线，本轮入口不回填、不启用来源。
+
 CLI 参数和确认文件格式见 `go run ./scripts/notion-sync -h`。运行期只读；bootstrap 凭据仅在审核维护窗口注入。
 
 ## 回退与验证

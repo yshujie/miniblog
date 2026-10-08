@@ -21,3 +21,5 @@
 测试使用内存数据库、模拟 REST 传输及模拟客户端，没有真实 Notion 账号或生产访问。当前尚未配置服务端 token：真实官方 REST 读取权限、公开 URL、原生归档双分区和生产切换都未验收。
 
 分库执行门槛：目录准备、绑定、目标来源启用后读取最终版本，再生成完整 bootstrap_preview；CLI 核验运行完成且 failed/blocked 为零，正常 pending/frozen 允许，但候选仍需逐项审核。每库确认文件只含当期来源的页面，精确核对 ID、新页标记、状态及指纹；Published 还须 public_url_available、无发布阻止原因、已绑定且启用的目标目录。接管会使历史 Published 文章待核验，成功后立即解除双暂停，并执行 --mode sync --enable-sync 全量重新读取；部署总开关 false 时后台 HTTP 同步不能代替该命令。核验本次运行、该来源成功时间与逐项 effective_visibility 后再开定时器。部分接管失败时停止扩大范围并保留日志，先核验成功项、重新审核失败项，再完成即时同步，不能静默留下待核验文章。
+
+GitHub Actions 只读五库联验入口与受限报告操作见[生产只读维护入口](../notion-ops/README.md)。该流程仅开放 schema_check、dry_run、bootstrap_preview，使用当前运行镜像，不读取一次性写 Secret、不实施历史回填或来源启用。
