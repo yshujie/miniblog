@@ -26,12 +26,15 @@ jobs:
           --health-retries=10
     env:
       MINIBLOG_TEST_MYSQL_DSN: root@tcp(127.0.0.1:3306)/miniblog_refactor_test_ci?parseTime=true&multiStatements=true
+      MINIBLOG_ROLLOUT_INIT_TEST_DSN: root@tcp(127.0.0.1:3306)/miniblog_rollout_init_test?parseTime=true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24.0"
           cache: true
+      - name: Prepare isolated rollout initialization fixture
+        run: docker exec "${{ job.services.mysql.id }}" mysql -uroot -e "CREATE DATABASE miniblog_rollout_init_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
       - run: go test -race ./...
       - run: go vet ./...
       - run: git diff --check

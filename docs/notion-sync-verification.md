@@ -76,11 +76,22 @@ MySQL 验证发现 `ON UPDATE CURRENT_TIMESTAMP` 会在身份升级时改变历�
 | 代码回归 | 先复现配置 no-op、历史清单未留存、公开状态缺字段、Go 试运行时间错误，再修复；全部回归（含 race）、vet 和差异检查通过；新增 journal 冻结、显式重新审核与 CLI 部分失败门槛通过组合复核，非空未知状态拒绝覆盖 |
 | 真实 MySQL | 本任务独立 MySQL 8.0.36，回环端口 63368、测试库 miniblog_refactor_test_rollout；不使用用户或生产数据，全部 13 项集成回归通过（含 race） |
 | 前端 | 独立 Node 24，锁定依赖保持；类型/非修复 lint/构建通过；管理端 18 文件/73 测试，阅读端 9 文件/46 测试通过。原生 Chrome 本地替身验证状态展示、只读历史对照、大 ID、配置失败输入保留、作者失败重试、下架不可阅读、解除后待核验；不代替真实 Notion 或手机 |
-| CI / 兼容生产发布 | 待 PR 与部署核验；自动同步保持关闭，来源未启用 |
-| 真实 Notion REST | 等待专用连接授权与受限凭据配置；未扫描、回填或接管 |
+| CI / 兼容生产发布 | PR #3/#4 的 CI 与完整质量门槛通过；main 735344f 的部署 37781019063 成功。三服务实际 SHA 一致、后端 healthy，schema 6 clean 与唯一约束通过；历史文章和目录字段比对保持。运行只读 Token 已注入，bootstrap Token 未注入，同步 false、control paused、五来源 disabled |
+| 真实 Notion REST | schema_check 37781133297 成功：五库 complete=true，官方实际 data source ID 与固定清单一致，标题/主题/知识点类型和四态 ID 有效。运行连接身份为 miniblog_reader。尚未完整扫描页面、冻结基线、回填或接管 |
 | 生产定时 / 五库试运行 | 未启用；等待实际历史审核、分库接管与计时运行 |
 | 匿名阅读 / 实际手机 / 使用确认 | 待真实公开验收页及用户试读，不用浏览器视口代替手机 |
 
 生产先备份核验，再部署关闭同步的兼容版本。真实凭据就绪后全五库只读联验和基线；每库目录准备后重做最终历史预览，经审核再回填/接管并立即手动同步。计时、运行 ID、生产版本、来源与目录映射及待处理清单在实际执行后记录。
 
-本阶段生产只读预检已完成：部署仍为 2f4c406，content-preflight 通过 clean schema >=6 检查；私有目录 /opt/miniblog/backups/notion-rollout-20261008 保存 pre-notion-rollout-schema6.sql.gz（0600，gzip 校验通过）、legacy-fields-before.json 与 content-audit-before.json。身份审计无阻断项；未改目录、文章、Notion 或同步开关。连接尚待最小权限核验和受限凭据填写；Chrome 已观察到个人知识库访问授权，尚未用 REST 证明五库均可读取。
+本阶段首次生产只读预检时版本为 2f4c406，content-preflight 通过 clean schema >=6 检查；私有目录 /opt/miniblog/backups/notion-rollout-20261008 保存 pre-notion-rollout-schema6.sql.gz（0600，gzip 校验通过）、legacy-fields-before.json 与 content-audit-before.json。身份审计无阻断项；未改目录、文章、Notion 或同步开关。这是连接配置前的记录；随后专用凭据由 GitHub Actions Secrets 提供，真实 REST schema-only 核验已证明五库可读。此证据不代替完整页面扫描或匿名阅读。
+
+
+### 专用凭据接入与受控初始化
+
+- [PR #3](https://github.com/yshujie/miniblog/pull/3) 将运行只读 Secret 通过受限临时目录写入服务器私有环境；[PR #4](https://github.com/yshujie/miniblog/pull/4) 修复 SSH Key 换行兼容并增强任务目录所有权及清理守卫。34 项 Python 操作工具测试通过。首次 SSH 传输失败发生在服务替换和 Notion 请求之前；修复后验证成功，失败及成功任务的凭据暂存均已清理。
+- [兼容部署 37781019063](https://github.com/yshujie/miniblog/actions/runs/37781019063) 实际生产版本为 `735344f086302454590a8d3e0033285ea99e9423`；运行 Token 存在，回填 Token 不存在。私有环境 0600，生产身份审计无阻断项。公开接口健康验证通过；不代表真实文章阅读或实际手机验收。
+- [真实 schema_check 37781133297](https://github.com/yshujie/miniblog/actions/runs/37781133297) 使用当时运行的兼容镜像；其 Go/CLI 实现与 735344f 相同。完整报告留存服务器 `/opt/miniblog/ops/notion/37781133297-1/schema.json`（0600），未上传 GitHub Artifact，未读取回填 Secret。
+- [一次性初始化工具](../scripts/notion-rollout-init/README.md) 默认仅读预检，显式执行时在一个事务中保存固定五库映射、改名 database/project、新建停用 algorithm，保留历史目录状态 0、ID/code/排序及全部文章字段。不访问 Notion、不建立章节、不冻结基线、不启用来源或同步。实际生产初始化尚未执行。
+- 初始化工具本地独立 MySQL 8.0.36 测试通过（专用回环端口 63369、数据库 `miniblog_rollout_init_test`），含 race、第五库 SQL 失败完整回滚、真实旧状态/正文/作者/位置/时间保持、公开 ID 集合不变、重复执行 no-op、MyISAM 拒绝。12 项顶层测试与 vet 通过；真实五库 schema 报告离线复验通过。CI 为该夹具单独建库，远程结果随后记录。
+
+接下来先审核初始化预检并执行固定配置，再完整 dry_run 冻结本次历史基线，生成历史匹配及公开条件清单。运行连接的页面读取、公开地址、接管回填、定时试运行、匿名阅读和实际手机验收仍分别待执行；当前不能把 schema-only 成功标记为五库自动同步已上线。

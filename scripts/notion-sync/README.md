@@ -18,8 +18,10 @@
 
 生产镜像包含 `/app/notion-sync`、`/app/audit-content` 和 `/app/content-preflight`。在服务器受限报告目录中，通过一次性 `docker compose run --rm --no-deps --entrypoint /app/notion-sync miniblog-backend` 任务执行以上模式；挂载目录和私有 env 文件时不得打印完整 Compose 配置或环境。常驻配置沿用服务器 /opt/miniblog/.env，原子更新为 0600；更新时核验无并行 CI 部署，不能另建未被 CI 读取的 runtime.env。CLI 默认读取 DB 环境；报告挂载目录 0700，输入和报告 0600，任务容器使用报告目录所有者的 UID:GID，避免生成宿主无法读取的 root-owned 0600 文件。bootstrap 凭据不能只放进 compose --env-file：常驻 service 未映射该变量，须使用服务器支持的任务级 --env-from-file，或安全读取、export 后通过 --env MINIBLOG_NOTION_BOOTSTRAP_TOKEN 传入变量名，参数不带值。运行只读 token 保留在服务端，bootstrap token 仅向审核回填任务注入，不配置给常驻服务。历史核对清单也固化在运行明细中，后台只读查看，网页没有反写 Notion 的入口。暂停或关闭定时同步只冻结当前结果，不自动逆向修改 Notion；回退保留绑定、历史来源 alias 和运行记录。
 
-测试使用内存数据库、模拟 REST 传输及模拟客户端，没有真实 Notion 账号或生产访问。当前尚未配置服务端 token：真实官方 REST 读取权限、公开 URL、原生归档双分区和生产切换都未验收。
+单元测试使用内存数据库、模拟 REST 传输及模拟客户端。真实官方 REST、生产启用及实际设备的当前验收状态见[验收记录](../../docs/notion-sync-verification.md)。
 
 分库执行门槛：目录准备、绑定、目标来源启用后读取最终版本，再生成完整 bootstrap_preview；CLI 核验运行完成且 failed/blocked 为零，正常 pending/frozen 允许，但候选仍需逐项审核。每库确认文件只含当期来源的页面，精确核对 ID、新页标记、状态及指纹；Published 还须 public_url_available、无发布阻止原因、已绑定且启用的目标目录。接管会使历史 Published 文章待核验，成功后立即解除双暂停，并执行 --mode sync --enable-sync 全量重新读取；部署总开关 false 时后台 HTTP 同步不能代替该命令。核验本次运行、该来源成功时间与逐项 effective_visibility 后再开定时器。部分接管失败时停止扩大范围并保留日志，先核验成功项、重新审核失败项，再完成即时同步，不能静默留下待核验文章。
 
 GitHub Actions 只读五库联验入口与受限报告操作见[生产只读维护入口](../notion-ops/README.md)。该流程仅开放 schema_check、dry_run、bootstrap_preview，使用当前运行镜像，不读取一次性写 Secret、不实施历史回填或来源启用。
+
+真实五库 schema 检查通过后，固定模块改名与初始字段配置可使用[一次性初始化工具](../notion-rollout-init/README.md)：默认仅读预检，显式执行保留停用状态和历史文章；不代替后续基线、接管审核或公开启用。
