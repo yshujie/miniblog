@@ -1,13 +1,12 @@
 package store
 
 import (
-	"sync"
+	"context"
 
 	"gorm.io/gorm"
 )
 
 var (
-	once sync.Once
 	// 全局变量，方便其他包直接调用已经初始化好的 S 实例
 	S *datastore
 )
@@ -31,10 +30,16 @@ var _ IStore = (*datastore)(nil)
 
 // NewStore 创建一个 Store 实例
 func NewStore(db *gorm.DB) *datastore {
-	once.Do(func() {
-		S = &datastore{db}
-	})
-	return S
+	return &datastore{db: db}
+}
+
+// InTransaction binds every repository in the callback to the same transaction.
+// In-memory implementations of IStore have no SQL connection.
+func InTransaction(ctx context.Context, ds IStore, fn func(IStore) error) error {
+	if ds.DB() == nil {
+		return fn(ds)
+	}
+	return ds.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error { return fn(NewStore(tx)) })
 }
 
 // DB 返回一个实现了 UserStore 接口的实例

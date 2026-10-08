@@ -148,7 +148,7 @@ func initStore() error {
 		return err
 	}
 
-	store.NewStore(db)
+	store.S = store.NewStore(db)
 
 	return nil
 }
