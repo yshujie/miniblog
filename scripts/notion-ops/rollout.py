@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Restricted, reviewed server maintenance. Never print private input or reports."""
 import argparse
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -199,15 +199,21 @@ def source_status(status, manifest):
 
 
 def instant(value):
+    """Parse Go RFC3339Nano into exact UTC nanoseconds on Python 3.10 too."""
     if not isinstance(value, str):
         raise SafeError("sync completion timestamps are missing")
+    match = re.fullmatch(r"([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})"
+                         r"(?:\.([0-9]{1,9}))?(Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])", value)
+    if match is None:
+        raise SafeError("sync completion timestamps are invalid")
     try:
-        result = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if result.tzinfo is None:
-            raise ValueError()
-        return result
+        # Python 3.10 only accepts 3/6 fractional digits. Validate calendar/zone
+        # without the fraction, then keep all Go nanoseconds in integer form.
+        seconds = datetime.fromisoformat(match[1] + match[3].replace("Z", "+00:00"))
+        delta = seconds - datetime(1970, 1, 1, tzinfo=timezone.utc)
     except ValueError:
         raise SafeError("sync completion timestamps are invalid") from None
+    return (delta.days * 86400 + delta.seconds) * 1_000_000_000 + int((match[2] or "").ljust(9, "0"))
 
 
 def validate_sync_evidence(run, source, identifier, now=None):
@@ -219,8 +225,8 @@ def validate_sync_evidence(run, source, identifier, now=None):
             or type(run["counts"].get("blocked")) is not int or run["counts"]["blocked"] != 0):
         raise SafeError("scheduler approval lacks a successful enabled-source sync")
     start, finish, success = instant(run.get("started_at")), instant(run.get("finished_at")), instant(source.get("last_success_at"))
-    now = now or datetime.now(timezone.utc)
-    if not start <= success <= finish or finish < now - timedelta(minutes=30) or finish > now + timedelta(seconds=30):
+    now = instant((now or datetime.now(timezone.utc)).isoformat())
+    if not start <= success <= finish or finish < now - 30 * 60 * 1_000_000_000 or finish > now + 30 * 1_000_000_000:
         raise SafeError("scheduler sync validation is stale or unrelated")
 
 

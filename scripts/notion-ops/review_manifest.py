@@ -6,7 +6,7 @@ in a candidate must be checked by the caller's private preflight, or supplied th
 --latest-local when included in approved.local. This tool grants no new approval.
 """
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
@@ -127,11 +127,35 @@ def snapshot_shape(value):
             and value["desired_state"] in STATE_NAMES)
 
 
+RFC3339 = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?(Z|[+-][0-9]{2}:[0-9]{2})\Z")
+
+
+def run_instant_ns(value):
+    # Python 3.10 fromisoformat only accepts 0/3/6 fractional digits. Go JSON
+    # emits 0..9; validate the calendar separately and retain every nanosecond.
+    matched = RFC3339.fullmatch(value) if type(value) is str else None
+    if matched is None:
+        raise ValueError("invalid run timestamp")
+    zone = matched[8]
+    offset = 0
+    if zone != "Z":
+        hours, minutes = int(zone[1:3]), int(zone[4:6])
+        if hours > 23 or minutes > 59:
+            raise ValueError("invalid run timestamp")
+        offset = (hours * 60 + minutes) * 60 * (1 if zone[0] == "+" else -1)
+    whole = datetime(*(int(matched[index]) for index in range(1, 7)),
+                     tzinfo=timezone(timedelta(seconds=offset)))
+    delta = whole.astimezone(timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)
+    seconds = delta.days * 86400 + delta.seconds
+    fraction = int((matched[7] or "").ljust(9, "0"))
+    return seconds * 1_000_000_000 + fraction
+
+
 def valid_run_times(run):
     try:
-        start, finish = [datetime.fromisoformat(run[key].replace("Z", "+00:00")) for key in ("started_at", "finished_at")]
-        return start.tzinfo is not None and finish.tzinfo is not None and start <= finish
-    except (KeyError, ValueError, TypeError, AttributeError):
+        start, finish = [run_instant_ns(run[key]) for key in ("started_at", "finished_at")]
+        return start <= finish
+    except (KeyError, ValueError, TypeError, AttributeError, OverflowError):
         return False
 
 

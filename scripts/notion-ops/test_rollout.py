@@ -6,6 +6,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import subprocess
 import sys
@@ -186,6 +187,106 @@ class GuardTests(unittest.TestCase):
                 mock.patch.object(rollout.remote, "docker_json", return_value={"name": "/some-other-cli", "entrypoint": ["/app/notion-sync"], "command": []}):
             with self.assertRaises(rollout.SafeError):
                 rollout.no_active_tasks()
+
+
+class RFC3339NanoTests(unittest.TestCase):
+    def test_go_zero_to_nine_fraction_digits_are_exact_across_offsets(self):
+        base = rollout.instant("2026-10-09T05:04:02Z")
+        self.assertIs(type(base), int)
+        self.assertEqual(base, rollout.instant("2026-10-09T13:04:02+08:00"))
+        self.assertEqual(base, rollout.instant("2026-10-09T01:04:02-04:00"))
+        self.assertEqual(base, rollout.instant("2026-10-09T05:04:02.000000000Z"))
+        for digits in range(1, 10):
+            fraction = "123456789"[:digits]
+            with self.subTest(digits=digits):
+                self.assertEqual(rollout.instant("2026-10-09T05:04:02." + fraction + "Z"),
+                                 base + int(fraction.ljust(9, "0")))
+                self.assertEqual(rollout.instant("2026-10-09T13:04:02." + fraction + "+08:00"),
+                                 base + int(fraction.ljust(9, "0")))
+        self.assertLess(rollout.instant("2026-10-09T05:04:02.123456788Z"),
+                        rollout.instant("2026-10-09T05:04:02.123456789Z"))
+
+    def test_go_timestamp_on_python310_fraction_parser(self):
+        class Python310DateTime(datetime):
+            @classmethod
+            def fromisoformat(cls, value):
+                fraction = re.search(r"\.([0-9]+)", value)
+                if fraction and len(fraction.group(1)) not in (3, 6):
+                    raise ValueError("Python 3.10 accepts only 3 or 6 fraction digits")
+                return datetime.fromisoformat(value)
+        run = {"run_id": RUN, "mode": "sync", "status": "completed",
+               "counts": {"failed": 0, "blocked": 0},
+               "started_at": "2026-10-09T13:03:47.382306+08:00",
+               "finished_at": "2026-10-09T13:04:28.954917+08:00"}
+        source = {"enabled": True, "last_success_at": "2026-10-09T13:04:02.04173+08:00"}
+        now = datetime(2026, 10, 9, 5, 4, 29, tzinfo=timezone.utc)
+        with self.assertRaises(ValueError):
+            Python310DateTime.fromisoformat(source["last_success_at"])
+        with mock.patch.object(rollout, "datetime", Python310DateTime):
+            rollout.validate_sync_evidence(run, source, RUN, now)
+            for digits in range(1, 10):
+                self.assertIs(type(rollout.instant("2026-10-09T05:04:02." + "123456789"[:digits] + "Z")), int)
+
+    def test_missing_timezone_malformed_date_offset_and_fraction_are_rejected(self):
+        invalid = (None, False, 0, "", "2026-10-09T05:04:02",
+                   "2026-10-09T05:04:02.123456", "2026-10-09 05:04:02Z",
+                   "2026-10-09T05:04:02z", "2026-10-09T05:04:02UTC",
+                   "2026-10-09T05:04:02+0800", "2026-10-09T05:04:02+24:00",
+                   "2026-10-09T05:04:02+01:60", "2026-10-09T05:04:02.Z",
+                   "2026-10-09T05:04:02.1234567890Z", "2026-02-30T05:04:02Z",
+                   "2026-10-09T24:04:02Z", "2026-10-09T05:60:02Z",
+                   "2026-10-09T05:04:60Z", "0000-10-09T05:04:02Z")
+        for value in invalid:
+            with self.subTest(value=value), self.assertRaises(rollout.SafeError):
+                rollout.instant(value)
+
+    def test_source_success_outside_run_by_one_nanosecond_is_rejected(self):
+        now = datetime(2026, 10, 9, 5, 4, 29, tzinfo=timezone.utc)
+        run = {"run_id": RUN, "mode": "sync", "status": "completed",
+               "counts": {"failed": 0, "blocked": 0},
+               "started_at": "2026-10-09T05:04:02.000000100Z",
+               "finished_at": "2026-10-09T05:04:02.000000200Z"}
+        for fraction in ("000000100", "000000150", "000000200"):
+            rollout.validate_sync_evidence(run, {"enabled": True, "last_success_at":
+                                           "2026-10-09T13:04:02." + fraction + "+08:00"}, RUN, now)
+        for fraction in ("000000099", "000000201"):
+            with self.subTest(fraction=fraction), self.assertRaises(rollout.SafeError):
+                rollout.validate_sync_evidence(run, {"enabled": True, "last_success_at":
+                                               "2026-10-09T05:04:02." + fraction + "Z"}, RUN, now)
+
+    def test_stale_and_future_windows_preserve_nanosecond_boundaries(self):
+        now = datetime(2026, 10, 9, 5, 4, 29, tzinfo=timezone.utc)
+        for finish, allowed in (("2026-10-09T04:34:29Z", True),
+                                ("2026-10-09T04:34:28.999999999Z", False),
+                                ("2026-10-09T05:04:59Z", True),
+                                ("2026-10-09T05:04:59.000000001Z", False)):
+            run = {"run_id": RUN, "mode": "sync", "status": "completed",
+                   "counts": {"failed": 0, "blocked": 0},
+                   "started_at": "2026-10-09T04:00:00Z", "finished_at": finish}
+            source = {"enabled": True, "last_success_at": finish}
+            with self.subTest(finish=finish):
+                if allowed:
+                    rollout.validate_sync_evidence(run, source, RUN, now)
+                else:
+                    with self.assertRaises(rollout.SafeError):
+                        rollout.validate_sync_evidence(run, source, RUN, now)
+
+    def test_success_timestamp_compatibility_does_not_relax_other_guards(self):
+        now = datetime(2026, 10, 9, 5, 4, 29, tzinfo=timezone.utc)
+        run = {"run_id": RUN, "mode": "sync", "status": "completed",
+               "counts": {"failed": 0, "blocked": 0},
+               "started_at": "2026-10-09T05:03:47.382306Z",
+               "finished_at": "2026-10-09T05:04:28.954917Z"}
+        source = {"enabled": True, "last_success_at": "2026-10-09T05:04:02.04173Z"}
+        for change in ({"status": "completed_with_errors"}, {"mode": "dry_run"},
+                       {"run_id": "other"}, {"error": "source_unavailable"},
+                       {"counts": {"failed": 1, "blocked": 0}},
+                       {"counts": {"failed": 0, "blocked": 1}},
+                       {"counts": {"failed": False, "blocked": 0}}):
+            with self.subTest(change=change), self.assertRaises(rollout.SafeError):
+                rollout.validate_sync_evidence(dict(run, **change), source, RUN, now)
+        with self.assertRaises(rollout.SafeError):
+            rollout.validate_sync_evidence(run, dict(source, enabled=False), RUN, now)
 
 
 class SchedulerHealthTests(unittest.TestCase):
