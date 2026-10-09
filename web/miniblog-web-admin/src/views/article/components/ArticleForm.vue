@@ -1,42 +1,33 @@
 <template>
-  <div class="article-form">
-    <div class="toolbar">
-      <el-button v-if="canSave" type="primary" :loading="editor.loading.value" :disabled="!editor.article.value || editor.article.value.status === 'Deleted'" @click="save">{{ managed ? '保存本地信息' : '保存资料' }}</el-button>
-      <el-button v-if="can('publish')" type="success" :disabled="!editor.article.value" :loading="editor.loading.value" @click="changeStatus('publish')">发布</el-button>
-      <el-button v-if="can('unpublish')" type="warning" :loading="editor.loading.value" @click="changeStatus('unpublish')">下架</el-button>
-      <el-button v-if="can('restore')" type="success" :loading="editor.loading.value" @click="changeStatus('restore')">恢复为草稿</el-button>
-      <el-button v-if="can('archive')" :disabled="!editor.article.value" :loading="editor.loading.value" @click="changeStatus('archive')">归档</el-button>
-      <el-button v-if="can('hold')" type="danger" :loading="editor.loading.value" @click="changeHold(true)">紧急下架</el-button>
-      <el-button v-if="can('release_hold')" :loading="editor.loading.value" @click="changeHold(false)">解除本地下架</el-button>
-      <el-tag v-if="managed">Notion 同步管理</el-tag><el-tag v-if="editor.article.value?.publication_hold?.held" type="danger">本地紧急下架</el-tag>
-      <el-tag v-if="managed && editor.article.value?.effective_visibility === false && !editor.article.value?.publication_hold?.held" type="warning">前台暂不可用</el-tag>
-      <router-link v-if="managed" to="/content/sync">查看同步状态</router-link>
-      <el-tag v-if="editor.article.value">{{ statusLabels[editor.article.value.status] }}</el-tag>
-      <el-button :disabled="editor.loading.value || editor.dirty.value" @click="load">重新读取</el-button>
-      <span v-if="editor.dirty.value" class="dirty">有未保存的修改</span>
+  <div class="article-detail">
+    <router-link class="back-link" to="/article/list">← 返回文章库</router-link>
+    <header class="detail-heading"><div><p class="eyebrow">{{ managed ? 'Notion 自动同步' : '手工收录' }} · 文章资料</p><h1>{{ editor.article.value?.title || '文章详情' }}</h1><p class="directory-path">{{ articleDirectory }}</p></div><el-button :disabled="editor.loading.value || editor.dirty.value" @click="load">重新读取</el-button></header>
+    <el-alert v-if="editor.error.value || catalogError" :title="editor.error.value || catalogError" type="error" :closable="false" class="detail-error"><template #default><el-button v-if="!editor.article.value" link @click="load">重试</el-button></template></el-alert>
+    <div v-if="!editor.article.value" class="detail-state" v-loading="editor.loading.value"><p>{{ editor.loading.value ? '正在读取文章资料…' : '暂未读取文章资料，请重试。' }}</p></div>
+    <div v-else class="detail-grid">
+      <section class="detail-main">
+        <section v-if="managed || !can('edit')" class="detail-card source-facts" aria-label="来源资料"><div class="card-heading"><h2>{{ managed ? '来源资料' : '文章资料' }}</h2><span v-if="managed" class="readonly-label">由 Notion 管理 · 只读</span></div><p class="card-note">{{ managed ? '标题、目录、标签、链接与发布状态在 Notion 维护。本地调整不会覆盖来源资料。' : '当前状态下仅查看资料；可执行的操作显示在发布与可见性面板。' }}</p><dl><dt>标题</dt><dd data-test="source-title">{{ editor.article.value.title }}</dd><dt>所属目录</dt><dd>{{ articleDirectory }}</dd><dt>标签</dt><dd><template v-if="editor.article.value.tags.length"><el-tag v-for="tag in editor.article.value.tags" :key="tag">{{ tag }}</el-tag></template><span v-else class="muted">未设置</span></dd><dt>来源文档</dt><dd><a v-if="sourceURL(editor.article.value)" :href="sourceURL(editor.article.value)" target="_blank" rel="noopener noreferrer" class="source-document">打开外部原文 ↗</a><span v-else class="muted">尚未提供有效链接</span><p class="raw-link">{{ sourceURL(editor.article.value) || editor.form.external_link }}</p></dd><template v-if="sourceURL(editor.article.value) !== editor.form.external_link && editor.form.external_link"><dt>原始收录链接</dt><dd class="raw-link">{{ editor.form.external_link }}</dd></template><template v-if="!canSave"><dt>作者</dt><dd>{{ editor.article.value.author || '未设置' }}</dd></template></dl><router-link v-if="managed" to="/content/sync" class="sync-link">查看同步状态 →</router-link></section>
+        <section v-if="canSave" class="detail-card edit-card" :aria-label="managed ? '本地作者信息' : '编辑文章资料'"><div class="card-heading"><h2>{{ managed ? '本地信息' : '编辑资料' }}</h2><span v-if="editor.dirty.value" class="dirty" role="status">有未保存的修改</span></div><p class="card-note">{{ managed ? '作者是本站维护的信息，可以独立保存；目录顺序在工作台调整。' : '保存资料会保留当前发布状态，正文继续在外部文档中维护。' }}</p>
+          <el-form label-position="top" :disabled="editor.loading.value || editor.article.value.status === 'Deleted'" @submit.prevent="save">
+            <el-form-item v-if="!managed" label="文章标题" required><el-input v-model="editor.form.title" data-test="article-title" maxlength="255" /></el-form-item>
+            <el-form-item label="作者（可选）"><el-input v-model="editor.form.author" data-test="article-author" maxlength="128" /></el-form-item>
+            <el-form-item v-if="!managed" label="所属目录" required><DirectoryPicker active-only v-model="directory" /></el-form-item>
+            <el-form-item v-if="!managed" label="标签（可选）"><el-select v-model="editor.form.tags" multiple filterable allow-create default-first-option placeholder="输入标签后按 Enter"><el-option v-for="tag in editor.form.tags" :key="tag" :label="tag" :value="tag" /></el-select></el-form-item>
+          </el-form>
+          <div v-if="!managed" class="manual-source"><span>来源文档 · 只读</span><a v-if="sourceURL(editor.article.value)" :href="sourceURL(editor.article.value)" target="_blank" rel="noopener noreferrer">打开外部原文 ↗</a><p class="raw-link">{{ sourceURL(editor.article.value) || editor.form.external_link || '尚未提供有效链接' }}</p></div>
+          <footer class="save-footer"><span class="card-note">{{ editor.dirty.value ? '修改尚未保存' : '以最近读取的资料为准' }}</span><el-button data-test="article-save" type="primary" :loading="editor.loading.value" :disabled="editor.article.value.status === 'Deleted'" @click="save">{{ managed ? '保存本地信息' : '保存资料' }}</el-button></footer>
+        </section>
+        <section v-if="editor.conflictDraft.value" class="detail-card"><el-collapse><el-collapse-item title="接管前未保存的资料 · 已保留" name="conflict"><p class="card-note">这些输入不会写入来源管理字段，可保留作为核对资料。</p><dl><dt>标题</dt><dd>{{ editor.conflictDraft.value.title }}</dd><dt>作者</dt><dd>{{ editor.conflictDraft.value.author }}</dd><dt>标签</dt><dd>{{ editor.conflictDraft.value.tags.join('、') || '未设置' }}</dd><dt>目录</dt><dd>{{ catalog.label(editor.conflictDraft.value as DirectoryContext) || [editor.conflictDraft.value.module_code, editor.conflictDraft.value.section_code, editor.conflictDraft.value.subsection_code].filter(Boolean).join(' / ') }}</dd><dt>链接</dt><dd>{{ editor.conflictDraft.value.external_link }}</dd></dl><el-button @click="copyConflictDraft">复制旧输入</el-button><el-button @click="editor.conflictDraft.value = undefined">清除这份旧输入</el-button></el-collapse-item></el-collapse></section>
+        <section v-if="editor.article.value.content" class="detail-card"><el-collapse><el-collapse-item title="查看历史正文 · 只读" name="content"><p class="card-note">历史快照仅供核对，外部文档仍是正文维护入口。</p><pre class="historic-content">{{ editor.article.value.content }}</pre></el-collapse-item></el-collapse></section>
+      </section>
+      <aside class="detail-card publication-card" aria-label="发布与可见性"><h2>发布与可见性</h2><dl><dt>本站状态</dt><dd><el-tag :type="editor.article.value.status === 'Published' ? 'success' : 'info'">{{ statusLabels[editor.article.value.status] || '状态待确认' }}</el-tag></dd><dt>前台实际可见</dt><dd :class="{ available: editor.article.value.effective_visibility === true }">{{ visibility }}</dd><dt>本地下架</dt><dd>{{ editor.article.value.publication_hold?.held === true ? '已紧急下架' : editor.article.value.publication_hold?.held === false ? '未设置' : '尚未提供' }}</dd></dl><p v-if="editor.article.value.publication_hold?.held" class="hold-note">原因：{{ editor.article.value.publication_hold.reason || '未填写' }}。解除后仍需重新同步核验来源。</p><p class="card-note">{{ managed ? '来源发布状态由 Notion 管理，本地下架独立于来源。' : '发布状态与前台可见性分开，文章及完整目录都需要符合公开条件。' }}</p><p v-if="editor.article.value.effective_visibility === undefined" class="card-note">接口尚未提供实际可见性，请以阅读页结果为准。</p><div class="publication-actions"><el-button v-if="can('publish')" :loading="editor.loading.value" @click="changeStatus('publish')">发布文章</el-button><el-button v-if="can('unpublish')" :loading="editor.loading.value" @click="changeStatus('unpublish')">下架文章</el-button><el-button v-if="can('restore')" :loading="editor.loading.value" @click="changeStatus('restore')">恢复为草稿</el-button><el-button v-if="can('archive')" :loading="editor.loading.value" @click="changeStatus('archive')">归档文章</el-button><el-button v-if="can('hold')" @click="openHold(true)">紧急下架</el-button><el-button v-if="can('release_hold')" @click="openHold(false)">解除本地下架</el-button></div></aside>
     </div>
-    <p class="hint">{{ managed ? '标题、目录、标签、链接和发布状态由 Notion 管理；这里仅保存本地作者信息。排序仍在工作台调整。' : '保存标题、标签和归属会保留当前发布状态；正文继续在外部文档中维护。' }}</p>
-    <p v-if="editor.article.value?.publication_hold?.held" class="hint">下架原因：{{ editor.article.value.publication_hold.reason || '未填写' }}。解除后需重新同步核验来源，再按来源和目录状态决定是否公开。</p>
-    <el-alert v-if="editor.error.value || catalogError" :title="editor.error.value || catalogError" type="error" :closable="false"><template #default><el-button v-if="!editor.article.value" link @click="load">重试</el-button></template></el-alert>
-    <el-form label-width="110px" :disabled="editor.loading.value || !editor.article.value || editor.article.value.status === 'Deleted'">
-      <el-form-item label="标题" required><el-input :disabled="managed || !can('edit')" v-model="editor.form.title" maxlength="255" /></el-form-item>
-      <el-form-item label="作者（可选）"><el-input :disabled="!canSave" v-model="editor.form.author" maxlength="128" /></el-form-item>
-      <el-form-item label="归属目录" required><DirectoryPicker :disabled="managed || !can('edit')" active-only v-model="directory" /></el-form-item>
-      <el-form-item label="标签（可选）"><el-select :disabled="managed || !can('edit')" v-model="editor.form.tags" multiple filterable allow-create default-first-option><el-option v-for="tag in editor.form.tags" :key="tag" :label="tag" :value="tag" /></el-select></el-form-item>
-      <el-form-item label="来源文档"><a :href="editor.article.value ? sourceURL(editor.article.value) : ''" target="_blank" rel="noopener noreferrer">{{ editor.article.value ? sourceURL(editor.article.value) : editor.form.external_link }}</a></el-form-item>
-      <el-form-item v-if="managed && editor.article.value && sourceURL(editor.article.value) !== editor.form.external_link" label="原始收录链接"><span>{{ editor.form.external_link }}</span></el-form-item>
-    </el-form>
-    <el-collapse v-if="editor.conflictDraft.value"><el-collapse-item title="查看接管前未保存的资料" name="conflict">
-      <p>这些输入不会写入来源管理字段，可保留作为核对资料。</p>
-      <dl><dt>标题</dt><dd>{{ editor.conflictDraft.value.title }}</dd><dt>作者</dt><dd>{{ editor.conflictDraft.value.author }}</dd><dt>标签</dt><dd>{{ editor.conflictDraft.value.tags.join('、') }}</dd><dt>目录</dt><dd>{{ catalog.label(editor.conflictDraft.value as DirectoryContext) || [editor.conflictDraft.value.module_code, editor.conflictDraft.value.section_code, editor.conflictDraft.value.subsection_code].filter(Boolean).join(' / ') }}</dd><dt>链接</dt><dd>{{ editor.conflictDraft.value.external_link }}</dd></dl>
-      <el-button @click="copyConflictDraft">复制旧输入</el-button><el-button @click="editor.conflictDraft.value = undefined">清除这份旧输入</el-button>
-    </el-collapse-item></el-collapse>
-    <el-collapse v-if="editor.article.value?.content"><el-collapse-item title="查看历史正文" name="content"><pre class="historic-content">{{ editor.article.value.content }}</pre></el-collapse-item></el-collapse>
+    <el-drawer class="article-hold-sheet" v-model="holdOpen" :title="holdRequested ? '紧急下架' : '解除本地下架'" size="min(520px, 100%)" :close-on-click-modal="false" :before-close="beforeHoldClose"><p class="hold-title">{{ editor.article.value?.title }}</p><p class="card-note">{{ holdRequested ? '只阻止 miniblog 阅读，不撤回外部原文权限，也不改写来源发布状态。' : '解除后需重新同步核验来源，再按来源及目录状态决定是否公开。解除不等于立即公开。' }}</p><el-alert v-if="holdError" :title="holdError" type="error" :closable="false" /><el-form v-if="holdRequested" label-position="top"><el-form-item label="下架原因（可选）"><el-input v-model="holdReason" type="textarea" :rows="4" :disabled="editor.loading.value" placeholder="记录本次暂时下架的原因" /></el-form-item></el-form><template #footer><el-button :disabled="editor.loading.value" @click="beforeHoldClose(() => holdOpen = false)">取消</el-button><el-button type="primary" :loading="editor.loading.value" @click="confirmHold">{{ holdRequested ? '确认下架' : '确认解除' }}</el-button></template></el-drawer>
   </div>
 </template>
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { onBeforeRouteLeave, useRoute } from 'vue-router';
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import DirectoryPicker from '@/components/content/DirectoryPicker.vue';
 import { useArticleEditor } from '@/composables/useArticleEditor';
@@ -47,9 +38,9 @@ import { canArticleAction, isManagedArticle, sourceURL } from '@/utils/article-a
 import { errorMessage } from '@/utils/api-error';
 defineProps<{ isEdit: boolean }>();
 const route = useRoute(); const editor = useArticleEditor(); const catalog = useCatalog(); const workspace = useWorkspace(); const catalogError = ref('');
-const managed = computed(() => isManagedArticle(editor.article.value));
-const can = (action: string) => canArticleAction(editor.article.value, action);
-const canSave = computed(() => can(managed.value ? 'edit_local_fields' : 'edit'));
+const managed = computed(() => isManagedArticle(editor.article.value)); const can = (action: string) => canArticleAction(editor.article.value, action); const canSave = computed(() => can(managed.value ? 'edit_local_fields' : 'edit'));
+const articleDirectory = computed(() => [editor.article.value?.module?.title, editor.article.value?.section?.title, editor.article.value?.subsection?.title || (editor.article.value?.section ? '直属章节' : '')].filter(Boolean).join(' / ') || '目录尚未提供');
+const visibility = computed(() => editor.article.value?.effective_visibility === true ? '前台可见' : editor.article.value?.effective_visibility === false ? '前台不可见' : '尚未提供');
 const directory = computed<DirectoryContext>({ get: () => ({ module_code: editor.form.module_code, section_code: editor.form.section_code, subsection_code: editor.form.subsection_code || '' }), set: value => { Object.assign(editor.form, value); } });
 const load = () => editor.load(String(route.params.id || ''));
 async function save() { if (!managed.value && !catalog.valid(directory.value)) { editor.error.value = '请选择有效目录'; return; } if (await editor.save()) { workspace.invalidateArticles(); ElMessage.success(managed.value ? '本地作者信息已保存' : '文章资料已保存，发布状态保持'); } }
@@ -58,20 +49,17 @@ async function changeStatus(command: 'publish' | 'unpublish' | 'archive' | 'rest
   if (command === 'archive') { try { await ElMessageBox.confirm('归档后文章移出前台，记录仍保留，可恢复为草稿。', '归档文章'); } catch { return; } }
   if (await editor.changeStatus(command, true)) { workspace.invalidateArticles(); ElMessage.success('状态已更新'); }
 }
-async function copyConflictDraft() {
-  const draft = editor.conflictDraft.value; if (!draft) return;
-  const text = `标题：${draft.title}\n作者：${draft.author}\n标签：${draft.tags.join('、')}\n目录：${[draft.module_code, draft.section_code, draft.subsection_code].filter(Boolean).join(' / ')}\n链接：${draft.external_link}`;
-  try { await navigator.clipboard.writeText(text); ElMessage.success('旧输入已复制'); } catch { editor.error.value = '无法自动复制，请从上方资料中选择并复制。'; }
-}
-async function changeHold(held: boolean) {
-  let reason: string | undefined;
-  try {
-    if (held) reason = (await ElMessageBox.prompt('只阻止 miniblog 阅读，不撤回外部原文权限。可填写原因。', '紧急下架', { inputPlaceholder: '可选原因', confirmButtonText: '确认下架' })).value;
-    else await ElMessageBox.confirm('解除后需重新同步核验来源，再按来源及目录状态决定是否公开。是否继续？', '解除本地下架');
-  } catch { return; }
-  if (await editor.changeHold(held, reason)) { workspace.invalidateArticles(); ElMessage.success('本地下架状态已更新'); }
-}
-onBeforeRouteLeave(async () => { if (!editor.dirty.value) return true; try { await ElMessageBox.confirm('修改尚未保存，是否离开？', '未保存修改', { confirmButtonText: '离开', cancelButtonText: '继续编辑' }); return true; } catch { return false; } });
+async function copyConflictDraft() { const draft = editor.conflictDraft.value; if (!draft) return; const text = `标题：${draft.title}\n作者：${draft.author}\n标签：${draft.tags.join('、')}\n目录：${[draft.module_code, draft.section_code, draft.subsection_code].filter(Boolean).join(' / ')}\n链接：${draft.external_link}`; try { await navigator.clipboard.writeText(text); ElMessage.success('旧输入已复制'); } catch { editor.error.value = '无法自动复制，请从上方资料中选择并复制。'; } }
+const holdOpen = ref(false); const holdRequested = ref(true); const holdReason = ref(''); const holdError = ref('');
+function openHold(held: boolean) { if (editor.loading.value || !can(held ? 'hold' : 'release_hold')) return; holdRequested.value = held; holdReason.value = ''; holdError.value = ''; holdOpen.value = true; }
+async function beforeHoldClose(done: () => void) { if (editor.loading.value) return; if (holdRequested.value && holdReason.value) { try { await ElMessageBox.confirm('下架原因尚未提交，放弃本次输入？', '未提交操作'); } catch { return; } } done(); }
+async function confirmHold() { if (await editor.changeHold(holdRequested.value, holdRequested.value ? holdReason.value : undefined)) { workspace.invalidateArticles(); holdOpen.value = false; ElMessage.success('本地下架状态已更新'); } else holdError.value = editor.error.value || '操作未完成，请核对当前允许操作'; }
+async function confirmLeave() { if (!editor.dirty.value && !(holdOpen.value && holdReason.value)) return true; try { await ElMessageBox.confirm('修改尚未保存，是否离开？', '未保存修改', { confirmButtonText: '离开', cancelButtonText: '继续编辑' }); return true; } catch { return false; } }
+onBeforeRouteLeave(confirmLeave);
+onBeforeRouteUpdate(async to => String(to.params.id || '') === String(route.params.id || '') || await confirmLeave());
 onMounted(async () => { await Promise.all([load(), catalog.load().catch(cause => { catalogError.value = errorMessage(cause, '加载目录失败'); })]); });
 </script>
-<style scoped>.article-form { padding:24px; max-width:1100px; } .toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:16px; } .hint { color:var(--el-text-color-secondary); } .dirty { color:var(--el-color-warning); } .el-select { width:100%; } .historic-content { white-space:pre-wrap; word-break:break-word; }</style>
+<style scoped>
+.article-detail { min-width:0; } .back-link { color:var(--admin-muted); font-size:13px; display:inline-flex; align-items:center; min-height:40px; text-decoration:none; margin-bottom:14px; } .detail-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin-bottom:24px; } .eyebrow { font-size:12px; color:var(--admin-muted); margin:0 0 8px; } h1 { color:var(--admin-ink); font-size:26px; margin:0; letter-spacing:-.8px; overflow-wrap:anywhere; } .directory-path { color:var(--admin-muted); font-size:13px; line-height:1.8; overflow-wrap:anywhere; margin:10px 0 0; } .detail-grid { display:grid; grid-template-columns:minmax(0,1fr) 285px; gap:24px; align-items:start; } .detail-main { min-width:0; } .detail-card { padding:24px; border:1px solid var(--admin-line); border-radius:8px; background:white; margin-bottom:20px; min-width:0; } h2 { font-size:17px; color:var(--admin-ink); margin:0; } .card-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; } .readonly-label { color:var(--admin-muted); background:var(--admin-canvas); font-size:12px; border-radius:20px; padding:5px 9px; } .card-note { font-size:13px; color:var(--admin-muted); line-height:1.8; margin:12px 0 18px; } dl { margin:20px 0; } dt { font-size:12px; color:var(--admin-muted); margin-top:20px; } dd { font-size:14px; color:var(--admin-ink); margin:7px 0 0; line-height:1.8; overflow-wrap:anywhere; } dd .el-tag { margin:0 6px 6px 0; } .raw-link { font-size:12px; color:var(--admin-muted); word-break:break-all; margin:6px 0 0; line-height:1.7; } .source-document,.sync-link { color:var(--admin-green); text-decoration:none; } .sync-link { font-size:13px; display:inline-flex; align-items:center; min-height:40px; } .muted { color:var(--admin-muted); } .el-select { width:100%; } .manual-source { padding-top:16px; border-top:1px solid var(--admin-line); color:var(--admin-muted); font-size:12px; line-height:1.8; } .manual-source a { float:right; color:var(--admin-green); } .save-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; border-top:1px solid var(--admin-line); padding-top:20px; margin-top:20px; } .save-footer .card-note { margin:0; font-size:12px; } .dirty { font-size:12px; color:#9b6518; } .publication-card { position:sticky; top:100px; } .publication-card dl { padding-bottom:16px; border-bottom:1px solid var(--admin-line); } .available { color:var(--admin-green); } .hold-note { font-size:13px; color:#a34f39; line-height:1.75; overflow-wrap:anywhere; } .publication-actions { display:flex; flex-direction:column; gap:10px; } .publication-actions :deep(.el-button) { margin:0; } .historic-content { white-space:pre-wrap; word-break:break-word; font-size:12px; color:var(--admin-muted); line-height:1.8; } .detail-state { min-height:240px; display:grid; place-content:center; color:var(--admin-muted); } .detail-error { margin-bottom:18px; } .hold-title { font-weight:600; overflow-wrap:anywhere; line-height:1.7; } @media(max-width:1100px) { .detail-grid { grid-template-columns:minmax(0,1fr) 250px; gap:16px; } .detail-card { padding:20px; } } @media(max-width:780px) { .detail-grid { display:block; } h1 { font-size:24px; } .detail-heading { flex-wrap:wrap; gap:12px; margin-bottom:18px; } .detail-card { padding:18px; border-radius:8px; margin-bottom:16px; } .publication-card { position:static; } .save-footer { align-items:flex-start; } .save-footer .el-button { width:100%; } .back-link,.sync-link { min-height:44px; } .publication-actions { flex-direction:row; flex-wrap:wrap; } .publication-actions :deep(.el-button) { flex:1 1 130px; } }
+@media(max-width:780px) { :global(.article-hold-sheet) { width:100%!important; } }
+</style>

@@ -4,7 +4,7 @@ import permissionStore from './store/modules/permission';
 import NProgress from 'nprogress'; // progress bar
 import 'nprogress/nprogress.css'; // progress bar style
 import { ElMessage } from 'element-plus';
-import { getToken } from './utils/auth'; // get token from cookie
+import { getToken } from './utils/auth'; // get token from local storage
 import getPageTitle from './utils/get-page-title';
 
 NProgress.configure({ showSpinner: false }); // NProgress Configuration
@@ -61,14 +61,15 @@ router.beforeEach(async (to, from, next) => {
           // its authorized dynamic route existed. Rematch the original local URL.
           const original = to.redirectedFrom?.fullPath;
           const target = original?.startsWith('/') && !original.startsWith('//') ? original : to.fullPath;
-          next({ path: target, replace: true });
+          const resolved = router.resolve(target);
+          next({ path: resolved.path, query: resolved.query, hash: resolved.hash, replace: true });
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error: any) {
           // remove token and go to login page to re-login
           await userStore().resetToken();
           ElMessage.error(error.message || 'Has Error');
           NProgress.done();
-          next(`/login?redirect=${to.path}`);
+          next({ path: '/login', query: { redirect: to.redirectedFrom?.fullPath || to.fullPath }});
         }
       }
     }
@@ -80,7 +81,7 @@ router.beforeEach(async (to, from, next) => {
     } else {
       // other pages that do not have permission to access are redirected to the login page.
       NProgress.done();
-      next(`/login?redirect=${to.path}`);
+      next({ path: '/login', query: { redirect: to.redirectedFrom?.fullPath || to.fullPath }});
     }
   }
 });

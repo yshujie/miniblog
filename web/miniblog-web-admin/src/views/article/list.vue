@@ -1,2 +1,3 @@
-<template><div class="app-container"><ArticleListPanel directory-filters /></div></template>
+<template><div class="article-library"><header class="library-heading"><p>内容工作台</p><h1>文章库</h1><span>跨目录查找文章，核对资料与发布结果。</span></header><ArticleListPanel title="查询结果" directory-filters /></div></template>
 <script setup lang="ts">import ArticleListPanel from '@/components/content/ArticleListPanel.vue'; </script>
+<style scoped>.library-heading { margin-bottom:28px; } .library-heading p { font-size:12px; color:var(--admin-muted); margin:0 0 8px; } h1 { color:var(--admin-ink); font-size:26px; letter-spacing:-1px; margin:0 0 12px; } .library-heading span { color:var(--admin-muted); font-size:14px; } @media(max-width:780px) { h1 { font-size:24px; } .library-heading { margin-bottom:22px; } }</style>

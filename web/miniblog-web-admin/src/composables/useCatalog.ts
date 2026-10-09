@@ -5,6 +5,7 @@ import useSubsectionStore from '@/store/modules/subsection';
 import type { DirectoryContext, CatalogOrder } from '@/types/content';
 import { reorderCatalog } from '@/api/content';
 export interface DirectoryNode extends DirectoryContext { key: string; label: string; kind: CatalogOrder['kind']; code: string; children?: DirectoryNode[] }
+const nodeLabel = (item: { title: string; status?: number }) => item.status === 1 ? item.title : `${item.title}（${item.status === 2 ? '未上架' : '状态待确认'}）`;
 export function useCatalog() {
   const modules = useModuleStore(); const sections = useSectionStore(); const subsections = useSubsectionStore();
   async function load(force = false) {
@@ -15,10 +16,10 @@ export function useCatalog() {
     }));
   }
   const tree = computed<DirectoryNode[]>(() => modules.modules.map(module => ({
-    key: `module:${module.code}`, code: module.code, label: module.status === 1 ? module.title : `${module.title}（未上架）`, kind: 'module', module_code: module.code, section_code: '', subsection_code: '',
+    key: `module:${module.code}`, code: module.code, label: nodeLabel(module), kind: 'module', module_code: module.code, section_code: '', subsection_code: '',
     children: sections.getSectionsByModule(module.code).map(section => ({
-      key: `section:${section.code}`, code: section.code, label: section.status === 1 ? section.title : `${section.title}（未上架）`, kind: 'section', module_code: module.code, section_code: section.code, subsection_code: '',
-      children: subsections.getSubsectionsBySection(section.code).map(subsection => ({ key: `subsection:${subsection.code}`, code: subsection.code, label: subsection.status === 1 ? subsection.title : `${subsection.title}（未上架）`, kind: 'subsection', module_code: module.code, section_code: section.code, subsection_code: subsection.code }))
+      key: `section:${section.code}`, code: section.code, label: nodeLabel(section), kind: 'section', module_code: module.code, section_code: section.code, subsection_code: '',
+      children: subsections.getSubsectionsBySection(section.code).map(subsection => ({ key: `subsection:${subsection.code}`, code: subsection.code, label: nodeLabel(subsection), kind: 'subsection', module_code: module.code, section_code: section.code, subsection_code: subsection.code }))
     }))
   })));
   function valid(context?: DirectoryContext): context is DirectoryContext {

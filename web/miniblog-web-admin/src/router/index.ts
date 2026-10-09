@@ -23,7 +23,7 @@ export const constantRoutes: RouteRecordRaw[] = [
         path: 'home',
         component: () => import('@/views/home/index.vue'),
         name: 'Home',
-        meta: { title: '首页', icon: 'dashboard', affix: true }
+        meta: { title: '工作概览', icon: 'dashboard', affix: true }
       }
     ]
   },
@@ -38,14 +38,14 @@ export const asyncRoutes: RouteRecordRaw[] = [
   {
     path: '/content', component: Layout, redirect: '/content/workbench', name: 'Content',
     meta: { title: '内容工作台', icon: 'tree', roles: ['admin'] },
-    children: [{ path: 'sync', component: () => import('@/views/content/sync.vue'), name: 'ContentSync', meta: { title: 'Notion 同步', icon: 'tree', noCache: true }}, { path: 'workbench', component: () => import('@/views/content/workbench.vue'), name: 'ContentWorkbench', meta: { title: '目录与收录', icon: 'tree', noCache: true }}]
+    children: [{ path: 'sync', component: () => import('@/views/content/sync.vue'), name: 'ContentSync', meta: { title: 'Notion 自动同步', icon: 'tree', noCache: true }}, { path: 'workbench', component: () => import('@/views/content/workbench.vue'), name: 'ContentWorkbench', meta: { title: '目录与收录', icon: 'tree', noCache: true }}]
   },
   {
     path: '/module',
     component: Layout,
     redirect: '/module/list',
     name: 'Module',
-    meta: { title: '模块管理', icon: 'list', roles: ['admin'] },
+    meta: { title: '模块管理', icon: 'list', roles: ['admin'], hidden: true },
     children: [
       {
         path: 'list',
@@ -60,7 +60,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
     component: Layout,
     redirect: '/section/list',
     name: 'Section',
-    meta: { title: '章节管理', icon: 'list', roles: ['admin'] },
+    meta: { title: '章节管理', icon: 'list', roles: ['admin'], hidden: true },
     children: [
       {
         path: 'list',
@@ -75,7 +75,7 @@ export const asyncRoutes: RouteRecordRaw[] = [
     component: Layout,
     redirect: '/subsection/list',
     name: 'Subsection',
-    meta: { title: '子章节管理', icon: 'list', roles: ['admin'] },
+    meta: { title: '子章节管理', icon: 'list', roles: ['admin'], hidden: true },
     children: [
       {
         path: 'list',
@@ -90,25 +90,25 @@ export const asyncRoutes: RouteRecordRaw[] = [
     component: Layout,
     redirect: '/article/list',
     name: 'Article',
-    meta: { title: '文章管理', icon: 'list', roles: ['admin'] },
+    meta: { title: '文章库', icon: 'list', roles: ['admin'] },
     children: [
       {
         path: 'list',
         component: () => import('@/views/article/list.vue'),
         name: 'ArticleList',
-        meta: { title: '文章列表', icon: 'list' }
+        meta: { title: '文章库', icon: 'list' }
       },
       {
         path: 'create',
         component: () => import('@/views/article/create.vue'),
         name: 'CreateArticle',
-        meta: { title: '新增文章', icon: 'edit' }
+        meta: { title: '收录文章', icon: 'edit', hidden: true }
       },
       {
         path: 'edit/:id(\\d+)',
         component: () => import('@/views/article/edit.vue'),
         name: 'EditArticle',
-        meta: { title: '编辑文章', hidden: true, activeMenu: '/article/list' }
+        meta: { title: '文章资料', hidden: true, activeMenu: '/article/list' }
       }
     ]
   }

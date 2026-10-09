@@ -86,4 +86,16 @@ describe('quick collection drawer', () => {
     expect(changeArticleStatus).toHaveBeenCalledWith(article.id, 'restore'); expect(registerArticle).not.toHaveBeenCalled(); expect(moveArticle).not.toHaveBeenCalled();
     expect(wrapper.get('[data-test="collect-duplicate"]').text()).toContain('草稿');
   });
+  it('retries an uncertain publish-and-continue with the same payload/key, then keeps the sheet open', async () => {
+    await open(); await fill();
+    vi.mocked(registerArticle).mockRejectedValueOnce(new Error('connection lost')).mockResolvedValueOnce({ outcome: 'created', article });
+    await wrapper.get('[data-test="collect-continue"]').trigger('click'); await flushPromises();
+    expect(wrapper.get('input[data-test="collect-title"]').attributes('disabled')).toBeDefined();
+    const first = vi.mocked(registerArticle).mock.calls[0];
+    await wrapper.findAll('button').find(button => button.text() === '原样重试')!.trigger('click'); await flushPromises();
+    expect(vi.mocked(registerArticle).mock.calls[1]).toEqual(first);
+    expect(wrapper.get('input[data-test="collect-link"]').element).toHaveProperty('value', '');
+    expect(wrapper.get('input[data-test="collect-title"]').attributes('disabled')).toBeUndefined();
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+  });
 });
