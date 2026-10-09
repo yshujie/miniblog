@@ -150,7 +150,7 @@ def running_image():
     return value["image"]
 
 
-def database_environment():
+def database_environment(require_scheduler_off=True):
     values = docker_json(["inspect", "--format", "{{json .Config.Env}}", "miniblog-backend"])
     if not isinstance(values, list):
         raise SafeError("backend environment metadata is invalid")
@@ -159,7 +159,7 @@ def database_environment():
         if isinstance(value, str) and "=" in value:
             key, entry = value.split("=", 1)
             current[key] = entry
-    if current.get("MINIBLOG_NOTION_SYNC_ENABLED", "").lower() not in ("false", "0"):
+    if require_scheduler_off and current.get("MINIBLOG_NOTION_SYNC_ENABLED", "").lower() not in ("false", "0"):
         raise SafeError("disable the runtime scheduler before rollout auditing")
     database = {}
     for key, fallback in DB_KEYS.items():
@@ -187,7 +187,7 @@ def sanitized_task_output(raw, env_file):
         if "=" not in line:
             continue
         key, value = line.split("=", 1)
-        if key in ("MINIBLOG_NOTION_TOKEN", "MYSQL_PASSWORD") and value:
+        if key in ("MINIBLOG_NOTION_TOKEN", "MINIBLOG_NOTION_BOOTSTRAP_TOKEN", "MYSQL_PASSWORD") and value:
             secret_values.append(value)
     for value in sorted(secret_values, key=len, reverse=True):
         raw = raw.replace(value, "[REDACTED]")
@@ -198,6 +198,10 @@ def docker_task(image, directory, env_file, binary, args, label, network=False):
     log = directory / (label + ".log")
     name = "miniblog-notion-ops-" + directory.name + "-" + label
     owner = secrets.token_hex(16)
+    # Durable, private ownership receipt lets the cancellation step clean only
+    # this run when SSH dies before the local finally block completes.
+    receipt = directory / ("container-" + label + ".json")
+    atomic_private(receipt, json.dumps({"name": name, "owner": owner}) + "\n")
     # Never reuse or remove a pre-existing task, even with the same run identifier.
     exists = subprocess.run(["docker", "container", "inspect", name],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30, check=False)

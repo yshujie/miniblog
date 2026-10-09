@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 import sys
 
-MODES = ("deploy_token", "cleanup_deploy", "cleanup_ops", "schema_check", "dry_run", "bootstrap_preview")
+MODES = ("deploy_token", "cleanup_deploy", "cleanup_ops", "schema_check", "dry_run", "bootstrap_preview", "rollout", "cleanup_rollout")
 
 class SafeError(Exception):
     pass
@@ -97,6 +97,52 @@ def stage_command(operation, stage, run):
     return "python3 -c " + shlex.quote(code) + " " + shlex.quote(stage) + " " + shlex.quote(run)
 
 
+ROLLOUT_CLEANUP_CODE = r"""import json, os, pathlib, re, stat, subprocess, sys
+run = sys.argv[1]
+if not re.fullmatch(r"[0-9]+-[0-9]+", run):
+    sys.exit(1)
+root = pathlib.Path('/opt/miniblog/ops/notion/rollout-' + run)
+try:
+    info = root.lstat()
+except FileNotFoundError:
+    sys.exit(0)
+if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+    sys.exit(1)
+for parent in (root.parent.parent, root.parent):
+    info = parent.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        sys.exit(1)
+def read(path):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd) as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+            raise ValueError()
+        return json.load(stream)
+if read(root / 'operation.json').get('run_id') != run:
+    sys.exit(1)
+for path in root.glob('container-*.json'):
+    row = read(path)
+    name, owner = row.get('name', ''), row.get('owner', '')
+    if not name.startswith('miniblog-notion-ops-rollout-' + run + '-') or not re.fullmatch(r'[0-9a-f]{32}', owner):
+        sys.exit(1)
+    result = subprocess.run(['docker', 'container', 'inspect', '--format', '{{index .Config.Labels "miniblog.notion-ops.owner"}}', name], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=30)
+    if result.returncode == 0:
+        if result.stdout.strip() != owner:
+            sys.exit(1)
+        if subprocess.run(['docker', 'rm', '-f', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30).returncode:
+            sys.exit(1)
+for path in root.glob('*.env'):
+    info = path.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        sys.exit(1)
+    path.unlink()
+"""
+
+def rollout_cleanup_command(run):
+    return "python3 -c " + shlex.quote(ROLLOUT_CLEANUP_CODE) + " " + shlex.quote(run)
+
+
 class SafeParser(argparse.ArgumentParser):
     def error(self, _message):
         raise SafeError("operation arguments are invalid")
@@ -122,8 +168,28 @@ def main():
                 or not port.isdigit() or not 1 <= int(port) <= 65535
                 or not re.fullmatch(r"[0-9]+-[0-9]+", run)):
             raise SafeError("SSH destination or run identifier is invalid")
+        rollout_action = os.environ.get("NOTION_ROLLOUT_ACTION", "")
+        review_id = os.environ.get("NOTION_MANIFEST_ID", "")
+        review_hash = os.environ.get("NOTION_MANIFEST_SHA256", "")
+        image_sha = os.environ.get("NOTION_EXPECTED_IMAGE_SHA", "")
+        revision = os.environ.get("NOTION_EXPECTED_CONFIG_REVISION", "")
+        rollout_actions = {"pause", "resume", "catalog_prepare", "catalog_bind", "catalog_activate", "source_update", "bootstrap_preview", "bootstrap_apply", "sync", "scheduler_on", "scheduler_off"}
+        if args.mode == "rollout" and (rollout_action not in rollout_actions
+                or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", review_id)
+                or not re.fullmatch(r"[0-9a-f]{64}", review_hash)
+                or not re.fullmatch(r"[0-9a-f]{40}", image_sha)
+                or not re.fullmatch(r"0|[1-9][0-9]{0,19}", revision)):
+            raise SafeError("reviewed operation inputs are invalid")
         token = os.environ.get("MINIBLOG_NOTION_TOKEN", "")
-        if args.mode not in ("cleanup_deploy", "cleanup_ops") and token and not re.fullmatch(r"[A-Za-z0-9_-]{10,4096}", token):
+        writer = os.environ.get("MINIBLOG_NOTION_BOOTSTRAP_TOKEN", "")
+        if args.mode == "rollout":
+            if rollout_action in {"catalog_prepare", "bootstrap_preview", "bootstrap_apply", "sync", "scheduler_on"} and not token:
+                raise SafeError("dedicated read credential is not configured")
+            if (rollout_action == "bootstrap_apply") != bool(writer):
+                raise SafeError("writer credential is restricted to bootstrap apply")
+            if writer and not re.fullmatch(r"[A-Za-z0-9_-]{10,4096}", writer):
+                raise SafeError("invalid writer credential format")
+        if args.mode not in ("cleanup_deploy", "cleanup_ops", "cleanup_rollout") and token and not re.fullmatch(r"[A-Za-z0-9_-]{10,4096}", token):
             raise SafeError("invalid read credential format")
         if args.mode in ("schema_check", "dry_run", "bootstrap_preview") and not token:
             raise SafeError("dedicated read credential is not configured")
@@ -158,7 +224,7 @@ def main():
             common = ["-i", str(temp / "key"), "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes",
                       "-o", "ConnectTimeout=15", "-o", "LogLevel=ERROR", "-o", "StrictHostKeyChecking=" + ("yes" if fingerprint else "accept-new"),
                       "-o", "UserKnownHostsFile=" + str(temp / "known_hosts")]
-            stage = "/tmp/miniblog-notion-" + ("deploy-" if args.mode in ("deploy_token", "cleanup_deploy") else "ops-") + run
+            stage = "/tmp/miniblog-notion-" + ("deploy-" if args.mode in ("deploy_token", "cleanup_deploy") else ("rollout-" if args.mode in ("rollout", "cleanup_rollout") else "ops-")) + run
             def ssh(command, timeout=1800, failure="remote SSH command failed"):
                 try:
                     result = subprocess.run(["ssh", *common, "-p", port, destination, command],
@@ -168,7 +234,9 @@ def main():
                 if result.returncode:
                     raise SafeError(ssh_error_category(result.stderr, result.returncode, failure))
                 return 0
-            if args.mode in ("cleanup_deploy", "cleanup_ops"):
+            if args.mode in ("cleanup_deploy", "cleanup_ops", "cleanup_rollout"):
+                if args.mode == "cleanup_rollout":
+                    ssh(rollout_cleanup_command(run), 120, "owned maintenance container cleanup failed")
                 if ssh(stage_command("cleanup", stage, run), 60, "remote private staging cleanup failed"):
                     raise SafeError("remote private staging cleanup failed")
                 print("Private operation staging removed.")
@@ -183,7 +251,15 @@ def main():
                 private_write(temp / "credential", token)
                 shutil.copyfile(Path(__file__).with_name("remote.py"), temp / "remote.py")
                 os.chmod(temp / "remote.py", 0o600)
-                for name in ("remote.py", "credential"):
+                files = ["remote.py", "credential"]
+                if args.mode == "rollout":
+                    shutil.copyfile(Path(__file__).with_name("rollout.py"), temp / "rollout.py")
+                    os.chmod(temp / "rollout.py", 0o600)
+                    files.append("rollout.py")
+                    if writer:
+                        private_write(temp / "writer", writer)
+                        files.append("writer")
+                for name in files:
                     try:
                         result = subprocess.run(["scp", *common, "-P", port, str(temp / name), destination + ":" + stage + "/" + name],
                                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=120, check=False)
@@ -195,6 +271,16 @@ def main():
                     deployment_handoff = True
                     print("Read credential staged privately for deployment.")
                     return 0  # The next deployment step consumes it; always() cleanup removes staging.
+                if args.mode == "rollout":
+                    command = ("python3 " + stage + "/rollout.py --app-dir /opt/miniblog --action " + shlex.quote(rollout_action) +
+                               " --manifest-id " + shlex.quote(review_id) + " --manifest-sha256 " + review_hash +
+                               " --expected-image-sha " + image_sha + " --expected-config-revision " + revision +
+                               " --run-id " + run + (" --reader " + stage + "/credential" if token else "") +
+                               (" --writer " + stage + "/writer" if writer else ""))
+                    print("Restricted server reports: /opt/miniblog/ops/notion/rollout-" + run, flush=True)
+                    ssh(command, failure="reviewed maintenance failed; inspect restricted server reports")
+                    print("Reviewed maintenance completed: " + rollout_action)
+                    return 0
                 print("Restricted server reports: /opt/miniblog/ops/notion/" + run, flush=True)
                 command = ("python3 " + stage + "/remote.py read-only --app-dir /opt/miniblog --credential " +
                            stage + "/credential --mode " + args.mode + " --run-id " + run)
