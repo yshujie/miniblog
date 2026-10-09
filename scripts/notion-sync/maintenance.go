@@ -156,10 +156,10 @@ func executeMaintenanceCommand(ctx context.Context, service *notionsync.Service,
 		}{int64(len(unresolved)), unresolved, control.Paused, control.SourceWritesPaused, control.CurrentRunID, control.LeaseOwner, strconv.FormatUint(control.LeaseEpoch, 10), control.LeaseUntil, control.BaselineFrozen}, nil
 	case "author_resolve":
 		var users []struct{ Nickname string }
-		if err := ds.DB().WithContext(ctx).Model(&model.UserM{}).Select("nickname").Where("status = ?", 1).Limit(2).Find(&users).Error; err != nil {
+		if err := ds.DB().WithContext(ctx).Model(&model.UserM{}).Select("nickname").Limit(2).Find(&users).Error; err != nil {
 			return nil, fmt.Errorf("管理员昵称查询失败")
 		}
-		if len(users) != 1 || strings.TrimSpace(users[0].Nickname) == "" || utf8.RuneCountInString(users[0].Nickname) > 255 || strings.ContainsAny(users[0].Nickname, "\r\n\x00") {
+		if len(users) != 1 || strings.TrimSpace(users[0].Nickname) == "" || utf8.RuneCountInString(users[0].Nickname) > 128 || strings.ContainsAny(users[0].Nickname, "\r\n\x00") {
 			return nil, fmt.Errorf("需明确且唯一的有效管理员昵称")
 		}
 		return struct {

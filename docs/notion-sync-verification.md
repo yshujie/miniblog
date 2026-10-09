@@ -132,3 +132,12 @@ MySQL 验证发现 `ON UPDATE CURRENT_TIMESTAMP` 会在身份升级时改变历�
 切换前实时预检（2026-10-09）：三镜像仍一致 `6c1fecb`，后端 Docker healthy；两前端未配置 Docker Healthcheck，HTTPS 探测通过。schema 6 clean、42 篇文章、47 个 baseline_pending、0 个 managed，五来源版本均为 1/停用。四表旧字段摘要等于上轮初始化后的快照，检查前后逐篇保护与六同步表摘要未变。身份审计无阻断/无重复，2 处既有排序冲突只报告、未调整。
 
 新备份及逐篇保护快照保存在 `/opt/miniblog/backups/notion-rollout-20261009`，目录 0700/文件 0600，压缩备份完整读回验证。此检查不改业务、Notion 或开关；来源写入仍未暂停，实际接管前必须双暂停并确认排空。
+
+
+### Go 真实接管与即时同步守卫（2026-10-09）
+
+- [PR #6](https://github.com/yshujie/miniblog/pull/6) 已合并，兼容版本 `e83a043` 经 [部署 37866184325](https://github.com/yshujie/miniblog/actions/runs/37866184325) 发布。三服务实际镜像与不可变 ID 核验通过，后端 healthy、两前端 HTTPS 可达；schema 6 和冻结 47 页保持，定时同步仍关闭。私有备份完整读回，历史逐篇保护快照在接管前一致。
+- 双暂停排空后，Go 准备七个主题绑定，复用五个原章节并按批准改名；仅 Go 来源启用、配置版本 3。最终五库预览 [37866950510](https://github.com/yshujie/miniblog/actions/runs/37866950510) 完整读取 47 页，原批准 Go 38 页没有实质变化，按最新指纹分批执行。
+- [24 个草稿来源回填/接管 37867327179](https://github.com/yshujie/miniblog/actions/runs/37867327179) 与 [14 篇已发布历史文章回填/接管 37867811870](https://github.com/yshujie/miniblog/actions/runs/37867811870) 成功，全部逐页回读确认。草稿未分配文章 ID，14 篇保留原 ID。其他九页仍待逐库审核；未对其写 Notion。
+- 解除维护暂停后，[即时同步 37868171002](https://github.com/yshujie/miniblog/actions/runs/37868171002) 在默认作者解析阶段被拒绝，尚未开始同步页面，不将该任务记为完成扫描或公开恢复。只读统计显示生产只有一个账号、昵称非空、历史 status=0；现有登录不按该字段过滤。默认作者解析移除错误的 status=1 假设，保留唯一账号、有效昵称和 128 字符限制，补真实 MySQL 回归；不修改账号和权限。
+- 已接管文章须通过新鲜同步解除待核验保护；定时试运行、真实新页全流程、匿名 Notion 阅读、实际手机和使用确认仍须分别记录，不能由接管成功替代。

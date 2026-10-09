@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -148,6 +149,90 @@ func TestAuthorResolveAndDrainEvidence(t *testing.T) {
 	}
 	if result["unresolved_bootstrap_count"] != float64(2) || result["baseline_frozen"] != true || result["lease_epoch"] != "0" {
 		t.Fatal(result)
+	}
+}
+
+type authorResolutionCase struct {
+	name     string
+	statuses []int
+	nickname string
+	accepted bool
+}
+
+func authorResolutionCases() []authorResolutionCase {
+	return []authorResolutionCase{
+		{name: "sole_legacy_status_0", statuses: []int{0}, nickname: "博客作者", accepted: true},
+		{name: "sole_status_1", statuses: []int{1}, nickname: "博客作者", accepted: true},
+		{name: "cross_status_ambiguous", statuses: []int{0, 1}, nickname: "博客作者"},
+		{name: "128_runes", statuses: []int{0}, nickname: strings.Repeat("中", 128), accepted: true},
+		{name: "129_runes", statuses: []int{1}, nickname: strings.Repeat("中", 129)},
+		{name: "empty_nickname", statuses: []int{0}},
+		{name: "control_character", statuses: []int{0}, nickname: "博客\n作者"},
+	}
+}
+
+func assertAuthorResolutionCase(t *testing.T, gdb *gorm.DB, test authorResolutionCase) {
+	t.Helper()
+	if err := gdb.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&model.UserM{}).Error; err != nil {
+		t.Fatal("author fixture reset failed")
+	}
+	for i, status := range test.statuses {
+		if err := gdb.Model(&model.UserM{}).Create(map[string]interface{}{
+			"id": i + 1, "username": fmt.Sprintf("fixture%d", i+1), "password": "private-fixture-hash",
+			"nickname": test.nickname, "status": status,
+		}).Error; err != nil {
+			t.Fatal("author fixture creation failed")
+		}
+	}
+	resolved, err := executeMaintenanceCommand(context.Background(), nil, store.NewStore(gdb), "author_resolve", maintenanceCommand{})
+	if (err == nil) != test.accepted {
+		t.Fatal("unexpected author resolution acceptance")
+	}
+	if err != nil {
+		if resolved != nil {
+			t.Fatal("rejected author returned result")
+		}
+	} else {
+		var result struct {
+			Author string `json:"author"`
+		}
+		raw, marshalErr := json.Marshal(resolved)
+		if marshalErr != nil || json.Unmarshal(raw, &result) != nil || result.Author != test.nickname {
+			t.Fatal("resolved author changed")
+		}
+	}
+	var users []struct {
+		Status   int
+		Password string
+	}
+	if err := gdb.Model(&model.UserM{}).Select("status", "password").Order("id").Find(&users).Error; err != nil {
+		t.Fatal("author fixture readback failed")
+	}
+	if len(users) != len(test.statuses) {
+		t.Fatal("author lookup changed account count")
+	}
+	for i, user := range users {
+		if user.Status != test.statuses[i] || user.Password != "private-fixture-hash" {
+			t.Fatal("author lookup changed account fields")
+		}
+	}
+}
+
+func TestAuthorResolveAccountAndNicknameRules(t *testing.T) {
+	gdb, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool, err := gdb.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	if err = gdb.AutoMigrate(&model.UserM{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range authorResolutionCases() {
+		t.Run(test.name, func(t *testing.T) { assertAuthorResolutionCase(t, gdb, test) })
 	}
 }
 
