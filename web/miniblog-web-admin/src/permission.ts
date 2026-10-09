@@ -61,7 +61,8 @@ router.beforeEach(async (to, from, next) => {
           // its authorized dynamic route existed. Rematch the original local URL.
           const original = to.redirectedFrom?.fullPath;
           const target = original?.startsWith('/') && !original.startsWith('//') ? original : to.fullPath;
-          next({ path: target, replace: true });
+          const resolved = router.resolve(target);
+          next({ path: resolved.path, query: resolved.query, hash: resolved.hash, replace: true });
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error: any) {
           // remove token and go to login page to re-login

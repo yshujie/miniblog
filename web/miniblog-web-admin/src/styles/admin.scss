@@ -22,3 +22,14 @@ p { color:var(--admin-muted); }h1,h2,h3 { line-height:1.45; }img { max-width:100
 }
 @media(max-width:360px) { .admin-surface { padding:16px; }.el-drawer__footer { padding-left:12px; padding-right:12px; } }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition-duration:0.01ms !important; animation-duration:0.01ms !important; } }
+
+/* Loaded component styles must not restore a second gap above drawer content. */
+.el-drawer .el-drawer__header { margin-bottom:0; }
+.el-drawer .el-drawer__body { min-height:0; overflow:auto; }
+.el-drawer .el-drawer__footer { flex-shrink:0; }
+
+@media(max-width:780px) {
+  .el-select .el-select__wrapper { min-height:44px; }
+  .el-switch { min-height:44px; min-width:44px; }
+  .el-checkbox { min-height:44px; height:auto; }
+}
