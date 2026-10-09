@@ -44,7 +44,10 @@ func runWithDependencies(args []string, out, errout io.Writer, deps dependencies
 	fs := flag.NewFlagSet("notion-sync", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	config := mysqlconfig.Bind(fs)
-	mode := fs.String("mode", "dry_run", "schema_check|catalog_prepare|dry_run|sync|status|bootstrap_preview|bootstrap_apply")
+	mode := fs.String("mode", "dry_run", "schema_check|catalog_prepare|dry_run|sync|status|bootstrap_preview|bootstrap_apply|control_update|source_update|catalog_bind|catalog_activate|author_resolve|drain_status|run_status")
+	runID := fs.String("run-id", "", "run_status 的运行 UUID")
+	commandInput := fs.String("input", "", "维护命令严格 JSON 输入文件")
+	catalogPlan := fs.String("catalog-plan", "", "目录准备审核复用映射 JSON 文件")
 	sourceID := fs.String("source-id", "", "catalog_prepare 的单个白名单 data source ID")
 	revision := fs.Uint64("expected-config-revision", 0, "catalog_prepare 审核时的来源配置版本")
 	manualMatches := fs.String("manual-matches", "", "bootstrap_preview 手工关联 BootstrapReviewInput JSON 文件")
@@ -77,7 +80,11 @@ func runWithDependencies(args []string, out, errout io.Writer, deps dependencies
 			revisionSet = true
 		}
 	})
-	if e := validateCatalogArguments(*mode, *sourceID, *revision, revisionSet); e != nil {
+	if e := validateRunArguments(*mode, *runID); e != nil {
+		fmt.Fprintln(errout, "运行参数无效")
+		return 2
+	}
+	if e := validateMaintenanceArguments(*mode, *sourceID, *revision, revisionSet, *commandInput, *catalogPlan); e != nil {
 		fmt.Fprintln(errout, e)
 		return 2
 	}
@@ -111,6 +118,11 @@ func runWithDependencies(args []string, out, errout io.Writer, deps dependencies
 		}
 		return 0
 	}
+	maintenance, e := readMaintenanceCommand(*mode, *sourceID, *revision, *commandInput, *catalogPlan)
+	if e != nil {
+		fmt.Fprintln(errout, "维护输入无效，请核对字段、来源及版本")
+		return 2
+	}
 	var review notionsync.BootstrapReviewInput
 	if *manualMatches != "" {
 		if e := readStrictJSON(*manualMatches, &review); e != nil {
@@ -135,6 +147,12 @@ func runWithDependencies(args []string, out, errout io.Writer, deps dependencies
 			return 2
 		}
 	}
+	if *mode == "bootstrap_apply" && *sourceID != "" {
+		if e := applyBootstrapScope(&input, *sourceID, *revision); e != nil {
+			fmt.Fprintln(errout, "确认文件与命令来源或版本不一致")
+			return 2
+		}
+	}
 	gdb, e := deps.connect(config.DBOptions(1))
 	if e != nil {
 		fmt.Fprintln(errout, "连接数据库失败")
@@ -146,11 +164,26 @@ func runWithDependencies(args []string, out, errout io.Writer, deps dependencies
 		return 1
 	}
 	defer sqlDB.Close()
-	service := notionsync.New(store.NewStore(gdb), notionsync.Options{Enabled: *enableSync, Author: *author, Client: deps.client(os.Getenv("MINIBLOG_NOTION_TOKEN"))})
+	authorSet := false
+	fs.Visit(func(value *flag.Flag) {
+		if value.Name == "author" {
+			authorSet = true
+		}
+	})
+	effectiveAuthor := *author
+	if !authorSet {
+		effectiveAuthor = os.Getenv("MINIBLOG_NOTION_SYNC_AUTHOR")
+	}
+	service := notionsync.New(store.NewStore(gdb), notionsync.Options{Enabled: *enableSync, Author: effectiveAuthor, Client: deps.client(os.Getenv("MINIBLOG_NOTION_TOKEN"))})
+	defer func() {
+		shutdown, done := context.WithTimeout(context.Background(), 5*time.Second)
+		defer done()
+		_ = service.Stop(shutdown)
+	}()
 	var result interface{}
 	switch *mode {
 	case "catalog_prepare":
-		prepared, prepareErr := service.PrepareCatalog(ctx, notionsync.CatalogPrepareInput{SourceID: *sourceID, ExpectedConfigRevision: *revision})
+		prepared, prepareErr := service.PrepareCatalog(ctx, maintenance.CatalogPlan)
 		result, e = prepared, prepareErr
 		if e == nil && prepared != nil {
 			for _, item := range prepared.Items {
@@ -160,6 +193,10 @@ func runWithDependencies(args []string, out, errout io.Writer, deps dependencies
 				}
 			}
 		}
+	case "control_update", "source_update", "catalog_bind", "catalog_activate", "author_resolve", "drain_status":
+		result, e = executeMaintenanceCommand(ctx, service, store.NewStore(gdb), *mode, maintenance)
+	case "run_status":
+		result, e = service.Run(ctx, *runID)
 	case "status":
 		result, e = service.Status(ctx)
 	case "bootstrap_preview":
@@ -171,13 +208,25 @@ func runWithDependencies(args []string, out, errout io.Writer, deps dependencies
 			} else {
 				run, readErr := service.Run(ctx, preview.RunID)
 				if readErr != nil {
-					// Database/driver errors may contain connection details. Do not echo them.
 					e = fmt.Errorf("无法核验历史预览运行结果，请查看运行记录")
 				} else {
 					e = validatePreviewRun(run)
 				}
+				if e == nil {
+					items, readErr := readAllItems(ctx, service, preview.RunID)
+					if readErr != nil {
+						e = fmt.Errorf("无法读取完整历史预览审计记录")
+					} else {
+						result = struct {
+							*notionsync.BootstrapPreviewResult
+							Run      *notionsync.RunDTO   `json:"run"`
+							RunItems []notionsync.ItemDTO `json:"run_items"`
+						}{preview, run, items}
+					}
+				}
 			}
 		}
+
 	case "bootstrap_apply":
 		applied, applyErr := service.BootstrapApply(ctx, input, source.NewNotionSyncClient(os.Getenv("MINIBLOG_NOTION_BOOTSTRAP_TOKEN")))
 		result, e = applied, applyErr
@@ -233,7 +282,7 @@ func validatePreviewRun(run *notionsync.RunDTO) error {
 
 func validateMode(mode string, write bool, path string) error {
 	switch mode {
-	case "schema_check", "catalog_prepare", "dry_run", "sync", "status", "bootstrap_preview":
+	case "schema_check", "catalog_prepare", "dry_run", "sync", "status", "bootstrap_preview", "control_update", "source_update", "catalog_bind", "catalog_activate", "author_resolve", "drain_status", "run_status":
 		if write {
 			return fmt.Errorf("--allow-notion-write 仅适用于 bootstrap_apply")
 		}
