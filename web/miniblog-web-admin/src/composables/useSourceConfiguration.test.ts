@@ -34,4 +34,12 @@ describe('source configuration edit session', () => {
     expect(editor.update.value?.expected_config_revision).toBe(7); expect(editor.update.value?.config?.state_option_ids.published).toBe('p');
     expect(editor.source.value?.config.topic_property_id).toBe('topic');
   });
+  it('shows a latest three-way comparison without changing the draft or revision until explicitly accepted', () => {
+    const editor = useSourceConfiguration(); editor.open(source()); editor.form.label = '本次草稿';
+    editor.compareLatest({ ...source(), label: '远端名称', config_revision: 8 });
+    expect(editor.update.value).toEqual({ label: '本次草稿', expected_config_revision: 7 }); expect(editor.needsReview.value).toBe(true);
+    expect(editor.comparison.value[0]).toEqual({ label: '名称', baseline: 'Go 文档', draft: '本次草稿', latest: '远端名称' });
+    editor.acceptLatest(); expect(editor.form.label).toBe('本次草稿'); expect(editor.update.value).toEqual({ label: '本次草稿', expected_config_revision: 8 }); expect(editor.needsReview.value).toBe(false);
+    editor.open(source()); expect(editor.latest.value).toBeUndefined();
+  });
 });

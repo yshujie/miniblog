@@ -1,6 +1,8 @@
 <template>
   <section class="bootstrap-preview">
     <p class="notice">这是已保存的历史基线审核清单，仅供核对；此页面不会写入 Notion 或直接接管文章。确认关联与当前博客状态后，再通过受控审核流程执行。</p>
+    <p v-if="run" data-test="preview-run">运行 {{ run.run_id }} · 开始 {{ time(run.started_at) }} · 完成 {{ time(run.finished_at) }}</p>
+    <p class="warning" data-test="preview-validity">这是生成时的快照。目录准备、来源配置、主题绑定、来源启用或文章资料变化后，需要重新生成清单；本页不证明清单当前仍有效。</p>
     <p v-if="!items.length" class="notice">本页暂无审核候选。</p>
     <article v-for="(item, index) in items" :key="item.item_id || item.page_id || index" class="candidate">
       <template v-if="candidate(item)">
@@ -23,6 +25,8 @@
         <p v-if="candidate(item)!.requires_legacy_alias" class="warning">需要额外确认旧阅读链接与此 Notion 页面确为同一文档，审核流程才能登记历史别名。</p>
         <p v-if="candidate(item)!.publish_block_reason" class="warning">公开限制：{{ syncReasonLabel(candidate(item)!.publish_block_reason) }}</p>
         <p v-if="candidate(item)!.reason || item.reason || item.error" class="warning">待核对原因：{{ syncReasonLabel(candidate(item)!.reason || item.reason || item.error) }}</p>
+        <details v-if="candidate(item)!.expected_fingerprint" class="fingerprint"><summary>查看核对指纹</summary><code>{{ candidate(item)!.expected_fingerprint }}</code><p class="notice">受控审核使用原始清单中的指纹；此处仅供查看，不代表已确认。</p></details>
+        <p v-else class="notice">此记录没有核对指纹，请重新生成清单后再审核。</p>
         <div v-if="candidate(item)!.candidate_article_ids?.length" class="matches"><strong>候选历史文章</strong><router-link v-for="id in candidate(item)!.candidate_article_ids" :key="id" :to="articleURL(id)">文章 {{ id }}</router-link></div>
         <div v-if="candidate(item)!.title_hint_article_ids?.length" class="matches"><strong>仅同名参考，不作为自动关联依据</strong><router-link v-for="id in candidate(item)!.title_hint_article_ids" :key="id" :to="articleURL(id)">文章 {{ id }}</router-link></div>
       </template>
@@ -35,14 +39,15 @@
   </section>
 </template>
 <script setup lang="ts">
-import type { BootstrapCandidate, SyncItem } from '@/types/notion-sync';
+import type { BootstrapCandidate, SyncItem, SyncRun } from '@/types/notion-sync';
 import { syncStateLabel, syncReasonLabel } from './sync-presentation';
-const props = withDefaults(defineProps<{ items: SyncItem[]; sourceLabels?: Record<string, string>; directoryLabels?: Record<string, string> }>(), { sourceLabels: () => ({}), directoryLabels: () => ({}) });
+const props = withDefaults(defineProps<{ items: SyncItem[]; sourceLabels?: Record<string, string>; directoryLabels?: Record<string, string>; run?: SyncRun }>(), { sourceLabels: () => ({}), directoryLabels: () => ({}) });
 function candidate(item: SyncItem): BootstrapCandidate | undefined {
   if (!item.after || typeof item.after !== 'object' || !('bootstrap_preview' in item.after)) return undefined;
   const value = item.after.bootstrap_preview;
   return value && typeof value === 'object' && 'page_id' in value && typeof value.page_id === 'string' && 'source_id' in value && typeof value.source_id === 'string' ? value as BootstrapCandidate : undefined;
 }
+const time = (value?: string) => value ? new Date(value).toLocaleString() : '尚未记录';
 const articleURL = (id: string) => `/article/edit/${encodeURIComponent(id)}`;
 function directory(section?: string, subsection?: string) {
   // The parent loads current catalog names; absent historical codes remain inspectable.
@@ -62,6 +67,7 @@ function publicLabel(value: string) {
 .candidate { margin:16px 0; padding:16px; border:1px solid var(--el-border-color); border-radius:8px; }
 h3,h4 { margin:0 0 12px; } .comparison { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
 dl { display:grid; grid-template-columns:100px minmax(0,1fr); gap:8px; } dt { color:var(--el-text-color-secondary); } dd { margin:0; overflow-wrap:anywhere; }
+.fingerprint { margin:12px 0; } .fingerprint code { display:block; overflow-wrap:anywhere; padding-top:8px; }
 .identifier { display:block; font-size:12px; color:var(--el-text-color-secondary); } .warning { color:var(--el-color-warning-dark-2); }
 .matches { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; } .matches strong { flex-basis:100%; }
 @media (max-width:640px) { .comparison { grid-template-columns:1fr; } dl { grid-template-columns:85px minmax(0,1fr); } .candidate { padding:12px; } }

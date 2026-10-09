@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/yshujie/miniblog/internal/miniblog/biz/catalog"
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/source"
 	"gorm.io/gorm"
@@ -169,5 +170,50 @@ func TestCatalogPrepareGuardsRejectBeforeCatalogWrites(t *testing.T) {
 				t.Fatal("guard read Notion before validation", guard, client.calls)
 			}
 		})
+	}
+}
+
+func TestCatalogPrepareReviewedReuseUsesFreshOpaqueSchema(t *testing.T) {
+	s, db, client, input := prepareFixture(t)
+	legacy := model.Section{Code: "concurrency&sync", Title: "并发&同步", ModuleCode: "m1", Status: 2, Sort: 73}
+	if err := db.Create(&legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	status, sort := legacy.Status, legacy.Sort
+	input.ReuseMap = []catalog.TopicReuseInput{{OptionID: "opaque-option", ExpectedOptionName: "主题一", SectionCode: legacy.Code, ExpectedSectionTitle: legacy.Title, ExpectedSectionStatus: &status, ExpectedSectionSort: &sort}}
+	result, err := s.PrepareCatalog(context.Background(), input)
+	if err != nil || result.ConfigRevision != input.ExpectedConfigRevision+1 || len(result.Items) != 2 {
+		t.Fatal(result, err)
+	}
+	db.First(&legacy, legacy.ID)
+	if legacy.Title != "主题一" || legacy.Status != 2 || legacy.Sort != 73 {
+		t.Fatal(legacy)
+	}
+	if client.forbidden != 0 || len(client.calls) != 1 {
+		t.Fatal(client)
+	}
+}
+func TestCatalogPrepareReviewedReuseRejectsSchemaRenameWithoutWrites(t *testing.T) {
+	s, db, client, input := prepareFixture(t)
+	legacy := model.Section{Code: "legacy", Title: "Old", ModuleCode: "m1", Status: 1, Sort: 0}
+	if err := db.Create(&legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	status, sort := legacy.Status, legacy.Sort
+	input.ReuseMap = []catalog.TopicReuseInput{{OptionID: "opaque-option", ExpectedOptionName: "主题一", SectionCode: legacy.Code, ExpectedSectionTitle: legacy.Title, ExpectedSectionStatus: &status, ExpectedSectionSort: &sort}}
+	client.mutate = func(_ string, schema *source.NotionDataSource) {
+		topic := schema.Properties["主题"]
+		topic.Select.Options[0].Name = "Changed remotely"
+		schema.Properties["主题"] = topic
+	}
+	_, err := s.PrepareCatalog(context.Background(), input)
+	if err == nil {
+		t.Fatal("stale option name accepted")
+	}
+	var count int64
+	db.Model(&model.NotionCatalogBinding{}).Count(&count)
+	db.First(&legacy, legacy.ID)
+	if count != 0 || legacy.Title != "Old" || client.forbidden != 0 {
+		t.Fatal("invalid reviewed schema wrote", count, legacy)
 	}
 }

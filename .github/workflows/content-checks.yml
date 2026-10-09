@@ -37,6 +37,8 @@ jobs:
         run: docker exec "${{ job.services.mysql.id }}" mysql -uroot -e "CREATE DATABASE miniblog_rollout_init_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
       - run: go test -race ./...
       - run: go vet ./...
+      - name: Restricted Notion operation contracts
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/notion-ops -p 'test_*.py'
       - run: git diff --check
 
   frontend:

@@ -2,6 +2,7 @@ package article
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/yshujie/miniblog/internal/miniblog/biz/catalog"
 	"github.com/yshujie/miniblog/internal/miniblog/model"
@@ -86,6 +87,35 @@ func (b *articleBiz) AdoptSyncedSource(ctx context.Context, r AdoptInput) (resul
 		}
 		if p.SourceID != r.SourceID || p.Revision != r.ExpectedBindingRevision || p.BootstrapState != "verified" || p.BootstrapExpectedFingerprint != r.ExpectedFingerprint {
 			return syncConflict("审核快照未确认或已变化")
+		}
+		if p.DesiredState == model.ArticleStatusPublished || (p.BootstrapExpectedState != nil && *p.BootstrapExpectedState == model.ArticleStatusPublished) {
+			if p.BootstrapExpectedState == nil || *p.BootstrapExpectedState != p.DesiredState {
+				return syncConflict("已发布接管状态尚未回读确认")
+			}
+			var snapshot struct {
+				ReviewedPublicationInput
+				PageID       string `json:"page_id"`
+				SourceID     string `json:"source_id"`
+				DesiredState int    `json:"desired_state"`
+			}
+			if json.Unmarshal([]byte(p.SnapshotJSON), &snapshot) != nil || snapshot.PageID != p.PageID || snapshot.SourceID != p.SourceID || snapshot.DesiredState != p.DesiredState || !reflect.DeepEqual(snapshot.PublicURL, p.PublicURL) || snapshot.NativeArchived != p.NativeArchived || snapshot.InTrash != p.InTrash {
+				return syncConflict("已发布接管缺少有效来源快照")
+			}
+			reviewed := snapshot.ReviewedPublicationInput
+			var mapping struct {
+				TopicPropertyID string `json:"topic_property_id"`
+			}
+			if json.Unmarshal([]byte(src.PropertyMappingJSON), &mapping) != nil || mapping.TopicPropertyID == "" {
+				return syncConflict("已发布接管来源字段映射无效")
+			}
+			reviewed.TopicPropertyID = mapping.TopicPropertyID
+			reviewed.PublicURL, reviewed.NativeArchived, reviewed.InTrash, reviewed.PublicationHeld = p.PublicURL, p.NativeArchived, p.InTrash, p.PublicationHeld
+			if a != nil {
+				reviewed.LocalSectionCode, reviewed.LocalSubsectionCode = a.SectionCode, a.SubsectionCode
+			}
+			if e = ValidateReviewedPublication(ds, &src, reviewed); e != nil {
+				return e
+			}
 		}
 		knownURLs := []string{identity.CanonicalURL, p.PageURL}
 		if p.PublicURL != nil {

@@ -4,22 +4,25 @@
     <p class="hint">同步标题、主题、标签、链接和发布状态；正文仍从外部文档阅读。作者、历史正文、排序和本地下架由博客保留。</p>
     <el-alert v-if="sync.error.value" :title="reason(sync.error.value)" type="error" :closable="false"><template #default><el-button link @click="sync.refresh">重新读取</el-button></template></el-alert>
     <section v-if="sync.status.value" class="health">
-      <el-tag>{{ label(sync.status.value.health) }}</el-tag><el-tag v-if="!sync.status.value.enabled" type="info">服务未启用</el-tag><el-tag v-if="sync.status.value.paused" type="warning">同步已暂停</el-tag><el-tag v-if="sync.status.value.source_writes_paused" type="warning">来源回填已暂停</el-tag>
+      <el-tag>{{ label(sync.status.value.health) }}</el-tag><el-tag v-if="!sync.status.value.enabled" type="info">自动同步总开关关闭</el-tag><el-tag v-if="sync.status.value.paused" type="warning">同步维护暂停</el-tag><el-tag v-if="sync.status.value.source_writes_paused" type="warning">来源回填暂停</el-tag>
       <p>最近完整扫描：{{ time(sync.status.value.last_complete_scan_at) }} · 最近成功：{{ time(sync.status.value.last_success_at) }} · 历史待核对 {{ sync.status.value.pending_count }} · 公开受限 {{ sync.status.value.blocked_count ?? '—' }} · 读取 / 执行失败 {{ sync.status.value.error_count }}</p>
       <p v-if="sync.status.value.current_run_id">正在运行：<el-button link @click="openRun(sync.status.value.current_run_id!)">{{ sync.status.value.current_run_id }}</el-button></p>
       <div class="actions">
-        <el-button :disabled="sync.actionBusy.value || !sync.status.value.enabled || !!sync.status.value.current_run_id" @click="start('dry_run')">运行预览</el-button>
-        <el-button type="primary" :disabled="sync.actionBusy.value || !sync.status.value.enabled || sync.status.value.paused || !!sync.status.value.current_run_id" @click="start('sync')">手动同步</el-button>
-        <el-button :disabled="sync.actionBusy.value" @click="sync.control({ paused: !sync.status.value.paused })">{{ sync.status.value.paused ? '恢复同步' : '暂停同步' }}</el-button>
+        <el-button data-test="run-preview" :disabled="sync.actionBusy.value || !!sync.status.value.current_run_id" @click="start('dry_run')">运行预览</el-button>
+        <el-button type="primary" data-test="run-sync" :disabled="sync.actionBusy.value || !sync.status.value.enabled || sync.status.value.paused || sync.status.value.source_writes_paused || sync.status.value.baseline_frozen !== true || !!sync.status.value.current_run_id" @click="start('sync')">手动同步</el-button>
+        <el-button :disabled="sync.actionBusy.value" @click="sync.control({ paused: !sync.status.value.paused })">{{ sync.status.value.paused ? '解除维护暂停' : '暂停同步' }}</el-button>
         <el-button :disabled="sync.actionBusy.value" @click="sync.control({ source_writes_paused: !sync.status.value.source_writes_paused })">{{ sync.status.value.source_writes_paused ? '允许来源回填' : '暂停来源回填' }}</el-button>
       </div>
-      <p v-if="!sync.status.value.enabled" class="hint">总开关由服务配置控制，此处不能开启服务。</p>
+      <p v-if="!sync.status.value.enabled" class="hint">总开关由服务配置控制，此处不能开启自动同步；仍可运行只读预览。</p>
+      <p v-if="sync.status.value.baseline_frozen !== true" class="hint">历史基线尚未冻结，完成受控审核后才能执行同步；现在仍可预览。</p>
+      <p v-if="sync.status.value.source_writes_paused" class="hint">来源回填暂停期间仅可预览，不能启动同步。</p>
     </section>
     <h3>来源与主题绑定</h3>
     <p class="hint">全新主题自动创建章节。遇到同名冲突或失效绑定，请选择正确章节后重新预览；修改绑定会要求受影响文章重新核验，可能暂时影响前台阅读。历史文章需通过受控命令审核当前博客状态并回填，网页不会执行接管写入。</p>
     <el-empty v-if="!sync.loading.value && !sync.sources.value.items.length" description="暂无已配置来源" />
     <section v-for="source in sync.sources.value.items" :key="source.source_id" class="source-card">
-      <div class="toolbar"><strong>{{ source.label || source.source_id }}</strong><div><el-tag>{{ label(source.health) }}</el-tag> <el-tag v-if="!source.enabled">停用</el-tag> <el-button link :disabled="sync.actionBusy.value" @click="editSource(source)">配置</el-button></div></div>
+      <div class="toolbar"><strong>{{ source.label || source.source_id }}</strong><div><el-tag>{{ label(source.health) }}</el-tag> <el-tag v-if="!source.enabled">来源同步停用</el-tag><el-tag v-else type="success">来源同步启用</el-tag> <el-button link :disabled="sync.actionBusy.value" @click="editSource(source)">配置</el-button></div></div>
+      <p v-if="!source.enabled" class="hint">此来源保持冻结，预览仍可读取；不会同步新变更。停用来源不等于本地紧急下架。</p>
       <p>模块 {{ source.module_code }} · 最近尝试 {{ time(source.last_attempt_at) }} · 完整扫描 {{ time(source.last_complete_scan_at) }} · 成功 {{ time(source.last_success_at) }}</p>
       <el-alert v-if="source.last_error" :title="reason(source.last_error)" type="error" :closable="false" />
       <el-table :data="source.catalog_bindings || []" empty-text="扫描后显示主题绑定" size="small">
@@ -31,9 +34,9 @@
     <el-pagination v-if="sync.sources.value.total > sync.sourceQuery.limit" v-model:current-page="sync.sourceQuery.page" :page-size="sync.sourceQuery.limit" :total="sync.sources.value.total" layout="prev, pager, next" @current-change="sync.refresh" />
     <h3>页面同步情况</h3>
     <el-form inline @submit.prevent="searchPages">
-      <el-form-item label="标题"><el-input v-model="sync.pageFilters.title" clearable @keyup.enter="searchPages" /></el-form-item>
-      <el-form-item label="来源"><el-select v-model="sync.pageFilters.source_id" clearable placeholder="全部来源"><el-option v-for="source in sync.status.value?.sources || sync.sources.value.items" :key="source.source_id" :label="source.label || source.source_id" :value="source.source_id" /></el-select></el-form-item>
-      <el-form-item label="管理状态"><el-select v-model="sync.pageFilters.management_state" clearable placeholder="全部"><el-option v-for="state in ['baseline_pending', 'managed', 'detached']" :key="state" :label="label(state)" :value="state" /></el-select></el-form-item>
+      <el-form-item label="标题"><el-input v-model="sync.pageFilterDraft.title" clearable @keyup.enter="searchPages" /></el-form-item>
+      <el-form-item label="来源"><el-select v-model="sync.pageFilterDraft.source_id" clearable placeholder="全部来源"><el-option v-for="source in sync.status.value?.sources || sync.sources.value.items" :key="source.source_id" :label="source.label || source.source_id" :value="source.source_id" /></el-select></el-form-item>
+      <el-form-item label="管理状态"><el-select v-model="sync.pageFilterDraft.management_state" clearable placeholder="全部"><el-option v-for="state in ['baseline_pending', 'managed', 'detached']" :key="state" :label="label(state)" :value="state" /></el-select></el-form-item>
       <el-button @click="searchPages">查询</el-button>
     </el-form>
     <el-table :data="sync.pages.value.items" empty-text="当前条件下没有同步页面">
@@ -59,7 +62,7 @@
       <div v-loading="sync.detailLoading.value">
         <p v-if="sync.selectedRun.value">{{ label(sync.selectedRun.value.status) }} / {{ label(sync.selectedRun.value.phase) }} · {{ sync.selectedRun.value.mode === 'dry_run' ? '预览不会写入文章或目录' : label(sync.selectedRun.value.mode) }}</p>
         <el-alert v-if="sync.selectedRun.value?.error" :title="reason(sync.selectedRun.value.error)" type="error" :closable="false" />
-        <BootstrapPreviewList v-if="sync.selectedRun.value?.mode === 'bootstrap_preview'" :items="sync.items.value.items" :source-labels="sourceLabels" :directory-labels="directoryLabels" />
+        <BootstrapPreviewList v-if="sync.selectedRun.value?.mode === 'bootstrap_preview'" :items="sync.items.value.items" :source-labels="sourceLabels" :directory-labels="directoryLabels" :run="sync.selectedRun.value" />
         <el-table v-else :data="sync.items.value.items" :row-key="(item: SyncItem) => item.item_id || item.page_id" empty-text="暂无逐项结果">
           <el-table-column label="页面 / 主题" min-width="180"><template #default="{ row }">{{ row.page_id || '主题目录' }}</template></el-table-column><el-table-column label="结果"><template #default="{ row }">{{ label(row.outcome) }}</template></el-table-column>
           <el-table-column label="原因" min-width="180"><template #default="{ row }">{{ reason(row.reason || row.error) }}</template></el-table-column>
@@ -69,19 +72,34 @@
       </div>
     </el-drawer>
     <el-dialog v-model="sourceOpen" title="来源配置" width="min(700px, 95%)" :close-on-click-modal="false">
-      <p class="hint">填写 Notion 属性 ID 和状态选项 ID。修改会校验配置版本；失败时保留本次输入，请重新读取后核对。</p>
+      <p class="hint">填写 Notion 属性 ID 和状态选项 ID。修改会校验配置版本；失败时保留输入。读取最新版只显示对照，不会自动改变草稿或保存版本。</p>
+      <el-button data-test="source-read-latest" :loading="sync.latestSourceLoading.value" :disabled="sync.actionBusy.value" @click="readLatestSource">读取最新版对照</el-button>
+      <section v-if="sourceEditor.latest.value" data-test="source-comparison" class="revision-comparison">
+        <p>编辑依据版本 {{ sourceEditor.source.value?.config_revision }} · 最新版本 {{ sourceEditor.latest.value.config_revision }}</p>
+        <el-table :data="sourceEditor.comparison.value" size="small"><el-table-column prop="label" label="项目" /><el-table-column prop="baseline" label="编辑时资料" /><el-table-column prop="draft" label="本次草稿" /><el-table-column prop="latest" label="最新资料" /></el-table>
+        <p class="hint">逐项检查差异后可采用最新版本作为保存依据；草稿保持原样，需要的修改仍由你决定。保存时会再次校验版本。</p>
+        <el-button v-if="sourceEditor.needsReview.value" data-test="source-accept-latest" @click="sourceEditor.acceptLatest">已核对，以最新版本为保存依据</el-button>
+      </section>
       <el-form label-width="150px" :disabled="sync.actionBusy.value"><el-form-item label="名称"><el-input v-model="sourceForm.label" data-test="source-label" /></el-form-item><el-form-item label="模块"><el-select v-model="sourceForm.module_code"><el-option v-for="module in catalog.modules.modules" :key="module.code" :label="module.title" :value="module.code" /></el-select></el-form-item><el-form-item label="启用来源"><el-switch v-model="sourceForm.enabled" /></el-form-item>
         <el-form-item v-for="field in propertyFields" :key="field.key" :label="field.label"><el-input v-model="sourceForm.config[field.key]" :data-test="'source-' + field.key" /></el-form-item>
         <el-form-item v-for="state in ['draft', 'published', 'unpublished', 'archived']" :key="state" :label="label(state) + '选项 ID'"><el-input v-model="sourceForm.config.state_option_ids[state]" /></el-form-item>
       </el-form>
       <el-alert v-if="sync.error.value" :title="reason(sync.error.value)" type="error" :closable="false" />
       <p v-if="sourceEditor.affectsPublication.value" class="hint" data-test="source-publication-impact">模块或字段映射变化将要求已有托管文章重新核验，可能暂时影响前台阅读。</p>
-      <template #footer><el-button @click="sourceOpen = false">关闭</el-button><el-button type="primary" :loading="sync.actionBusy.value" data-test="source-save" @click="saveSource">保存配置</el-button></template>
+      <template #footer><el-button @click="sourceOpen = false">关闭</el-button><el-button type="primary" :loading="sync.actionBusy.value" :disabled="sourceEditor.needsReview.value || sync.latestSourceLoading.value" data-test="source-save" @click="saveSource">保存配置</el-button></template>
     </el-dialog>
     <el-dialog v-model="bindingOpen" title="调整主题绑定" width="min(560px, 95%)" :close-on-click-modal="false">
-      <p>{{ binding?.option_name }}：{{ reason(binding?.reason) }}</p><el-select v-model="bindingCode" placeholder="请选择同模块的正常章节"><el-option v-for="section in bindingSections" :key="section.code" :label="section.title" :value="section.code" :disabled="section.status !== 1" /></el-select>
+      <p>{{ binding?.option_name }}：{{ reason(binding?.reason) }}</p>
+      <el-button data-test="binding-read-latest" :loading="sync.latestSourceLoading.value" :disabled="sync.actionBusy.value" @click="readLatestBinding">读取最新版对照</el-button>
+      <section v-if="latestBindingSource" class="revision-comparison" data-test="binding-comparison">
+        <p>编辑依据版本 {{ bindingSource?.config_revision }} · 最新版本 {{ latestBindingSource.config_revision }}</p>
+        <p>编辑时：{{ bindingSource?.module_code }} / {{ binding?.section_code || '未绑定' }} · 本次草稿：{{ bindingCode || '未选择' }}</p>
+        <p>最新：{{ latestBindingSource.module_code }} / {{ latestBinding?.section_code || '未绑定' }} · {{ latestBinding ? label(latestBinding.status) : '此主题绑定已不存在，请关闭后重新检查来源' }}</p>
+        <el-button v-if="bindingNeedsReview && latestBinding" data-test="binding-accept-latest" @click="acceptLatestBinding">已核对，以最新版本为保存依据</el-button>
+      </section>
+      <el-select v-model="bindingCode" placeholder="请选择同模块的正常章节"><el-option v-for="section in bindingSections" :key="section.code" :label="section.title" :value="section.code" :disabled="section.status !== 1" /></el-select>
       <el-alert v-if="sync.error.value" :title="reason(sync.error.value)" type="error" :closable="false" />
-      <template #footer><el-button @click="bindingOpen = false">关闭</el-button><el-button type="primary" :disabled="!bindingCode" :loading="sync.actionBusy.value" @click="saveBinding">保存绑定</el-button></template>
+      <template #footer><el-button @click="bindingOpen = false">关闭</el-button><el-button type="primary" :disabled="!validBindingSelection || bindingNeedsReview || sync.latestSourceLoading.value" data-test="binding-save" :loading="sync.actionBusy.value" @click="saveBinding">保存绑定</el-button></template>
     </el-dialog>
   </div>
 </template>
@@ -113,8 +131,27 @@ const directoryLabels = computed(() => {
   }
   return labels;
 });
-const bindingSections = computed(() => catalog.sections.getSectionsByModule(bindingSource.value?.module_code || ''));
-function searchPages() { sync.pageFilters.page = 1; void sync.loadPages(); }
+const latestBindingSource = ref<SyncSource>(); const latestBinding = ref<CatalogBinding>();
+const bindingSections = computed(() => catalog.sections.getSectionsByModule((latestBindingSource.value || bindingSource.value)?.module_code || ''));
+const bindingNeedsReview = computed(() => Boolean(latestBindingSource.value && (!latestBinding.value || latestBindingSource.value.config_revision !== bindingSource.value?.config_revision)));
+const validBindingSelection = computed(() => bindingSections.value.some(section => section.code === bindingCode.value.trim() && section.status === 1));
+function searchPages() { void sync.searchPages(); }
+async function readLatestSource() {
+  const editing = sourceEditor.source.value; if (!editing) return;
+  const latest = await sync.readSource(editing.source_id);
+  if (latest && sourceOpen.value && sourceEditor.source.value === editing) sourceEditor.compareLatest(latest);
+}
+async function readLatestBinding() {
+  const editing = binding.value; const source = bindingSource.value; if (!editing || !source) return;
+  const latest = await sync.readSource(source.source_id);
+  if (!latest || !bindingOpen.value || binding.value !== editing) return;
+  latestBindingSource.value = { ...latest }; latestBinding.value = latest.catalog_bindings.find(row => row.id === editing.id);
+  try { await catalog.load(true); } catch (cause) { sync.error.value = errorMessage(cause, '读取最新目录失败，草稿仍保留'); }
+}
+function acceptLatestBinding() {
+  if (!latestBindingSource.value || !latestBinding.value) return;
+  bindingSource.value = { ...latestBindingSource.value }; binding.value = { ...latestBinding.value };
+}
 async function openRun(id: string) { runID.value = id; runOpen.value = true; await sync.selectRun(id); }
 const retryRun = () => sync.selectRun(runID.value, false);
 async function start(mode: 'dry_run' | 'sync') {
@@ -124,21 +161,21 @@ async function start(mode: 'dry_run' | 'sync') {
 function editSource(value: SyncSource) { sourceEditor.open(value); sourceOpen.value = true; }
 async function saveSource() {
   const editing = sourceEditor.source.value; const update = sourceEditor.update.value;
-  if (!editing) return;
+  if (!editing || sourceEditor.needsReview.value || sync.latestSourceLoading.value) return;
   if (!update) { ElMessage.info('配置没有变化，无需保存'); sourceOpen.value = false; return; }
   if (sourceEditor.affectsPublication.value) {
     try { await ElMessageBox.confirm('模块或字段映射发生变化。如该来源已有托管文章，保存后会要求重新核验，文章可能暂时无法在前台阅读。请在保存后重新预览并同步核验。是否继续？', '确认公开影响', { confirmButtonText: '保存并重新核验', cancelButtonText: '返回检查' }); } catch { return; }
   }
   if (await sync.saveSource(editing, update) && sourceEditor.source.value === editing) sourceOpen.value = false;
 }
-function editBinding(value: SyncSource, row: CatalogBinding) { bindingSource.value = { ...value }; binding.value = { ...row }; bindingCode.value = row.section_code || ''; bindingOpen.value = true; }
+function editBinding(value: SyncSource, row: CatalogBinding) { bindingSource.value = { ...value }; binding.value = { ...row }; bindingCode.value = row.section_code || ''; latestBindingSource.value = undefined; latestBinding.value = undefined; bindingOpen.value = true; }
 async function saveBinding() {
   const editing = binding.value; const source = bindingSource.value; const code = bindingCode.value.trim();
-  if (!editing || !source || !code) return;
+  if (!editing || !source || !validBindingSelection.value || bindingNeedsReview.value || sync.latestSourceLoading.value) return;
   if (code === (editing.section_code || '')) { ElMessage.info('主题绑定没有变化，无需保存'); bindingOpen.value = false; return; }
   try { await ElMessageBox.confirm('主题章节绑定发生变化。受影响的托管文章会等待重新核验，可能暂时无法在前台阅读。保存后请重新预览并同步核验。是否继续？', '确认公开影响', { confirmButtonText: '保存并重新核验', cancelButtonText: '返回检查' }); } catch { return; }
   if (await sync.saveBinding(editing, code, source.config_revision) && binding.value === editing) bindingOpen.value = false;
 }
 onMounted(refreshAll);
 </script>
-<style scoped>.sync-page { padding:24px; } .toolbar,.actions { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; } .actions { justify-content:flex-start; } .health,.source-card { border:1px solid var(--el-border-color); border-radius:8px; padding:16px; margin:16px 0; } .hint,.source-card p { color:var(--el-text-color-secondary); font-size:13px; } .source-link { display:block; margin-top:6px; } .el-select { min-width:180px; } .el-pagination { margin-top:12px; } pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:360px; overflow:auto; } h3 { margin-top:28px; }</style>
+<style scoped>.sync-page { padding:24px; } .toolbar,.actions { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; } .actions { justify-content:flex-start; } .health,.source-card { border:1px solid var(--el-border-color); border-radius:8px; padding:16px; margin:16px 0; } .revision-comparison { margin:12px 0; padding:12px; background:var(--el-fill-color-light); overflow-wrap:anywhere; } .hint,.source-card p { color:var(--el-text-color-secondary); font-size:13px; } .source-link { display:block; margin-top:6px; } .el-select { min-width:180px; } .el-pagination { margin-top:12px; } pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:360px; overflow:auto; } h3 { margin-top:28px; }</style>
