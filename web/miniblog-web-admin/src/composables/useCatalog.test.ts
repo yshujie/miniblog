@@ -23,4 +23,8 @@ describe('catalog context and sibling order', () => {
     await expect(catalog.move(catalog.tree.value[0], 1)).rejects.toThrow('stop before reload');
     expect(reorderCatalog).toHaveBeenCalledWith({ kind: 'module', parent_code: undefined, codes: ['hidden', 'go'] });
   });
+  it('does not mark missing directory status as normal or unpublished', () => {
+    const catalog = useCatalog(); catalog.modules.modules = [{ code: 'unknown', title: '待核对主题' }];
+    expect(catalog.tree.value[0].label).toBe('待核对主题（状态待确认）'); expect(catalog.valid({ module_code: 'unknown', section_code: '', subsection_code: '' })).toBe(false);
+  });
 });

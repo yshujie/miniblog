@@ -1,6 +1,8 @@
 <template>
-  <el-drawer :model-value="modelValue" title="收录外部文章" size="min(620px, 100%)" :close-on-click-modal="false" :before-close="beforeClose" @update:model-value="emit('update:modelValue', $event)">
-    <p class="intro">粘贴 Notion 或飞书文档链接，在当前目录发布。</p>
+  <el-drawer :model-value="modelValue" title="收录外部文章" size="min(620px, 100%)" class="collect-sheet" :close-on-click-modal="false" :before-close="beforeClose" @update:model-value="emit('update:modelValue', $event)">
+    <template #header="{ titleId }"><div><p class="sheet-eyebrow">目录与收录</p><h2 :id="titleId">收录外部文章</h2></div></template>
+    <p class="intro">文章继续在外部文档中维护，这里整理目录与发布资料。</p>
+    <div class="source-notice">Notion 可自动建议标题；飞书和其他外部文档可直接填写。</div>
     <el-alert v-if="catalogError" :title="catalogError" type="error" :closable="false" />
     <el-form label-position="top" v-loading="catalogLoading">
       <el-form-item v-if="recent.length" label="最近目录">
@@ -8,11 +10,11 @@
           <el-option v-for="(item, index) in recent" :key="`${item.section_code}:${item.subsection_code}`" :label="catalog.label(item)" :value="index" />
         </el-select>
       </el-form-item>
-      <el-form-item label="所属目录" required>
+      <el-form-item label="收录到" required>
         <DirectoryPicker active-only :model-value="quick.context()" :disabled="quick.requestLocked.value" @update:model-value="quick.setDirectory" />
       </el-form-item>
       <el-form-item label="文档链接" required>
-        <el-input data-test="collect-link" :model-value="quick.form.external_link" :disabled="quick.requestLocked.value" placeholder="https://…" @update:model-value="quick.setLink" />
+        <el-input ref="linkInput" data-test="collect-link" aria-label="文档链接" :model-value="quick.form.external_link" :disabled="quick.requestLocked.value" placeholder="https://…" @update:model-value="quick.setLink" />
       </el-form-item>
       <el-form-item label="标题" required>
         <el-input data-test="collect-title" :model-value="quick.form.title" :disabled="quick.requestLocked.value" placeholder="自动建议，也可手动填写" maxlength="255" @update:model-value="quick.setTitle" />
@@ -45,14 +47,14 @@
       </template>
       <template v-else>
         <el-button :disabled="quick.submitting.value" @click="close">关闭</el-button>
-        <el-button data-test="collect-publish" type="primary" :loading="quick.submitting.value" :disabled="catalogLoading || !!catalogError" @click="submit(false)">发布</el-button>
-        <el-button data-test="collect-continue" type="success" :loading="quick.submitting.value" :disabled="catalogLoading || !!catalogError" @click="submit(true)">发布并继续</el-button>
+        <el-button data-test="collect-publish" :loading="quick.submitting.value" :disabled="catalogLoading || !!catalogError" @click="submit(false)">发布</el-button>
+        <el-button data-test="collect-continue" type="primary" :loading="quick.submitting.value" :disabled="catalogLoading || !!catalogError" @click="submit(true)">发布并继续</el-button>
       </template>
     </template>
   </el-drawer>
 </template>
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import DirectoryPicker from './DirectoryPicker.vue';
@@ -68,6 +70,7 @@ import { statusLabels, type DirectoryContext, type ArticleInfo } from '@/types/c
 const props = defineProps<{ modelValue: boolean; context?: DirectoryContext }>();
 const emit = defineEmits<{ 'update:modelValue': [boolean]; collected: [] }>();
 const router = useRouter(); const quick = useQuickCollect(); const catalog = useCatalog(); const workspace = useWorkspace(); const user = useUserStore();
+const linkInput = ref<{ focus:() => void }>();
 const catalogLoading = ref(false); const catalogError = ref(''); const duplicateBusy = ref(false);
 const recent = computed(() => workspace.recentDirectories.filter(catalog.valid));
 let openVersion = 0;
@@ -84,13 +87,13 @@ watch(() => props.modelValue, async open => {
 const selectRecent = (index: number) => { if (recent.value[index]) quick.setDirectory(recent.value[index]); };
 async function submit(continueAdding = false) {
   if (!contentRegistrationEnabled) { quick.error.value = '收录功能暂未启用'; return; }
+  const continueAfterSuccess = quick.frozen.value?.continueAdding ?? continueAdding;
   const before = quick.context(); const author = quick.form.author;
   if (!catalog.valid(before)) { quick.error.value = '请选择有效的章节或子章节'; return; }
   const result = await quick.submit(true, continueAdding);
   if (result?.outcome === 'created') {
     workspace.remember(before, author); workspace.invalidateArticles(); emit('collected'); ElMessage.success('文章已发布');
-    if (!continueAdding && !quick.form.external_link) return;
-    if (!continueAdding) emit('update:modelValue', false);
+    if (continueAfterSuccess) { await nextTick(); linkInput.value?.focus(); } else emit('update:modelValue', false);
   }
 }
 const openExisting = () => { if (quick.duplicate.value) { emit('update:modelValue', false); router.push(`/article/edit/${quick.duplicate.value.id}`); } };
@@ -112,4 +115,7 @@ async function beforeClose(done: () => void) {
 }
 const close = () => beforeClose(() => emit('update:modelValue', false));
 </script>
-<style scoped>.intro,.preview-note { color: var(--el-text-color-secondary); } .preview-note { font-size: 13px; margin-top: 6px; } .duplicate { margin-top: 16px; padding: 12px; background: var(--el-fill-color-light); } .el-select { width: 100%; }</style>
+<style scoped>
+.sheet-eyebrow { color:var(--admin-muted); font-size:12px; margin:0 0 6px; } h2 { color:var(--admin-ink); font-size:24px; margin:0; } .intro { color:var(--admin-muted); line-height:1.75; margin:0 0 18px; } .source-notice { color:var(--admin-green); background:var(--admin-pale); font-size:13px; line-height:1.75; border-radius:8px; padding:12px 14px; margin-bottom:22px; } .preview-note { color:var(--admin-muted); font-size:12px; margin-top:6px; display:flex; align-items:center; flex-wrap:wrap; gap:8px; line-height:1.7; } .duplicate { margin-top:16px; padding:16px; background:var(--admin-canvas); border:1px solid var(--admin-line); border-radius:8px; overflow-wrap:anywhere; line-height:1.75; } .duplicate p { font-size:13px; } .duplicate :deep(.el-button) { margin:4px 8px 4px 0; } .el-select { width:100%; } :deep(.el-form-item) { margin-bottom:22px; } :deep(.el-alert) { margin-bottom:16px; } @media(max-width:780px) { :deep(.el-drawer__footer .el-button) { flex:1; margin-left:0; } }
+:global(.collect-sheet .el-drawer__footer) { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; } :global(.collect-sheet .el-drawer__footer .el-button) { margin:0; } @media(max-width:780px) { :global(.collect-sheet) { width:100%!important; } :global(.collect-sheet .el-drawer__footer .el-button) { flex:1; } }
+</style>
