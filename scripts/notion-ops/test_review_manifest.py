@@ -1,9 +1,12 @@
 """Only synthetic records; no private review files or external services are used."""
+import ast
 import contextlib
+from datetime import datetime, timedelta, timezone
 import copy
 import io
 import json
 import os
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -48,6 +51,66 @@ def update_candidate(latest, index, **fields):
     latest["items"][index].update(fields)
     latest["run_items"][index * 2 + 1]["after"]["bootstrap_preview"].update(fields)
 
+
+
+class RunTimeTests(unittest.TestCase):
+    def test_zero_through_nine_fractional_digits_remain_valid(self):
+        for fraction in ("", "1", "12", "123", "1234", "12345", "123456", "1234567", "12345678", "123456789"):
+            value = "2026-10-09T05:30:00" + ("." + fraction if fraction else "") + "Z"
+            with self.subTest(fraction=fraction):
+                self.assertTrue(compiler.valid_run_times({"started_at": value, "finished_at": value}))
+                whole = compiler.run_instant_ns("2026-10-09T05:30:00Z")
+                self.assertEqual(int(fraction.ljust(9, "0") or "0"), compiler.run_instant_ns(value) - whole)
+
+    def test_offset_equivalence_leap_day_and_pre_epoch_are_exact(self):
+        for first, second in (("2026-10-09T05:30:00.123456789Z", "2026-10-09T13:30:00.123456789+08:00"),
+                              ("2026-10-09T05:30:00.1Z", "2026-10-09T00:00:00.1-05:30"),
+                              ("2024-02-29T00:00:00Z", "2024-02-28T23:00:00-01:00")):
+            self.assertEqual(compiler.run_instant_ns(first), compiler.run_instant_ns(second))
+            self.assertTrue(compiler.valid_run_times({"started_at": first, "finished_at": second}))
+        self.assertEqual(-1, compiler.run_instant_ns("1969-12-31T23:59:59.999999999Z"))
+
+    def test_one_nanosecond_reverse_order_cannot_compile_approval(self):
+        approved, latest = fixture()
+        latest["run"].update(started_at="2026-10-09T05:30:00.123456789Z", finished_at="2026-10-09T05:30:00.123456788Z")
+        self.assertFalse(compiler.valid_run_times(latest["run"]))
+        with self.assertRaises(compiler.SafeError) as caught:
+            compile_fixture(approved, latest)
+        self.assertEqual("incomplete_preview_run", caught.exception.category)
+        latest["run"]["finished_at"] = "2026-10-09T13:30:00.123456790+08:00"
+        self.assertEqual(38, sum(len(batch["input"]["confirmations"]) for batch in compile_fixture(approved, latest).values()))
+
+    def test_malformed_dates_zones_precision_and_missing_values_are_rejected(self):
+        values = [None, 1, True, "", "PRIVATE_TIMESTAMP", "2026-10-09", "2026-10-09T05:30:00", "2026-10-09 05:30:00Z",
+                  "2026-10-09T05:30:00z", "2026-10-09T05:30:00.Z", "2026-10-09T05:30:00.1234567890Z",
+                  "2026-10-09T05:30:00,123Z", "2026-10-09T05:30:00+0800", "2026-10-09T05:30:00+08:00:00",
+                  "2026-10-09T05:30:00+24:00", "2026-10-09T05:30:00+00:60", "2026-02-29T05:30:00Z",
+                  "2026-13-01T05:30:00Z", "2026-10-09T24:00:00Z", "2026-10-09T05:30:60Z", "0000-10-09T05:30:00Z",
+                  "2026-10-09T05:30:00Z\n"]
+        for value in values:
+            with self.subTest(value=value):
+                self.assertFalse(compiler.valid_run_times({"started_at": value, "finished_at": "2026-10-09T06:00:00Z"}))
+        self.assertFalse(compiler.valid_run_times({}))
+
+    def test_python310_fraction_contract_and_syntax(self):
+        class Python310DateTime(datetime):
+            @classmethod
+            def fromisoformat(cls, value):
+                fraction = re.search(r"\.([0-9]+)", value)
+                if fraction and len(fraction[1]) not in (3, 6):
+                    raise ValueError("Python 3.10 fractional precision contract")
+                return datetime.fromisoformat(value)
+        # Explicitly demonstrate the historical contract rejects Go's 1/2/4/5/7/8/9 digits.
+        for digits in (1, 2, 4, 5, 7, 8, 9):
+            value = "2026-10-09T05:30:00." + "1" * digits + "+00:00"
+            with self.assertRaises(ValueError):
+                Python310DateTime.fromisoformat(value)
+        with mock.patch.object(compiler, "datetime", Python310DateTime):
+            for digits in range(1, 10):
+                value = "2026-10-09T05:30:00." + "1" * digits + "Z"
+                self.assertTrue(compiler.valid_run_times({"started_at": value, "finished_at": value}))
+            self.assertFalse(compiler.valid_run_times({"started_at": "2026-10-09T05:30:00.000000002Z", "finished_at": "2026-10-09T05:30:00.000000001Z"}))
+        ast.parse(Path(compiler.__file__).read_text(), feature_version=(3, 10))
 
 class ManifestTests(unittest.TestCase):
     def assert_drift(self, approved, latest, field=None):
