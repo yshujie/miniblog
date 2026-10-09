@@ -134,7 +134,7 @@ func (b *articleBiz) IsolateSyncedTarget(ctx context.Context, r TargetIsolationI
 			p.DesiredState = r.DesiredState
 			if r.DesiredState != model.ArticleStatusPublished && a.Status != r.DesiredState {
 				a.Status = r.DesiredState
-				if e = save(ds, &a); e != nil {
+				if e = saveSyncedState(ds, &a); e != nil {
 					return e
 				}
 			}
