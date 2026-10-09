@@ -56,10 +56,12 @@ GitHub Actions 的 **Notion read operations (manual)** 仅允许 `main`，输入
 
 首次放行顺序：双暂停 → 目录复用/绑定和受审核祖先启用 → 修改来源配置/启用 → fresh 最终预览 → 人工核对带指纹确认 → 分库 bootstrap_apply → 确认所有未知 journal 已解决 → resume → 一次 sync 并核对文章/公开阅读效果 → pause 排空 → 以该 sync 证明 scheduler_on → 再 resume。scheduler_on 本身保持数据库暂停，不能把健康重启视作定时任务已经开始；最后 resume 后才允许下一轮定时同步。
 
-开关动作只原子修改 `.env` 的 `MINIBLOG_NOTION_SYNC_ENABLED` 和 `MINIBLOG_NOTION_SYNC_AUTHOR`（由当前唯一账号的有效昵称（最多 128 字符）解析），保留其余原行；去除 writer。备份、恢复文件和 `.env` 均 0600。只对当前审核镜像执行 `compose up --no-deps --no-build --pull never miniblog-backend`；重启后核验 image/tag、实际 Docker env、Docker healthy 和本机/公网 health。开启核验失败时仅恢复总开关 false 并尝试重启，数据库保持暂停，不重试 Notion、不自动 resume；若恢复重启也失败，按受限报告人工处理。关闭失败保持 false 目标配置，不重新打开开关。
+开关动作只原子修改 `.env` 的 `MINIBLOG_NOTION_SYNC_ENABLED` 和 `MINIBLOG_NOTION_SYNC_AUTHOR`（由当前唯一账号的有效昵称（最多 128 字符）解析），保留其余原行；去除 writer。备份、恢复文件和 `.env` 均 0600。只对当前审核镜像执行 `compose up --no-deps --no-build --pull never miniblog-backend`；重启后核验 image/tag、实际 Docker env、Docker healthy 和本机/公网 health。开启核验失败时恢复总开关 false 并验证本地后端，数据库保持暂停，不重试 Notion、不自动 resume；本地回退成功不表示公网恢复，仍须另行核验公网地址。阶段、匹配布尔值和健康状态码仅写入 0600 的 `scheduler-diagnostics.json`，不保存完整环境、作者、响应正文或原始异常。环境备份只留在 `.env.previous`，不复制到运行报告。若恢复重启也失败，按受限报告人工处理。关闭失败保持 false 目标配置，不重新打开开关。
 
 writer Secret 只出现在 bootstrap-apply 独立 job 的 apply 步骤，进入私有传输文件及该次 apply 容器的临时 env；status/drain/preview 等任务都不拿 writer，常驻 `.env`、镜像、备份无 writer。普通操作只在确需 Notion 读取的动作注入 reader。任务 `.env` 在 finally 删除。取消 workflow 的 always cleanup 依私有 run 容器 receipt，核验 exact 随机 owner label 后只删除本次容器/临时 env，不删除审计报告或其他任务；SSH/服务器失联或 SIGKILL 仍须人工核验当前 run 遗留，禁止全局 prune。
 
 ## 本地维护回归
 
 `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/notion-ops -p 'test_*.py'` 包含原只读契约及新维护 mock。新测试覆盖精确审批字节/owner/symlink/重复键、固定范围与版本、真实运行镜像绑定、租约和独立任务排空、未知 journal 只限原页恢复、writer 独立传输及取消清理、配置变化不接受旧 receipt、重启健康失败回退和保持双暂停。`actionlint .github/workflows/notion-rollout.yml` 校验 workflow。测试不连接 Docker daemon、生产或 Notion；这些本地结果不等于生产验收。
+
+API 代理使用 Docker DNS 动态上游（`zone`、`resolver` 和 `server ... resolve`），需要现有 Nginx 1.27.3 或更新版本。该设置只作用于 `miniblog-api`，后端重建后不依赖人工重载来刷新 IP；TLS、CORS 和请求 URI 保持。生产代理配置由基础设施挂载，须单独备份、测试并应用；普通应用部署仅重载 Nginx，不会同步此文件。[官方上游说明](https://nginx.org/en/docs/http/ngx_http_upstream_module.html)

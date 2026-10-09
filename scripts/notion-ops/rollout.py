@@ -12,6 +12,7 @@ import stat
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 
 import remote
@@ -293,31 +294,126 @@ def scheduler_content(original, enabled, author):
     return "\n".join(lines + ["MINIBLOG_NOTION_SYNC_ENABLED=" + str(enabled).lower(), "MINIBLOG_NOTION_SYNC_AUTHOR=" + quoted]) + "\n"
 
 
-def restart_backend(app_dir, sha):
+class SchedulerDiagnostics:
+    """A bounded private trace containing only fixed categories and comparisons."""
+    STAGES = {"env_write", "env_written", "compose_restart", "metadata", "runtime_check",
+              "http_local", "http_public", "health_verified", "health_timeout", "operation_failed",
+              "operation_completed", "rollback_env", "rollback_local_verified", "rollback_verified",
+              "rollback_failed"}
+    ERRORS = {"http_error", "url_error", "timeout", "os_error", "validation_error", "cancelled", "unexpected_error"}
+    BOOLEANS = {"running", "tag_matches", "image_matches", "scheduler_matches", "author_matches"}
+
+    def __init__(self, path):
+        self.path, self.events, self.available = Path(path), [], True
+
+    def record(self, stage, phase="apply", **fields):
+        if stage not in self.STAGES or phase not in {"apply", "rollback"}:
+            raise SafeError("scheduler diagnostic category is invalid")
+        for key, value in fields.items():
+            valid = ((key in self.BOOLEANS and type(value) is bool)
+                     or (key == "docker_health" and value in {"starting", "healthy", "unhealthy", "missing", "unknown"})
+                     or (key == "exception_class" and value in self.ERRORS)
+                     or (key == "http_status" and type(value) is int and 100 <= value <= 599)
+                     or (key == "returncode" and type(value) is int and -255 <= value <= 255))
+            if not valid:
+                raise SafeError("scheduler diagnostic field is invalid")
+        events = (self.events + [{"phase": phase, "stage": stage, **fields}])[-256:]
+        try:
+            remote.atomic_private(self.path, json.dumps({"events": events}) + "\n")
+        except (OSError, SafeError):
+            # A trace failure must not prevent the safety rollback. The caller
+            # refuses successful activation if evidence could not be persisted.
+            self.available = False
+            return False
+        self.events = events
+        return True
+
+
+def scheduler_exception(error):
+    if isinstance(error, urllib.error.HTTPError):
+        return "http_error"
+    if isinstance(error, urllib.error.URLError):
+        return "url_error"
+    if isinstance(error, (TimeoutError, subprocess.TimeoutExpired)):
+        return "timeout"
+    if isinstance(error, OSError):
+        return "os_error"
+    if isinstance(error, SafeError):
+        return "validation_error"
+    if isinstance(error, (KeyboardInterrupt, SystemExit)):
+        return "cancelled"
+    return "unexpected_error"
+
+
+def scheduler_record(diagnostics, stage, phase="apply", **fields):
+    if diagnostics is not None:
+        try:
+            return diagnostics.record(stage, phase=phase, **fields)
+        except BaseException:
+            # Even a cancellation during diagnostic I/O cannot skip rollback.
+            diagnostics.available = False
+            return False
+    return True
+
+
+def restart_backend(app_dir, sha, diagnostics=None, phase="apply"):
     environment = dict(os.environ, BACKEND_IMAGE_TAG=IMAGE_REPOSITORY + sha)
-    result = subprocess.run(["docker", "compose", "-f", "docker-compose.yml", "-f", "docker-compose.prod.yml", "up", "-d", "--no-deps", "--no-build", "--pull", "never", "miniblog-backend"],
-                            cwd=app_dir, env=environment, stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL, timeout=180, check=False)
+    scheduler_record(diagnostics, "compose_restart", phase)
+    try:
+        result = subprocess.run(["docker", "compose", "--env-file", ".env", "-f", "docker-compose.yml", "-f", "docker-compose.prod.yml", "up", "-d", "--no-deps", "--no-build", "--pull", "never", "miniblog-backend"],
+                                cwd=app_dir, env=environment, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, timeout=180, check=False)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        scheduler_record(diagnostics, "compose_restart", phase, exception_class=scheduler_exception(error))
+        raise SafeError("backend scheduler restart did not complete; inspect private evidence") from None
+    scheduler_record(diagnostics, "compose_restart", phase, returncode=result.returncode)
     if result.returncode:
         raise SafeError("backend scheduler restart failed; inspect private evidence")
 
 
-def healthy_backend(sha, image, enabled, author):
+def healthy_backend(sha, image, enabled, author, diagnostics=None, phase="apply", check_public=True):
+    if not check_public and (phase != "rollback" or enabled is not False):
+        raise SafeError("public health may only be omitted when verifying an off rollback")
     deadline = time.monotonic() + 90
     while True:
+        stage = "metadata"
         try:
             current_image, environment, row = runtime_metadata(sha)
-            if (current_image == image and row.get("health") == "healthy"
-                    and environment.get("MINIBLOG_NOTION_SYNC_ENABLED", "").lower() == str(enabled).lower()
-                    and environment.get("MINIBLOG_NOTION_SYNC_AUTHOR") == author):
-                for url in ("http://127.0.0.1:8090/health", "https://api.yangshujie.com/health"):
+            image_matches = current_image == image
+            scheduler_matches = environment.get("MINIBLOG_NOTION_SYNC_ENABLED", "").lower() == str(enabled).lower()
+            author_matches = environment.get("MINIBLOG_NOTION_SYNC_AUTHOR") == author
+            health = row.get("health", "missing")
+            if health not in {"starting", "healthy", "unhealthy", "missing"}:
+                health = "unknown"
+            scheduler_record(diagnostics, "metadata", phase, running=row.get("running") is True,
+                             tag_matches=row.get("tag") == IMAGE_REPOSITORY + sha, image_matches=image_matches)
+            stage = "runtime_check"
+            scheduler_record(diagnostics, stage, phase, docker_health=health, image_matches=image_matches,
+                             scheduler_matches=scheduler_matches, author_matches=author_matches)
+            if image_matches and health == "healthy" and scheduler_matches and author_matches:
+                probes = [("http_local", "http://127.0.0.1:8090/health")]
+                if check_public:
+                    probes.append(("http_public", "https://api.yangshujie.com/health"))
+                for stage, url in probes:
                     with urllib.request.urlopen(url, timeout=8) as response:
-                        if response.status != 200:
+                        status = response.status
+                        if type(status) is not int or not 100 <= status <= 599:
+                            raise SafeError("backend health response metadata is invalid")
+                        scheduler_record(diagnostics, stage, phase, http_status=status)
+                        if status != 200:
                             raise SafeError("backend public health verification failed")
+                scheduler_record(diagnostics, "health_verified" if check_public else "rollback_local_verified", phase)
                 return
-        except (SafeError, OSError):
-            pass
+        except subprocess.TimeoutExpired as error:
+            scheduler_record(diagnostics, stage, phase, exception_class=scheduler_exception(error))
+            raise
+        except (SafeError, OSError) as error:
+            fields = {"exception_class": scheduler_exception(error)}
+            if isinstance(error, urllib.error.HTTPError) and type(error.code) is int and 100 <= error.code <= 599:
+                fields["http_status"] = error.code
+            scheduler_record(diagnostics, stage, phase, **fields)
         if time.monotonic() >= deadline:
+            scheduler_record(diagnostics, "health_timeout", phase)
             raise SafeError("backend scheduler health verification did not complete")
         time.sleep(3)
 
@@ -379,23 +475,37 @@ class Runner:
         original = target.read_text(encoding="utf-8")
         # Persist an off recovery environment, never a writer or an unsafe on backup.
         backup = scheduler_content(original, False, author)
-        remote.atomic_private(self.directory / "runtime-env-before", "\n".join(line for line in original.splitlines() if remote.env_key(line) != "MINIBLOG_NOTION_BOOTSTRAP_TOKEN") + "\n")
-        remote.atomic_private(self.app_dir / ".env.previous", backup)
-        remote.atomic_private(target, scheduler_content(original, enabled, author))
+        diagnostics = SchedulerDiagnostics(self.directory / "scheduler-diagnostics.json")
+        if not diagnostics.record("env_write"):
+            raise SafeError("scheduler private evidence could not be persisted")
         try:
-            restart_backend(self.app_dir, self.manifest["expected_image_sha"])
-            healthy_backend(self.manifest["expected_image_sha"], self.image, enabled, author)
+            remote.atomic_private(self.app_dir / ".env.previous", backup)
+            remote.atomic_private(target, scheduler_content(original, enabled, author))
+            if not diagnostics.record("env_written"):
+                raise SafeError("scheduler private evidence could not be persisted")
+            restart_backend(self.app_dir, self.manifest["expected_image_sha"], diagnostics)
+            healthy_backend(self.manifest["expected_image_sha"], self.image, enabled, author, diagnostics)
+            if not diagnostics.available:
+                raise SafeError("scheduler private evidence could not be persisted")
             self.drain(no_journal=enabled)
             self.status()
-        except BaseException:
+            if not diagnostics.available or not diagnostics.record("operation_completed"):
+                raise SafeError("scheduler private evidence could not be persisted")
+        except BaseException as error:
+            scheduler_record(diagnostics, "operation_failed", exception_class=scheduler_exception(error))
             if enabled:
-                # Roll back only the local scheduler switch. No external write or
-                # replay is attempted; both pause switches remain unchanged.
-                remote.atomic_private(target, backup)
+                # Rollback verifies the off switch and local backend recovery.
+                # A failed public check still fails this operation; it cannot be
+                # used to claim successful activation or public availability.
                 try:
-                    restart_backend(self.app_dir, self.manifest["expected_image_sha"])
-                except Exception:
-                    pass
+                    remote.atomic_private(target, backup)
+                    scheduler_record(diagnostics, "rollback_env", phase="rollback")
+                    restart_backend(self.app_dir, self.manifest["expected_image_sha"], diagnostics, phase="rollback")
+                    healthy_backend(self.manifest["expected_image_sha"], self.image, False, author,
+                                    diagnostics, phase="rollback", check_public=False)
+                    scheduler_record(diagnostics, "rollback_verified", phase="rollback")
+                except BaseException as rollback_error:
+                    scheduler_record(diagnostics, "rollback_failed", phase="rollback", exception_class=scheduler_exception(rollback_error))
             raise
         return {"scheduler_enabled": enabled, "image_id": self.image}
 

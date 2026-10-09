@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.error
 from unittest import mock
 
 HERE = Path(__file__).resolve().parent
@@ -187,6 +188,144 @@ class GuardTests(unittest.TestCase):
                 rollout.no_active_tasks()
 
 
+class SchedulerHealthTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.directory = Path(self.temp.name)
+        self.diagnostics = rollout.SchedulerDiagnostics(self.directory / "scheduler-diagnostics.json")
+
+    def metadata(self, health="healthy", enabled="true", author="author", image=IMAGE):
+        return image, {"MINIBLOG_NOTION_SYNC_ENABLED": enabled, "MINIBLOG_NOTION_SYNC_AUTHOR": author,
+                       "MINIBLOG_NOTION_TOKEN": TOKEN, "MYSQL_PASSWORD": PASSWORD}, {
+                           "tag": rollout.IMAGE_REPOSITORY + SHA, "running": True, "health": health}
+
+    def response(self, status=200):
+        response = mock.MagicMock()
+        response.__enter__.return_value.status = status
+        return response
+
+    def report(self):
+        path = self.directory / "scheduler-diagnostics.json"
+        self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+        text = path.read_text()
+        for value in (TOKEN, WRITER, PASSWORD, "private-author", "private exception detail"):
+            self.assertNotIn(value, text)
+        return json.loads(text)["events"]
+
+    def test_compose_restart_uses_explicit_app_env_and_backend_only(self):
+        with mock.patch.object(rollout.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
+            rollout.restart_backend(self.directory, SHA, self.diagnostics)
+        args, = run.call_args.args
+        self.assertEqual(args, ["docker", "compose", "--env-file", ".env", "-f", "docker-compose.yml",
+                                "-f", "docker-compose.prod.yml", "up", "-d", "--no-deps", "--no-build",
+                                "--pull", "never", "miniblog-backend"])
+        self.assertEqual(run.call_args.kwargs["cwd"], self.directory)
+        self.assertEqual(run.call_args.kwargs["env"]["BACKEND_IMAGE_TAG"], rollout.IMAGE_REPOSITORY + SHA)
+        self.assertEqual(run.call_args.kwargs["stdout"], subprocess.DEVNULL)
+        self.assertEqual(run.call_args.kwargs["stderr"], subprocess.DEVNULL)
+        self.assertEqual(self.report()[-1]["returncode"], 0)
+
+    def test_health_starting_then_healthy_records_only_safe_metadata(self):
+        with mock.patch.object(rollout, "runtime_metadata", side_effect=[self.metadata("starting", author="private-author"), self.metadata(author="private-author")]), \
+                mock.patch.object(rollout.urllib.request, "urlopen", side_effect=[self.response(), self.response()]) as opened, \
+                mock.patch.object(rollout.time, "monotonic", side_effect=[0, 1]), mock.patch.object(rollout.time, "sleep"):
+            rollout.healthy_backend(SHA, IMAGE, True, "private-author", self.diagnostics)
+        self.assertEqual([call.args[0] for call in opened.call_args_list],
+                         ["http://127.0.0.1:8090/health", "https://api.yangshujie.com/health"])
+        events = self.report()
+        checks = [event for event in events if event["stage"] == "runtime_check"]
+        self.assertEqual([event["docker_health"] for event in checks], ["starting", "healthy"])
+        self.assertTrue(all(event["image_matches"] and event["author_matches"] and event["scheduler_matches"] for event in checks))
+        self.assertEqual(events[-1]["stage"], "health_verified")
+
+    def test_public_502_still_fails_after_successful_local_health(self):
+        failure = urllib.error.HTTPError("https://api.yangshujie.com/health", 502, "private exception detail", {}, None)
+        with mock.patch.object(rollout, "runtime_metadata", return_value=self.metadata()), \
+                mock.patch.object(rollout.urllib.request, "urlopen", side_effect=[self.response(), failure]), \
+                mock.patch.object(rollout.time, "monotonic", side_effect=[0, 100]):
+            with self.assertRaises(rollout.SafeError):
+                rollout.healthy_backend(SHA, IMAGE, True, "author", self.diagnostics)
+        events = self.report()
+        self.assertIn({"phase": "apply", "stage": "http_public", "http_status": 502, "exception_class": "http_error"}, events)
+        self.assertIn({"phase": "apply", "stage": "http_local", "http_status": 200}, events)
+        self.assertEqual(events[-1]["stage"], "health_timeout")
+
+    def test_http_responses_other_than_200_never_verify_health(self):
+        for status in (204, 301, 401, 502):
+            with self.subTest(status=status), mock.patch.object(rollout, "runtime_metadata", return_value=self.metadata()), \
+                    mock.patch.object(rollout.urllib.request, "urlopen", return_value=self.response(status)), \
+                    mock.patch.object(rollout.time, "monotonic", side_effect=[0, 100]):
+                with self.assertRaises(rollout.SafeError):
+                    rollout.healthy_backend(SHA, IMAGE, True, "author", self.diagnostics)
+                events = self.report()
+                self.assertEqual(events[-1]["stage"], "health_timeout")
+                self.assertFalse(any(event["stage"] == "health_verified" for event in events))
+
+    def test_public_check_cannot_be_skipped_for_activation(self):
+        for options in ({"check_public": False}, {"check_public": False, "phase": "rollback"}):
+            with self.subTest(options=options), mock.patch.object(rollout, "runtime_metadata") as metadata:
+                with self.assertRaises(rollout.SafeError):
+                    rollout.healthy_backend(SHA, IMAGE, True, "author", self.diagnostics, **options)
+                metadata.assert_not_called()
+
+    def test_compose_failure_and_timeout_diagnostics_never_store_raw_output(self):
+        for result in (subprocess.CompletedProcess([], 7, TOKEN, PASSWORD),
+                       subprocess.TimeoutExpired(["docker", WRITER], 180, output=TOKEN, stderr=PASSWORD)):
+            with self.subTest(result=type(result).__name__):
+                with mock.patch.object(rollout.subprocess, "run", **({"side_effect": result} if isinstance(result, Exception) else {"return_value": result})):
+                    with self.assertRaises(rollout.SafeError):
+                        rollout.restart_backend(self.directory, SHA, self.diagnostics)
+                events = self.report()
+                self.assertEqual(events[-1]["stage"], "compose_restart")
+                if isinstance(result, Exception):
+                    self.assertEqual(events[-1]["exception_class"], "timeout")
+                else:
+                    self.assertEqual(events[-1]["returncode"], 7)
+
+    def test_diagnostic_fields_reject_raw_values_and_evidence_failure_is_flagged(self):
+        for fields in ({"author": "private-author"}, {"exception_class": PASSWORD}, {"docker_health": TOKEN}, {"http_status": "502"}):
+            with self.subTest(fields=list(fields)):
+                with self.assertRaises(rollout.SafeError):
+                    self.diagnostics.record("metadata", **fields)
+        with mock.patch.object(rollout.remote, "atomic_private", side_effect=OSError("private exception detail")):
+            self.assertFalse(self.diagnostics.record("metadata"))
+        self.assertFalse(self.diagnostics.available)
+        self.assertEqual(self.diagnostics.events, [])
+
+    def test_runtime_mismatch_never_reaches_http_checks(self):
+        for overrides, field in (({"enabled": "false"}, "scheduler_matches"),
+                                 ({"author": "private-author"}, "author_matches"),
+                                 ({"image": "sha256:" + "c" * 64}, "image_matches")):
+            with self.subTest(field=field), mock.patch.object(rollout, "runtime_metadata", return_value=self.metadata(**overrides)), \
+                    mock.patch.object(rollout.urllib.request, "urlopen") as opened, \
+                    mock.patch.object(rollout.time, "monotonic", side_effect=[0, 100]):
+                with self.assertRaises(rollout.SafeError):
+                    rollout.healthy_backend(SHA, IMAGE, True, "author", self.diagnostics)
+                opened.assert_not_called()
+                self.assertFalse([event for event in self.report() if event["stage"] == "runtime_check"][-1][field])
+
+    def test_metadata_inspection_timeout_keeps_original_abort_and_safe_stage(self):
+        failure = subprocess.TimeoutExpired(["docker", PASSWORD], 30, output=TOKEN, stderr=WRITER)
+        with mock.patch.object(rollout, "runtime_metadata", side_effect=failure), \
+                mock.patch.object(rollout.time, "monotonic", return_value=0):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                rollout.healthy_backend(SHA, IMAGE, True, "author", self.diagnostics)
+        self.assertEqual(self.report()[-1], {"phase": "apply", "stage": "metadata", "exception_class": "timeout"})
+
+    def test_untrusted_health_and_exception_messages_are_never_recorded(self):
+        with mock.patch.object(rollout, "runtime_metadata", return_value=self.metadata(health=PASSWORD)), \
+                mock.patch.object(rollout.time, "monotonic", side_effect=[0, 100]):
+            with self.assertRaises(rollout.SafeError):
+                rollout.healthy_backend(SHA, IMAGE, True, "author", self.diagnostics)
+        self.assertEqual([event for event in self.report() if event["stage"] == "runtime_check"][-1]["docker_health"], "unknown")
+        with mock.patch.object(rollout, "runtime_metadata", side_effect=OSError("private exception detail")), \
+                mock.patch.object(rollout.time, "monotonic", side_effect=[0, 100]):
+            with self.assertRaises(rollout.SafeError):
+                rollout.healthy_backend(SHA, IMAGE, True, "author", self.diagnostics)
+        self.assertIn({"phase": "apply", "stage": "metadata", "exception_class": "os_error"}, self.report())
+
+
 class RunnerTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -305,7 +444,7 @@ class RunnerTests(unittest.TestCase):
 
     def test_scheduler_restart_health_failure_recovers_off_env_without_external_retry(self):
         target = self.app / ".env"
-        target.write_text("MYSQL_PASSWORD=keep\nMINIBLOG_NOTION_SYNC_ENABLED=false\n")
+        target.write_text("MYSQL_PASSWORD=" + PASSWORD + "\nMINIBLOG_NOTION_TOKEN=" + TOKEN + "\nMINIBLOG_NOTION_SYNC_ENABLED=false\n")
         target.chmod(0o600)
         runner = self.runner("scheduler_on", {"validated_sync_run_id": RUN})
         runner.task = mock.Mock(side_effect=[{"author": "昵称"}, drain(), status()])
@@ -315,10 +454,123 @@ class RunnerTests(unittest.TestCase):
                 runner.scheduler(True, self.runtime)
         self.assertEqual(restart.call_count, 2)
         self.assertIn("MINIBLOG_NOTION_SYNC_ENABLED=false", target.read_text())
-        self.assertIn("MYSQL_PASSWORD=keep", target.read_text())
-        for path in (target, self.app / ".env.previous", self.directory / "runtime-env-before"):
+        self.assertIn("MYSQL_PASSWORD=" + PASSWORD, target.read_text())
+        for path in (target, self.app / ".env.previous"):
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
         self.assertEqual(runner.task.call_count, 3)
+        self.assertFalse((self.directory / "runtime-env-before").exists())
+        for path in self.directory.iterdir():
+            if path.is_file():
+                self.assertNotIn(TOKEN, path.read_text())
+                self.assertNotIn(PASSWORD, path.read_text())
+
+    def test_public_failure_rolls_back_and_verifies_local_off_without_claiming_public_success(self):
+        target = self.app / ".env"
+        target.write_text("MYSQL_PASSWORD=" + PASSWORD + "\nMINIBLOG_NOTION_TOKEN=" + TOKEN + "\nMINIBLOG_NOTION_SYNC_ENABLED=false\n")
+        target.chmod(0o600)
+        runner = self.runner("scheduler_on", {"validated_sync_run_id": RUN})
+        runner.task = mock.Mock(side_effect=[{"author": "private-author"}, drain(), status()])
+        row = {"health": "healthy", "running": True, "tag": rollout.IMAGE_REPOSITORY + SHA}
+        before = (IMAGE, {"MINIBLOG_NOTION_SYNC_ENABLED": "true", "MINIBLOG_NOTION_SYNC_AUTHOR": "private-author"}, row)
+        recovered = (IMAGE, {"MINIBLOG_NOTION_SYNC_ENABLED": "false", "MINIBLOG_NOTION_SYNC_AUTHOR": "private-author"}, row)
+        response = mock.MagicMock()
+        response.__enter__.return_value.status = 200
+        failure = urllib.error.HTTPError("https://api.yangshujie.com/health", 502, "private exception detail", {}, None)
+        with mock.patch.object(rollout, "no_active_tasks"), mock.patch.object(rollout, "restart_backend") as restart, \
+                mock.patch.object(rollout, "runtime_metadata", side_effect=[before, recovered]), \
+                mock.patch.object(rollout.urllib.request, "urlopen", side_effect=[response, failure, response]) as opened, \
+                mock.patch.object(rollout.time, "monotonic", side_effect=[0, 100, 200]):
+            with self.assertRaises(rollout.SafeError):
+                runner.scheduler(True, self.runtime)
+        self.assertEqual(restart.call_count, 2)
+        self.assertEqual(runner.task.call_count, 3)
+        self.assertIn("MINIBLOG_NOTION_SYNC_ENABLED=false", target.read_text())
+        self.assertEqual([call.args[0] for call in opened.call_args_list],
+                         ["http://127.0.0.1:8090/health", "https://api.yangshujie.com/health", "http://127.0.0.1:8090/health"])
+        path = self.directory / "scheduler-diagnostics.json"
+        self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+        text = path.read_text()
+        for value in (PASSWORD, TOKEN, WRITER, "private-author", "private exception detail"):
+            self.assertNotIn(value, text)
+        events = json.loads(text)["events"]
+        self.assertIn({"phase": "apply", "stage": "http_public", "http_status": 502, "exception_class": "http_error"}, events)
+        self.assertIn({"phase": "rollback", "stage": "rollback_local_verified"}, events)
+        self.assertEqual(events[-1]["stage"], "rollback_verified")
+        self.assertFalse(any(event["stage"] in {"health_verified", "operation_completed"} for event in events))
+
+    def test_failed_rollback_health_is_recorded_without_suppression_of_original_failure(self):
+        target = self.app / ".env"
+        target.write_text("MINIBLOG_NOTION_SYNC_ENABLED=false\n")
+        target.chmod(0o600)
+        runner = self.runner("scheduler_on", {"validated_sync_run_id": RUN})
+        runner.task = mock.Mock(side_effect=[{"author": "private-author"}, drain(), status()])
+        with mock.patch.object(rollout, "no_active_tasks"), mock.patch.object(rollout, "restart_backend") as restart, \
+                mock.patch.object(rollout, "healthy_backend", side_effect=rollout.SafeError("private exception detail")) as health:
+            with self.assertRaises(rollout.SafeError):
+                runner.scheduler(True, self.runtime)
+        self.assertEqual(restart.call_count, 2)
+        self.assertEqual(health.call_count, 2)
+        self.assertEqual(health.call_args.args[2], False)
+        self.assertEqual(health.call_args.kwargs, {"phase": "rollback", "check_public": False})
+        events = json.loads((self.directory / "scheduler-diagnostics.json").read_text())["events"]
+        self.assertEqual(events[-1], {"phase": "rollback", "stage": "rollback_failed", "exception_class": "validation_error"})
+        self.assertFalse(any(event["stage"] == "rollback_verified" for event in events))
+
+    def test_transient_diagnostic_failure_never_records_completed_and_always_rolls_back(self):
+        for failed_stage in ("runtime_check", "operation_completed"):
+            with self.subTest(failed_stage=failed_stage):
+                target = self.app / ".env"
+                target.write_text("MINIBLOG_NOTION_SYNC_ENABLED=false\n")
+                target.chmod(0o600)
+                runner = self.runner("scheduler_on", {"validated_sync_run_id": RUN})
+                runner.task = mock.Mock(side_effect=[{"author": "private-author"}, drain(), status(), drain(), status()])
+                row = {"health": "healthy", "running": True, "tag": rollout.IMAGE_REPOSITORY + SHA}
+                metadata = [(IMAGE, {"MINIBLOG_NOTION_SYNC_ENABLED": switch, "MINIBLOG_NOTION_SYNC_AUTHOR": "private-author"}, row)
+                            for switch in ("true", "false")]
+                response = mock.MagicMock()
+                response.__enter__.return_value.status = 200
+                write = rollout.remote.atomic_private
+                failed = []
+                def fail_once(path, value):
+                    if Path(path).name == "scheduler-diagnostics.json" and not failed and json.loads(value)["events"][-1]["stage"] == failed_stage:
+                        failed.append(True)
+                        raise OSError("private exception detail")
+                    return write(path, value)
+                with mock.patch.object(rollout, "no_active_tasks"), mock.patch.object(rollout, "restart_backend") as restart, \
+                        mock.patch.object(rollout.remote, "atomic_private", side_effect=fail_once), \
+                        mock.patch.object(rollout, "runtime_metadata", side_effect=metadata), \
+                        mock.patch.object(rollout.urllib.request, "urlopen", return_value=response), \
+                        mock.patch.object(rollout.time, "monotonic", side_effect=[0, 100]):
+                    with self.assertRaises(rollout.SafeError):
+                        runner.scheduler(True, self.runtime)
+                self.assertTrue(failed)
+                self.assertEqual(restart.call_count, 2)
+                self.assertIn("MINIBLOG_NOTION_SYNC_ENABLED=false", target.read_text())
+                events = json.loads((self.directory / "scheduler-diagnostics.json").read_text())["events"]
+                self.assertFalse(any(event["stage"] == "operation_completed" for event in events))
+                self.assertEqual(events[-1]["stage"], "rollback_verified")
+
+    def test_cancellation_during_failure_diagnostic_cannot_skip_off_rollback(self):
+        target = self.app / ".env"
+        target.write_text("MINIBLOG_NOTION_SYNC_ENABLED=false\n")
+        target.chmod(0o600)
+        runner = self.runner("scheduler_on", {"validated_sync_run_id": RUN})
+        runner.task = mock.Mock(side_effect=[{"author": "private-author"}, drain(), status()])
+        write = rollout.remote.atomic_private
+        def interrupt_failed_trace(path, value):
+            if Path(path).name == "scheduler-diagnostics.json" and json.loads(value)["events"][-1]["stage"] == "operation_failed":
+                raise KeyboardInterrupt()
+            return write(path, value)
+        with mock.patch.object(rollout, "no_active_tasks"), mock.patch.object(rollout, "restart_backend") as restart, \
+                mock.patch.object(rollout, "healthy_backend", side_effect=[rollout.SafeError("unverified"), None]), \
+                mock.patch.object(rollout.remote, "atomic_private", side_effect=interrupt_failed_trace):
+            with self.assertRaises(rollout.SafeError):
+                runner.scheduler(True, self.runtime)
+        self.assertEqual(restart.call_count, 2)
+        self.assertIn("MINIBLOG_NOTION_SYNC_ENABLED=false", target.read_text())
+        events = json.loads((self.directory / "scheduler-diagnostics.json").read_text())["events"]
+        self.assertEqual(events[-1]["stage"], "rollback_verified")
+        self.assertFalse(any(event["stage"] == "operation_completed" for event in events))
 
     def test_scheduler_on_remains_paused_and_requires_run_evidence(self):
         now = datetime.now(timezone.utc)
