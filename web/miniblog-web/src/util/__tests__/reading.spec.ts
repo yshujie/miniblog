@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { mapModuleDetail, decimalID } from '@/api/reading-contract'
-import { firstArticle, safeExternalURL, articleTitle } from '../reading'
+import { firstArticle, safeExternalURL, articleTitle, articleReadingLinks } from '../reading'
 import { parseResponse } from '../http'
 import { makeArticle } from '@/__tests__/fixtures'
 
@@ -40,5 +40,47 @@ describe('reading selection and v1 IDs', () => {
     const article = makeArticle()
     article.title = ''
     expect(articleTitle(article)).toBe('example.com')
+  })
+})
+
+
+describe('Notion original and embed addresses', () => {
+  const pageID = '2ec330bdddf1802d9835c5eba0858758'
+  const origin = 'https://shujie-blog.notion.site'
+  const current = `${origin}/defer-panic-recover-${pageID}?pvs=4#part`
+  const embed = `${origin}/ebd//${pageID}?showTitle=true`
+  const links = (readingURL: string, externalLink = '') => articleReadingLinks({ readingURL, externalLink })
+
+  it('keeps the current public original but derives an embed independently of the legacy URL', () => {
+    expect(links(current, embed)).toEqual({ originalURL: current, embedURL: `${origin}/ebd/${pageID}` })
+  })
+
+  it.each(['', 'javascript:bad', `${origin}/ebd/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`, 'https://old-domain.notion.site/ebd/' + pageID])('derives an embed from the current page instead of a missing, unsafe or stale legacy link: %s', legacy => {
+    expect(links(current, legacy)).toEqual({ originalURL: current, embedURL: `${origin}/ebd/${pageID}` })
+  })
+
+  it('keeps an existing current embed authoritative over a different legacy page', () => {
+    expect(links(embed, `${origin}/ebd/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`)).toEqual({ originalURL: embed, embedURL: embed })
+  })
+
+  it('derives the current page identity independently of slug and hexadecimal case', () => {
+    expect(links(`${origin}/new-slug-${pageID.toUpperCase()}`, embed).embedURL).toBe(`${origin}/ebd/${pageID}`)
+  })
+
+  it('converts a legacy ordinary Notion page when there is no safe current URL', () => {
+    expect(links('javascript:bad', current)).toEqual({ originalURL: current, embedURL: `${origin}/ebd/${pageID}` })
+  })
+
+  it.each(['https://example.com/doc', 'https://notion.site.example.com/' + pageID, `${origin}/named-page-without-id`, `${origin}/${pageID}?p=`, `${origin}/${pageID}?v=other`, `https://app.notion.com/p/${pageID}`])('does not guess a Notion page or overwrite a current unrelated address: %s', address => {
+    expect(links(address, embed)).toEqual({ originalURL: address, embedURL: address })
+  })
+
+  it.each([`${origin}/${pageID}/`, `${origin}/named-2ec330bd-ddf1-802d-9835-c5eba0858758`, `https://www.notion.so/${pageID}`])('handles explicit page IDs and keeps the current public origin: %s', address => {
+    expect(links(address).originalURL).toBe(address)
+    expect(links(address).embedURL).toBe(new URL(address).origin + '/ebd/' + pageID)
+  })
+
+  it('does not create an iframe or original link from unsafe input', () => {
+    expect(links('data:text/html,blocked', 'https://user:password@shujie-blog.notion.site/' + pageID)).toEqual({ originalURL: null, embedURL: null })
   })
 })

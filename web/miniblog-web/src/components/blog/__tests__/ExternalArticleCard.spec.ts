@@ -56,7 +56,7 @@ describe('external article presentation', () => {
 })
 
 describe('reading context and neighboring articles', () => {
-  it('shows only provided metadata, uses the selected original URL, and routes neighbors with string IDs', async () => {
+  it('keeps chapter navigation and original action without duplicating Notion metadata', async () => {
     const router = createRouter({ history: createMemoryHistory(), routes: [
       { path: '/topics/:module', name: 'TopicOverview', component: { template: '<div />' } },
       { path: '/blog/:module/article/:article', name: 'BlogArticle', component: { template: '<div />' } },
@@ -70,8 +70,9 @@ describe('reading context and neighboring articles', () => {
     wrapper = mount(ExternalArticleCard, { global: { plugins: [createPinia(), router] }, props: { article, module, placement, next } })
     expect(wrapper.get('[aria-label="文章位置"]').text()).toContain('go')
     expect(wrapper.get('[aria-label="文章位置"]').text()).toContain('章')
-    expect(wrapper.get('.reader-info').text()).toContain('Shujie')
-    expect(wrapper.findAll('.reader-tag').map(tag => tag.text())).toEqual(['Go', '基础'])
+    expect(wrapper.find('.reader-info').exists()).toBe(false)
+    expect(wrapper.findAll('.reader-tag')).toHaveLength(0)
+    expect(wrapper.get('h1').classes()).toContain('sr-only')
     expect(wrapper.get('a[target="_blank"]').attributes('href')).toBe(article.readingURL)
     expect(wrapper.get('.reading-pagination .next').attributes('href')).toBe('/blog/go/article/9007199254740994')
     expect(wrapper.get('.reading-pagination .previous').text()).toContain('返回文章目录')
@@ -102,5 +103,39 @@ describe('reading toolbar controls', () => {
     await wrapper.get('[aria-label="展开文章目录"]').trigger('click')
     expect(ui.sidebarOpen).toBe(true)
     expect(wrapper.get('iframe').element).toBe(frame)
+  })
+})
+
+
+describe('Notion embedding with a separate original URL', () => {
+  const pageID = '2ec330bdddf1802d9835c5eba0858758'
+  const original = `https://shujie-blog.notion.site/defer-panic-recover-${pageID}`
+  const embed = `https://shujie-blog.notion.site/ebd/${pageID}`
+  const legacyEmbed = `https://shujie-blog.notion.site/ebd//${pageID}`
+
+  it('shows the embeddable page while the original action opens the current public page', async () => {
+    const article = makeArticle()
+    article.readingURL = original; article.externalLink = legacyEmbed
+    wrapper = mount(ExternalArticleCard, { global: { plugins: [createPinia()], stubs: { RouterLink: true } }, props: { article } })
+    const frame = wrapper.get('iframe').element
+    expect(wrapper.get('iframe').attributes('src')).toBe(embed)
+    expect(wrapper.get('iframe').attributes('data-frame-key')).toBe(article.id + ':' + embed)
+    expect(wrapper.get('.original-link').attributes('href')).toBe(original)
+    await wrapper.setProps({ article: { ...article, title: 'Updated title', readingURL: original + '?pvs=4#part' } })
+    expect(wrapper.get('.original-link').attributes('href')).toBe(original + '?pvs=4#part')
+    expect(wrapper.get('iframe').element).toBe(frame)
+  })
+
+  it('replaces the iframe for a new current Notion page even when the legacy embed still points to the old page', async () => {
+    const article = makeArticle()
+    article.readingURL = original; article.externalLink = legacyEmbed
+    wrapper = mount(ExternalArticleCard, { global: { plugins: [createPinia()], stubs: { RouterLink: true } }, props: { article } })
+    const frame = wrapper.get('iframe').element
+    const newID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    const newOriginal = `https://shujie-blog.notion.site/new-page-${newID}`
+    await wrapper.setProps({ article: { ...article, readingURL: newOriginal } })
+    expect(wrapper.get('iframe').attributes('src')).toBe(`https://shujie-blog.notion.site/ebd/${newID}`)
+    expect(wrapper.get('iframe').element).not.toBe(frame)
+    expect(wrapper.get('.original-link').attributes('href')).toBe(newOriginal)
   })
 })

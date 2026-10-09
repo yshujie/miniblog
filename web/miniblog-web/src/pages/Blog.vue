@@ -1,10 +1,10 @@
 <template>
   <BlogLayout>
     <template #sidebar>
-      <Sidebar :sections="state.module?.sections || []" :module-code="moduleCode" :module-title="state.module?.title" />
+      <Sidebar :sections="state.module?.sections || []" :module-code="moduleCode" :module-title="state.module?.title" :catalog-ready="Boolean(state.module)" />
     </template>
     <template #drawer>
-      <Sidebar drawer :sections="state.module?.sections || []" :module-code="moduleCode" :module-title="state.module?.title" />
+      <Sidebar drawer :sections="state.module?.sections || []" :module-code="moduleCode" :module-title="state.module?.title" :catalog-ready="Boolean(state.module)" />
     </template>
     <template #main>
       <ContentState v-if="state.status === 'loading'" status="loading" :title="'正在加载' + (state.resource === 'article' ? '文章' : '目录') + '…'" />
