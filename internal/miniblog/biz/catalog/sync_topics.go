@@ -12,6 +12,22 @@ import (
 )
 
 type TopicOption struct{ ID, Name string }
+
+// TopicReuseInput is an operator-reviewed mapping, including the current local tuple.
+type TopicReuseInput struct {
+	OptionID              string `json:"option_id"`
+	ExpectedOptionName    string `json:"expected_option_name"`
+	SectionCode           string `json:"section_code"`
+	ExpectedSectionTitle  string `json:"expected_section_title"`
+	ExpectedSectionStatus *int   `json:"expected_section_status"`
+	ExpectedSectionSort   *int   `json:"expected_section_sort"`
+}
+
+// PrepareSyncedTopicsWithReuse retains the preparation contract and applies an explicit reviewed reuse map.
+func (s *Service) PrepareSyncedTopicsWithReuse(ctx context.Context, token store.LeaseToken, sourceID string, expectedRevision uint64, propertyID string, options []TopicOption, reuse []TopicReuseInput) ([]TopicResult, uint64, error) {
+	return s.syncedTopics(ctx, token, sourceID, expectedRevision, propertyID, options, true, reuse)
+}
+
 type TopicResult struct {
 	BindingID                              uint64
 	OptionID, SectionCode, Outcome, Reason string
@@ -23,17 +39,17 @@ func syncTopicConflict(message string) error {
 
 // EnsureSyncedTopics includes options without pages. Ordering remains locally owned.
 func (s *Service) EnsureSyncedTopics(ctx context.Context, token store.LeaseToken, sourceID string, expectedRevision uint64, propertyID string, options []TopicOption) ([]TopicResult, error) {
-	results, _, err := s.syncedTopics(ctx, token, sourceID, expectedRevision, propertyID, options, false)
+	results, _, err := s.syncedTopics(ctx, token, sourceID, expectedRevision, propertyID, options, false, nil)
 	return results, err
 }
 
 // PrepareSyncedTopics prepares only directory bindings in a frozen maintenance window.
 // A disabled source is allowed; no page binding or article is created or adopted.
 func (s *Service) PrepareSyncedTopics(ctx context.Context, token store.LeaseToken, sourceID string, expectedRevision uint64, propertyID string, options []TopicOption) ([]TopicResult, uint64, error) {
-	return s.syncedTopics(ctx, token, sourceID, expectedRevision, propertyID, options, true)
+	return s.syncedTopics(ctx, token, sourceID, expectedRevision, propertyID, options, true, nil)
 }
 
-func (s *Service) syncedTopics(ctx context.Context, token store.LeaseToken, sourceID string, expectedRevision uint64, propertyID string, options []TopicOption, prepare bool) (results []TopicResult, revision uint64, err error) {
+func (s *Service) syncedTopics(ctx context.Context, token store.LeaseToken, sourceID string, expectedRevision uint64, propertyID string, options []TopicOption, prepare bool, reuse []TopicReuseInput) (results []TopicResult, revision uint64, err error) {
 	if s.ds.DB() == nil {
 		return nil, 0, store.ErrSyncNotReady
 	}
@@ -74,7 +90,11 @@ func (s *Service) syncedTopics(ctx context.Context, token store.LeaseToken, sour
 				return e
 			}
 		}
-		results, e = ensureTopics(ds, &src, propertyID, options)
+		strict, e := applyReviewedTopicReuse(ds, &src, propertyID, options, reuse)
+		if e != nil {
+			return e
+		}
+		results, e = ensureTopics(ds, &src, propertyID, options, strict)
 		if e != nil {
 			return e
 		}
@@ -114,7 +134,7 @@ func topicCatalogState(ds store.IStore, src *model.NotionSyncSource, propertyID 
 	err = ds.DB().Select("id", "source_id", "data_source_id", "theme_property_id", "option_id", "option_name", "section_code", "status", "reason").Where("data_source_id = ? AND theme_property_id = ?", src.DataSourceID, propertyID).Order("id").Find(&state.Bindings).Error
 	return
 }
-func ensureTopics(ds store.IStore, src *model.NotionSyncSource, propertyID string, options []TopicOption) ([]TopicResult, error) {
+func ensureTopics(ds store.IStore, src *model.NotionSyncSource, propertyID string, options []TopicOption, strict map[string]bool) ([]TopicResult, error) {
 	seen := map[string]bool{}
 	for _, option := range options {
 		if seen[option.ID] {
@@ -139,6 +159,9 @@ func ensureTopics(ds store.IStore, src *model.NotionSyncSource, propertyID strin
 		p, topicErr := EnsureSyncedTheme(ds, src, propertyID, option.ID, option.Name)
 		result := TopicResult{OptionID: option.ID, Outcome: "bound"}
 		if topicErr != nil {
+			if strict[option.ID] {
+				return nil, topicErr
+			}
 			if e = ds.DB().RollbackTo("sync_topic").Error; e != nil {
 				return nil, e
 			}

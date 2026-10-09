@@ -5,16 +5,19 @@ import (
 	"errors"
 	"time"
 
-	"github.com/yshujie/miniblog/internal/miniblog/biz/article"
+	"github.com/yshujie/miniblog/internal/miniblog/biz/catalog"
 	"github.com/yshujie/miniblog/internal/miniblog/model"
 	"github.com/yshujie/miniblog/internal/miniblog/store"
 	"gorm.io/gorm"
 )
 
 type CatalogPrepareInput struct {
-	SourceID               string `json:"source_id"`
-	ExpectedConfigRevision uint64 `json:"expected_config_revision"`
+	SourceID               string                    `json:"source_id"`
+	ExpectedConfigRevision uint64                    `json:"expected_config_revision"`
+	ReuseMap               []catalog.TopicReuseInput `json:"reuse_map,omitempty"`
 }
+
+type CatalogReuseInput = catalog.TopicReuseInput
 
 type CatalogPrepareResult struct {
 	RunID          string            `json:"run_id"`
@@ -79,13 +82,13 @@ func (s *Service) PrepareCatalog(ctx context.Context, input CatalogPrepareInput)
 			return err
 		}
 		topic, _ := schemaProperty(schema, cfg.TopicPropertyID)
-		options := []article.TopicOption{{ID: "", Name: "未分类"}}
+		options := []catalog.TopicOption{{ID: "", Name: "未分类"}}
 		optionIDs := []string{""}
 		for _, option := range topic.Select.Options {
-			options = append(options, article.TopicOption{ID: option.ID, Name: option.Name})
+			options = append(options, catalog.TopicOption{ID: option.ID, Name: option.Name})
 			optionIDs = append(optionIDs, option.ID)
 		}
-		prepared, revision, err := article.NewForSync(s.ds, s.opts.Author).PrepareSyncedTopics(active, token, id, input.ExpectedConfigRevision, cfg.TopicPropertyID, options)
+		prepared, revision, err := catalog.New(s.ds).PrepareSyncedTopicsWithReuse(active, token, id, input.ExpectedConfigRevision, cfg.TopicPropertyID, options, input.ReuseMap)
 		if err != nil {
 			return err
 		}
