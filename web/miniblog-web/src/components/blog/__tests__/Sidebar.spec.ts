@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -21,6 +21,9 @@ describe('shared desktop and drawer directory', () => {
     const wrapper = mount(Sidebar, { props: { sections: module.sections, moduleCode: 'go', drawer: true }, global: { plugins: [pinia, router] } })
     const buttons = wrapper.findAll('.article-item')
     expect(buttons.map(button => button.text())).toEqual(['子章首篇', '子章次篇', '直属'])
+    expect(wrapper.get('.topic-count').text()).toBe('3 篇文章')
+    expect(wrapper.get('.section-header .section-count').text()).toBe('3')
+    expect(wrapper.get('.group-header .section-count').text()).toBe('2')
     expect(firstArticle(module)?.id).toBe('9007199254740993')
     await buttons[0].trigger('click')
     await flushPromises()
@@ -67,7 +70,7 @@ describe('shared desktop and drawer directory', () => {
   })
 })
 
-async function mountDirectory() {
+async function mountDirectory(attachTo?: HTMLElement) {
   const pinia = createPinia()
   const router = createRouter({ history: createMemoryHistory(), routes: [
     { path: '/blog/:module/article/:article', name: 'BlogArticle', component: { template: '<div />' } },
@@ -79,7 +82,7 @@ async function mountDirectory() {
       subsections: [{ id: '3', code: 'sub', title: '当前子章', section_code: 'current', articles: [{ id: '4', title: '当前文章' }] }] },
     { id: '6', code: 'other', title: '其他章节', module_code: 'go', articles: [{ id: '7', title: 'Go concurrency：这是一个需要完整展示而不能提前截断的长文章标题' }] },
   ] })
-  const wrapper = mount(Sidebar, { props: { sections: module.sections, moduleCode: 'go', moduleTitle: 'Go', drawer: true }, global: { plugins: [pinia, router] } })
+  const wrapper = mount(Sidebar, { attachTo, props: { sections: module.sections, moduleCode: 'go', moduleTitle: 'Go', drawer: true }, global: { plugins: [pinia, router] } })
   return { wrapper, router, module }
 }
 describe('directory exploration', () => {
@@ -123,6 +126,56 @@ describe('directory exploration', () => {
     await wrapper.setProps({ moduleCode: 'new' })
     expect((wrapper.get('input[type="search"]').element as HTMLInputElement).value).toBe('')
     expect(wrapper.findAll('.section-header').map(button => button.attributes('aria-expanded'))).toEqual(['false', 'true'])
+    wrapper.unmount()
+  })
+})
+
+describe('reader directory orientation', () => {
+  it('keeps total counts independent of title search and hides counts until the catalog is available', async () => {
+    const { wrapper } = await mountDirectory()
+    expect(wrapper.get('.topic-count').text()).toBe('2 篇文章')
+    await wrapper.get('input[type="search"]').setValue('concurrency')
+    expect(wrapper.get('.directory-label').text()).toBe('1 个搜索结果')
+    expect(wrapper.get('.topic-count').text()).toBe('2 篇文章')
+    expect(wrapper.get('.section-header').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.icon-arrow').exists()).toBe(false)
+    await wrapper.setProps({ catalogReady: false, sections: [] })
+    expect(wrapper.find('.topic-count').exists()).toBe(false)
+    expect(wrapper.get('input[type="search"]').attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+
+  it('locates the current article after searching elsewhere without changing the route', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView')
+    const scroll = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scroll })
+    const { wrapper, router } = await mountDirectory(document.body)
+    try {
+      await wrapper.get('.group-header').trigger('click')
+      await wrapper.findAll('.section-header')[0].trigger('click')
+      await wrapper.get('input[type="search"]').setValue('concurrency')
+      expect(wrapper.find('[aria-current="page"]').exists()).toBe(false)
+      await wrapper.get('.locate-current').trigger('click')
+      await flushPromises()
+      expect((wrapper.get('input[type="search"]').element as HTMLInputElement).value).toBe('')
+      expect(wrapper.findAll('.section-header')[0].attributes('aria-expanded')).toBe('true')
+      expect(wrapper.get('.group-header').attributes('aria-expanded')).toBe('true')
+      expect(document.activeElement).toBe(wrapper.get('[aria-current="page"]').element)
+      expect(scroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' })
+      expect(router.currentRoute.value.fullPath).toBe('/blog/go/article/4')
+    } finally {
+      wrapper.unmount()
+      if (descriptor) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', descriptor)
+      else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
+    }
+  })
+
+  it('omits the locate action when the current article is not in the refreshed catalog', async () => {
+    const { wrapper, router } = await mountDirectory()
+    await router.push('/blog/go/article/9007199254740999')
+    await flushPromises()
+    expect(wrapper.find('.locate-current').exists()).toBe(false)
+    expect(wrapper.find('[aria-current="page"]').exists()).toBe(false)
     wrapper.unmount()
   })
 })
