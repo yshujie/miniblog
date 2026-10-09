@@ -67,9 +67,9 @@ npm run test:unit
 npm run build
 ```
 
-阅读路由继续支持 `/blog/:module` 和 `/blog/:module/article/:article`。所有模块入口按目录显示顺序选择首篇（子章节文章先于章节直属文章）；空模块展示空态。文章深链接先按 ID 获取当前模块，跨模块移动后替换到当前路径，并保留 query/hash；指定文章不存在时不会跳到其他文章。公开 v1 文章响应可新增 `module_code`，旧字段及 ID 字符串契约保持不变。
+阅读路由继续支持 `/blog/:module` 和 `/blog/:module/article/:article`。首页“开始阅读”及旧模块地址按目录顺序选择首篇（子章节文章先于章节直属文章）；空模块展示空态。顶部主题导航进入新增主题总览 `/topics/:module`，不会请求正文或跳转首篇。章节入口使用 `?chapter=code` 定位；目录和总览仅搜索本主题文章标题。文章深链接先按 ID 获取当前模块，跨模块移动后替换到当前路径，并保留 query/hash；指定文章不存在时不会跳到其他文章。公开 v1 文章响应可新增 `module_code`，旧字段及 ID 字符串契约保持不变。
 
-文章正文继续通过外链 iframe 阅读，始终提供打开原文。iframe 的 load 事件仅代表收到加载事件，十秒提示也只提供原文出口，不判断平台页面是否真正可读。小于 1280px 的屏幕通过目录抽屉选择文章。
+文章正文继续通过外链 iframe 阅读，始终提供打开原文。iframe 的 load 事件仅代表收到加载事件，十秒提示也只提供原文出口，不判断平台页面是否真正可读。901px 起目录常驻；900px 及以下通过目录抽屉选择文章；650px 及以下通过独立主题面板切换主题。两个面板互斥。
 
 单元与组件测试使用本地替身，覆盖 v1 映射、大 ID、首篇、空目录、错误重试、历史链接、请求竞态、目录交互和 iframe 状态。它们不证明 Notion/飞书真实页面可访问；真实平台与 iOS/Android/Safari 的阅读验收需要单独记录。
 
@@ -77,3 +77,26 @@ npm run build
 公开文章可提供 `reading_url`，正文优先使用该地址，再回退旧 `external_link`；两者只接受 HTTP(S)。文章 ID 与旧路由保持不变。模块摘要和完整目录缓存有效期为 60 秒；阅读页可见时每 60 秒刷新，重新回到前台或获得焦点时刷新。相同阅读地址保留 iframe，资料刷新失败保留已加载内容并显示重试提示，明确的 404 则移除正文。紧急下架与解除后的来源重新核验由后端判断。
 
 [管理端本机浏览器夹具](../miniblog-web-admin/docs/notion-sync-fixtures.md)同时覆盖阅读地址、跨模块历史链接、60 秒刷新和紧急下架。当前验证使用本机替身正文，仍不证明真实 Notion/飞书允许 iframe 阅读。
+
+## 读者 UI 与独立浏览器验收
+
+首页使用公开主题摘要，视口附近章节预览最多三个并发详情请求。计数只来自完整目录，单个预览失败可以独立重试。主题总览和阅读页在可见时每60秒刷新目录，暂时错误保留已有内容，明确404清除内容。目录刷新保留用户展开选择；正文iframe仅文章ID或有效来源地址变化时重建。
+
+独立夹具仅使用本机公开API和替身文档，不驱动管理后台、不连接生产服务。先使用Node24按锁文件安装依赖，然后分别启动：
+
+```sh
+node scripts/reader-fixture-server.mjs
+VITE_API_BASE_URL=/api/v1 VITE_API_PROXY_TARGET=http://127.0.0.1:8771 npm run dev -- --host 127.0.0.1 --port 8770 --strictPort
+```
+
+打开 `http://127.0.0.1:8770` 可审阅真实Vue实现与本机示例数据。浏览器验收脚本需要环境可用的Playwright与Chromium；使用已有工作区运行时即可，不需要改变产品依赖：
+
+```sh
+MINIBLOG_PLAYWRIGHT_MODULE=/absolute/path/to/playwright \
+MINIBLOG_CHROMIUM_EXECUTABLE=/absolute/path/to/chromium \
+MINIBLOG_READER_URL=http://127.0.0.1:8770 \
+MINIBLOG_READER_OUTPUT=/absolute/path/to/output \
+node scripts/reader-browser-fixture.mjs
+```
+
+检查包含首页、总览、搜索、旧首篇、历史迁移、iframe稳定、刷新失败/下架、移动面板与焦点、320–1440px适配及状态截图。真实Notion可读性、Safari/iOS/Android和生产新路由硬刷新需要另行验收；替身截图不代表实际来源或部署结果。

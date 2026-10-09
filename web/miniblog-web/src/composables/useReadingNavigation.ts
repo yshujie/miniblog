@@ -7,12 +7,13 @@ export function useReadingNavigation() {
   const store = useModuleStore()
   onMounted(() => { void store.loadModules().catch(() => {}) })
 
-  // All three entry points go through the page's single loading coordinator.
+  // Keep bare-module entry and start-reading compatible with the reading coordinator.
   const openModule = (code: string) => router.push({ name: 'BlogModule', params: { module: code } })
   async function openFirstModule() {
     const modules = await store.loadModules()
     if (modules.length) await openModule(modules[0].code)
   }
+  const openTopic = (code: string, chapter?: string) => router.push({ name: 'TopicOverview', params: { module: code }, query: chapter ? { chapter } : undefined })
   const reloadModules = () => { void store.loadModules(true).catch(() => {}) }
-  return { store, openModule, openFirstModule, reloadModules }
+  return { store, openModule, openFirstModule, openTopic, reloadModules }
 }
