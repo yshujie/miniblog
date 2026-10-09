@@ -271,7 +271,7 @@ class ManifestTests(unittest.TestCase):
 
 class PrivateFileTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(dir="/private/tmp")
+        self.temporary = tempfile.TemporaryDirectory(dir=Path(tempfile.gettempdir()).resolve())
         self.directory = Path(self.temporary.name)
         self.addCleanup(self.temporary.cleanup)
 
