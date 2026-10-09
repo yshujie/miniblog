@@ -4,8 +4,7 @@ import { createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import Index from '../Index.vue'
 import Blog from '../Blog.vue'
-import Header from '@/components/Header.vue'
-import BlogHeader from '@/components/blog/BlogHeader.vue'
+import SiteHeader from '@/components/SiteHeader.vue'
 import { mapModuleDetail } from '@/api/reading-contract'
 import { makeArticle } from '@/__tests__/fixtures'
 
@@ -22,37 +21,47 @@ beforeEach(() => {
           articles: [{ id: '9007199254740993', title: '首篇', section_code: 's', subsection_code: 'sub' }] }] },
     ],
   })
-  modules.mockResolvedValue([module])
-  detail.mockResolvedValue(module)
-  const selected = makeArticle()
-  selected.subsectionCode = 'sub'
-  article.mockResolvedValue(selected)
+  modules.mockResolvedValue([module]); detail.mockResolvedValue(module)
+  const selected = makeArticle(); selected.subsectionCode = 'sub'; article.mockResolvedValue(selected)
 })
-
-describe('shared first article navigation', () => {
-  it.each([
-    ['home start button', Index, '.read-btn'],
-    ['home header module', Header, 'button.nav-link'],
-    ['reading header module', BlogHeader, '.blog-nav-item'],
-  ])('%s reaches the same subsection article through the route coordinator', async (_name, Entry, selector) => {
-    const router = createRouter({ history: createMemoryHistory(), routes: [
-      { path: '/', component: { template: '<div />' } },
-      { path: '/blog/:module', name: 'BlogModule', component: Blog },
-      { path: '/blog/:module/article/:article', name: 'BlogArticle', component: Blog },
-    ] })
-    await router.push('/')
-    const wrapper = mount({ components: { Entry }, template: '<Entry /><router-view />' }, {
-      global: { plugins: [createPinia(), router], stubs: {
-        ElDrawer: { props: ['modelValue'], template: '<div v-if="modelValue"><slot /></div>' },
-        ElButton: { template: '<button><slot /></button>' },
-        ElAvatar: { template: '<div><slot /></div>' },
-      } },
-    })
+const stubs = {
+  ElDrawer: { props: ['modelValue'], template: '<div v-if="modelValue" role="dialog"><slot /><slot name="header" /></div>' },
+  ElButton: { template: '<button><slot /></button>' },
+}
+function makeRouter() {
+  return createRouter({ history: createMemoryHistory(), routes: [
+    { path: '/', component: { template: '<div />' } },
+    { path: '/topics/:module', name: 'TopicOverview', component: { template: '<div>主题总览</div>' } },
+    { path: '/blog/:module', name: 'BlogModule', component: Blog },
+    { path: '/blog/:module/article/:article', name: 'BlogArticle', component: Blog },
+  ] })
+}
+describe('topic navigation and preserved first article entry', () => {
+  it.each(['/', '/blog/go/article/9007199254740993'])('header on %s enters overview without loading article detail', async (path) => {
+    const router = makeRouter(); await router.push(path)
+    const wrapper = mount(SiteHeader, { global: { plugins: [createPinia(), router], stubs } })
     await flushPromises()
-    await wrapper.get(selector as string).trigger('click')
+    await wrapper.get('.site-nav a[href="/topics/go"]').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/topics/go')
+    expect(article).not.toHaveBeenCalled()
+    expect(detail).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+  it('home start button still reaches the first subsection article', async () => {
+    const router = makeRouter(); await router.push('/')
+    const wrapper = mount({ components: { Index }, template: '<Index /><router-view />' }, { global: { plugins: [createPinia(), router], stubs } })
+    await flushPromises(); await wrapper.get('.read-btn').trigger('click'); await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/blog/go/article/9007199254740993')
+    expect(article).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('iframe').exists()).toBe(true)
+    wrapper.unmount()
+  })
+  it('a bookmarked bare module link retains the same first article behavior', async () => {
+    const router = makeRouter(); await router.push('/blog/go')
+    const wrapper = mount({ template: '<router-view />' }, { global: { plugins: [createPinia(), router], stubs } })
     await flushPromises()
     expect(router.currentRoute.value.fullPath).toBe('/blog/go/article/9007199254740993')
-    expect(detail).toHaveBeenCalledTimes(1)
     expect(article).toHaveBeenCalledTimes(1)
     expect(wrapper.find('iframe').exists()).toBe(true)
     wrapper.unmount()

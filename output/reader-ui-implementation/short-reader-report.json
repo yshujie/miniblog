@@ -1,0 +1,152 @@
+[
+  {
+    "width": 390,
+    "height": 500,
+    "rects": {
+      ".site-header": {
+        "height": 64,
+        "top": 0,
+        "bottom": 64,
+        "scrollHeight": 63,
+        "clientHeight": 63
+      },
+      ".reader-toolbar": {
+        "height": 159.375,
+        "top": 64,
+        "bottom": 223.375,
+        "scrollHeight": 158,
+        "clientHeight": 158
+      },
+      ".reader-title-row": {
+        "height": 50.375,
+        "top": 118,
+        "bottom": 168.375,
+        "scrollHeight": 50,
+        "clientHeight": 50
+      },
+      ".embed-container": {
+        "height": 220.625,
+        "top": 223.375,
+        "bottom": 444,
+        "scrollHeight": 221,
+        "clientHeight": 221
+      },
+      "iframe": {
+        "height": 208.625,
+        "top": 229.375,
+        "bottom": 438,
+        "scrollHeight": 207,
+        "clientHeight": 207
+      },
+      ".reading-pagination": {
+        "height": 56,
+        "top": 444,
+        "bottom": 500,
+        "scrollHeight": 57,
+        "clientHeight": 55
+      }
+    },
+    "stableFrameAfterResize": true,
+    "originalVisible": true
+  },
+  {
+    "width": 844,
+    "height": 390,
+    "rects": {
+      ".site-header": {
+        "height": 72,
+        "top": 0,
+        "bottom": 72,
+        "scrollHeight": 71,
+        "clientHeight": 71
+      },
+      ".reader-toolbar": {
+        "height": 140.5625,
+        "top": 72,
+        "bottom": 212.5625,
+        "scrollHeight": 140,
+        "clientHeight": 140
+      },
+      ".reader-title-row": {
+        "height": 50.375,
+        "top": 126,
+        "bottom": 176.375,
+        "scrollHeight": 50,
+        "clientHeight": 50
+      },
+      ".embed-container": {
+        "height": 124.4375,
+        "top": 212.5625,
+        "bottom": 337,
+        "scrollHeight": 124,
+        "clientHeight": 124
+      },
+      "iframe": {
+        "height": 112.4375,
+        "top": 218.5625,
+        "bottom": 331,
+        "scrollHeight": 110,
+        "clientHeight": 110
+      },
+      ".reading-pagination": {
+        "height": 53,
+        "top": 337,
+        "bottom": 390,
+        "scrollHeight": 52,
+        "clientHeight": 52
+      }
+    },
+    "stableFrameAfterResize": true,
+    "originalVisible": true
+  },
+  {
+    "width": 1024,
+    "height": 500,
+    "rects": {
+      ".site-header": {
+        "height": 72,
+        "top": 0,
+        "bottom": 72,
+        "scrollHeight": 71,
+        "clientHeight": 71
+      },
+      ".reader-toolbar": {
+        "height": 124.5625,
+        "top": 72,
+        "bottom": 196.5625,
+        "scrollHeight": 124,
+        "clientHeight": 124
+      },
+      ".reader-title-row": {
+        "height": 50.375,
+        "top": 110,
+        "bottom": 160.375,
+        "scrollHeight": 50,
+        "clientHeight": 50
+      },
+      ".embed-container": {
+        "height": 250.4375,
+        "top": 196.5625,
+        "bottom": 447,
+        "scrollHeight": 250,
+        "clientHeight": 250
+      },
+      "iframe": {
+        "height": 238.4375,
+        "top": 202.5625,
+        "bottom": 441,
+        "scrollHeight": 236,
+        "clientHeight": 236
+      },
+      ".reading-pagination": {
+        "height": 53,
+        "top": 447,
+        "bottom": 500,
+        "scrollHeight": 52,
+        "clientHeight": 52
+      }
+    },
+    "stableFrameAfterResize": true,
+    "originalVisible": true
+  }
+]

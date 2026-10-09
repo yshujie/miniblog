@@ -1,128 +1,37 @@
-/* color palette from <https://github.com/vuejs/theme> */
 :root {
-  --vt-c-white: #ffffff;
-  --vt-c-white-soft: #f8f8f8;
-  --vt-c-white-mute: #f2f2f2;
-
-  --vt-c-black: #181818;
-  --vt-c-black-soft: #222222;
-  --vt-c-black-mute: #282828;
-
-  --vt-c-indigo: #2c3e50;
-
-  --vt-c-divider-light-1: rgba(60, 60, 60, 0.29);
-  --vt-c-divider-light-2: rgba(60, 60, 60, 0.12);
-  --vt-c-divider-dark-1: rgba(84, 84, 84, 0.65);
-  --vt-c-divider-dark-2: rgba(84, 84, 84, 0.48);
-
-  --vt-c-text-light-1: var(--vt-c-indigo);
-  --vt-c-text-light-2: rgba(60, 60, 60, 0.66);
-  --vt-c-text-dark-1: var(--vt-c-white);
-  --vt-c-text-dark-2: rgba(235, 235, 235, 0.64);
+  color-scheme: light;
+  --page: #fff; --zone: #f6f8fa; --ink: #20262e; --secondary: #59636e;
+  --line: #e3e8ed; --green: #087f6d; --green-dark: #086858; --selected: #eaf5f1;
+  --warning: #80500c; --warning-bg: #fff8e9;
+  --sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --display: Georgia, 'Songti SC', 'Noto Serif CJK SC', serif;
+  --site-header-height: 72px; --sidebar-width: 280px; --content-width: 1160px;
+  --page-bg: var(--page); --card-bg: var(--page); --zone-bg: var(--zone);
+  --color-background: var(--page); --color-background-soft: var(--zone);
+  --color-background-mute: var(--zone); --color-heading: var(--ink); --color-text: var(--ink);
+  --color-border: var(--line); --color-border-hover: var(--secondary);
+  --border-color: var(--line); --border-light: var(--line); --border-divider: var(--line);
+  --text-primary: var(--ink); --text-secondary: var(--secondary); --text-muted: var(--secondary);
+  --accent: var(--green); --accent-hover: var(--green-dark);
+  --sidebar-bg: var(--zone); --sidebar-divider: var(--line); --sidebar-text: var(--secondary);
+  --sidebar-text-hover: var(--ink); --sidebar-section-text: var(--ink);
+  --sidebar-active-color: var(--green); --sidebar-hover-bg: #edf0f2; --sidebar-active-bg: var(--selected);
+  --header-footer-bg: var(--page); --blog-header-height: var(--site-header-height);
+  --blog-header-bg: var(--page); --blog-header-border: var(--line);
+  --blog-header-text: var(--secondary); --blog-header-active: var(--green);
+  --shadow-sm: 0 1px 2px #20262e0d; --shadow-md: 0 4px 12px #20262e14;
+  --radius-md: 6px; --radius-lg: 8px;
+  --el-color-primary: var(--green); --el-color-primary-dark-2: var(--green-dark);
+  --el-color-primary-light-9: var(--selected); --el-text-color-primary: var(--ink);
+  --el-text-color-regular: var(--secondary); --el-border-color: var(--line);
 }
-
-/* semantic color variables for this project */
-:root {
-  --color-background: var(--vt-c-white);
-  --color-background-soft: var(--vt-c-white-soft);
-  --color-background-mute: var(--vt-c-white-mute);
-
-  --color-border: var(--vt-c-divider-light-2);
-  --color-border-hover: var(--vt-c-divider-light-1);
-
-  --color-heading: var(--vt-c-text-light-1);
-  --color-text: var(--vt-c-text-light-1);
-
-  --section-gap: 160px;
-}
-
-/* blog / page theme: one source of truth for layout and accent */
-:root {
-  --page-bg: #ffffff;
-  --card-bg: #ffffff;
-  --zone-bg: #fafafa;
-  /* Header / Sidebar 等分区背景，与主内容区形成轻微分割 */
-  --border-color: #e5e7eb;
-  --border-light: #f3f4f6;
-  --border-divider: #eaecef;
-  /* 分区线：比 border-light 清晰，比 border-color 略轻 */
-  --text-primary: #1f2937;
-  --text-secondary: #4b5563;
-  --text-muted: #9ca3af;
-  --accent: rgb(250, 137, 25);
-  --accent-hover: rgb(225, 115, 15);
-  /* Sidebar：文档式极简导航 */
-  --sidebar-bg: #f7f8fa;
-  --sidebar-width: 18.5rem;
-  --sidebar-divider: #e8eaed;
-  --sidebar-text: #646a73;
-  --sidebar-text-hover: #1f2329;
-  --sidebar-section-text: #1f2329;
-  --sidebar-active-color: #00b894;
-  --sidebar-hover-bg: rgba(0, 0, 0, 0.04);
-  --sidebar-active-bg: transparent;
-  --header-footer-bg: #ffffff;
-  --blog-header-height: 3.5rem;
-  --blog-header-bg: #ffffff;
-  --blog-header-border: #eef0f3;
-  --blog-header-text: #646a73;
-  --blog-header-active: #00b894;
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: var(--vt-c-black);
-    --color-background-soft: var(--vt-c-black-soft);
-    --color-background-mute: var(--vt-c-black-mute);
-
-    --color-border: var(--vt-c-divider-dark-2);
-    --color-border-hover: var(--vt-c-divider-dark-1);
-
-    --color-heading: var(--vt-c-text-dark-1);
-    --color-text: var(--vt-c-text-dark-2);
-  }
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  font-weight: normal;
-}
-
-body {
-  min-height: 100vh;
-  color: var(--color-text);
-  background: var(--color-background);
-  transition:
-    color 0.5s,
-    background-color 0.5s;
-  line-height: 1.6;
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Fira Sans',
-    'Droid Sans',
-    'Helvetica Neue',
-    sans-serif;
-  font-size: 15px;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* 博客页：禁止 body 滚动，仅文章区内滚动，避免上下窜动 */
-body.blog-page-body {
-  overflow: hidden;
-}
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; min-width: 0; min-height: 100vh; color: var(--ink); background: var(--page); font-family: var(--sans); font-size: 15px; line-height: 1.6; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4, p { margin: 0; } h1, h2, h3, h4 { font-weight: 600; }
+button, input, select { font: inherit; } button { cursor: pointer; } a { color: inherit; text-decoration: none; }
+button, a, input, select { touch-action: manipulation; } button, a { -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: default; }
+img { max-width: 100%; } [hidden] { display: none !important; }
+body.blog-page-body { overflow: hidden; }
+@media (max-width: 650px) { :root { --site-header-height: 64px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

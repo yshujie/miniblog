@@ -1,0 +1,64 @@
+{
+  "passed": true,
+  "checks": [
+    "home-real-public-catalog",
+    "topic-overview-without-body-or-first-redirect",
+    "title-search-and-chapter-location",
+    "legacy-first-article-and-subsection-order",
+    "stable-frame-collapse-resize-and-refresh",
+    "mobile-panels-focus-escape-and-selection",
+    "history-migration-preserves-query-and-hash",
+    "refresh-error-retains-frame-authoritative404-removes",
+    "new-page-scroll-reset-and-history-position",
+    "directory-selection-and-previous-next",
+    "new-route-hard-refresh-and-browser-history",
+    "unknown-dynamic-topic-and-independent-preview-error",
+    "responsive-320",
+    "responsive-390",
+    "responsive-649",
+    "responsive-650",
+    "responsive-651",
+    "responsive-768",
+    "responsive-899",
+    "responsive-900",
+    "responsive-901",
+    "responsive-1024",
+    "responsive-1440",
+    "short-screen-390x500",
+    "short-screen-844x390",
+    "short-screen-1024x500",
+    "state-empty-topic",
+    "state-topic404",
+    "state-article404",
+    "state-error",
+    "state-missing-link",
+    "state-waiting",
+    "state-global404",
+    "state-home-empty",
+    "state-home-error",
+    "loading-home",
+    "loading-topic",
+    "loading-reader"
+  ],
+  "shortScreenMeasurements": [
+    {
+      "width": 390,
+      "height": 500,
+      "frameHeight": 176.4375
+    },
+    {
+      "width": 844,
+      "height": 390,
+      "frameHeight": 105.4375
+    },
+    {
+      "width": 1024,
+      "height": 500,
+      "frameHeight": 206.25
+    }
+  ],
+  "pageErrors": [],
+  "productionNetworkRequests": 0,
+  "screenshots": "/Users/yangshujie/.codex/worktrees/reader-ui/miniblog/output/reader-ui-implementation",
+  "evidence": "Local public API and document substitutes; real Notion/device acceptance remains separate."
+}
