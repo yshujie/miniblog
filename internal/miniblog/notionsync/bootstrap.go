@@ -227,6 +227,13 @@ func (s *Service) BootstrapPreview(ctx context.Context, review ...BootstrapRevie
 			if snap.NativeArchived || snap.InTrash {
 				c.PublishBlockReason = "native_archived_or_in_trash"
 			}
+			reason, err := article.ReviewedPublicationReason(store.NewStore(s.ds.DB().WithContext(ctx)), &src, reviewedPublicationInput(snap, configOf(src), p, selected))
+			if err != nil {
+				return err
+			}
+			if reason != "" && c.PublishBlockReason == "" {
+				c.PublishBlockReason = reason
+			}
 
 			if src.ModuleCode == "" {
 				c.Reason = "source_module_unconfigured"
@@ -297,6 +304,15 @@ func (s *Service) BootstrapApply(ctx context.Context, in BootstrapInput, writer 
 	if len(in.Confirmations) == 0 {
 		return nil, invalid("请提供已核对的接管确认清单")
 	}
+	if (in.SourceID == "") != (in.ExpectedConfigRevision == 0) {
+		return nil, invalid("受限接管须同时指定来源与配置版本")
+	}
+	if in.SourceID != "" {
+		in.SourceID = normalizeID(in.SourceID)
+		if _, ok := allowedSources[in.SourceID]; !ok {
+			return nil, invalid("接管来源不在五库白名单")
+		}
+	}
 	seen := map[string]bool{}
 	for _, c := range in.Confirmations {
 		if c.PageID == "" || (!c.NewPage && c.ArticleID == "") || (c.NewPage && c.ArticleID != "") || c.ExpectedFingerprint == "" || c.ConfirmedBy == "" || stateValue(c.ExpectedState) == 0 {
@@ -317,9 +333,12 @@ func (s *Service) BootstrapApply(ctx context.Context, in BootstrapInput, writer 
 		if !control.BaselineFrozen || !control.Paused || !control.SourceWritesPaused {
 			return conflict("接管前需冻结基线并暂停同步和外部来源写入")
 		}
+		if e := s.validateBootstrapScope(ctx, token, in); e != nil {
+			return e
+		}
 		for _, confirm := range in.Confirmations {
 			counts.Seen++
-			item, e := s.bootstrapOne(ctx, run, token, confirm, writer)
+			item, e := s.bootstrapOne(ctx, run, token, confirm, writer, in)
 			if e != nil {
 				counts.Failed++
 				item = ItemDTO{PageID: normalizePageID(confirm.PageID), Outcome: "failed", Error: e.Error()}
@@ -345,7 +364,7 @@ func (s *Service) BootstrapApply(ctx context.Context, in BootstrapInput, writer 
 	result.RunID = id
 	return result, e
 }
-func (s *Service) bootstrapOne(ctx context.Context, run model.NotionSyncRun, token store.LeaseToken, confirm BootstrapConfirm, writer source.BootstrapNotionWriter) (ItemDTO, error) {
+func (s *Service) bootstrapOne(ctx context.Context, run model.NotionSyncRun, token store.LeaseToken, confirm BootstrapConfirm, writer source.BootstrapNotionWriter, scope BootstrapInput) (ItemDTO, error) {
 	pageID := normalizePageID(confirm.PageID)
 	articleID := uint64(0)
 	var e error
@@ -370,6 +389,9 @@ func (s *Service) bootstrapOne(ctx context.Context, run model.NotionSyncRun, tok
 	}
 	if e = db.Where("source_id = ?", p.SourceID).First(&src).Error; e != nil {
 		return ItemDTO{}, e
+	}
+	if scope.SourceID != "" && (p.SourceID != scope.SourceID || src.ID != scope.SourceID || src.ConfigRevision != scope.ExpectedConfigRevision) {
+		return ItemDTO{}, conflict("接管来源或配置已漂移")
 	}
 	if src.ModuleCode == "" {
 		return ItemDTO{}, conflict("请先配置源模块")
@@ -431,12 +453,21 @@ func (s *Service) bootstrapOne(ctx context.Context, run model.NotionSyncRun, tok
 	if e != nil {
 		return ItemDTO{}, e
 	}
+	if e = validateSchemaIdentity(schema, src.ID); e != nil {
+		return ItemDTO{}, e
+	}
 	if e = validateConfig(schema, cfg); e != nil {
 		return ItemDTO{}, e
 	}
 	page, e := s.client.RetrievePage(ctx, pageID)
 	if e != nil {
 		return ItemDTO{}, e
+	}
+	if normalizePageID(page.ID) != pageID {
+		return ItemDTO{}, conflict("Notion回读页面身份不一致")
+	}
+	if scope.SourceID != "" && (page.Parent.Type != "data_source_id" || normalizeID(page.Parent.DataSourceID) != scope.SourceID) {
+		return ItemDTO{}, conflict("页面已移出已审核接管来源")
 	}
 	fresh, e := snapshotOf(page, p.SourceID, cfg)
 	if e != nil {
@@ -497,6 +528,11 @@ func (s *Service) bootstrapOne(ctx context.Context, run model.NotionSyncRun, tok
 	if fresh.DesiredState != 0 && fresh.DesiredState != desired {
 		return ItemDTO{}, conflict("Notion 状态已有其他值，禁止覆盖")
 	}
+	if desired == model.ArticleStatusPublished {
+		if e := article.ValidateReviewedPublication(store.NewStore(db), &src, reviewedPublicationInput(fresh, cfg, p, localPointer)); e != nil {
+			return ItemDTO{}, e
+		}
+	}
 	if !resuming {
 		beforeJSON, e := bootstrapBeforeJSON(localPointer, src.ConfigRevision, confirm.NewPage)
 		if e != nil {
@@ -554,12 +590,46 @@ func (s *Service) bootstrapOne(ctx context.Context, run model.NotionSyncRun, tok
 		if !c.Paused || !c.SourceWritesPaused {
 			return conflict("维护暂停已解除")
 		}
+		ds := store.NewStore(tx)
+		codes := []string{src.ModuleCode}
+		if localPointer != nil {
+			placement, err := catalog.Resolve(ds, local.SectionCode, local.SubsectionCode)
+			if err != nil {
+				return err
+			}
+			codes = append(codes, placement.Module.Code)
+		}
+		if e := catalog.LockModules(ds, codes...); e != nil {
+			return e
+		}
 		var current model.NotionSyncSource
-		if e := tx.Where("source_id = ?", src.ID).First(&current).Error; e != nil {
+		if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("source_id = ?", src.ID).First(&current).Error; e != nil {
 			return e
 		}
 		if current.ConfigRevision != src.ConfigRevision {
 			return conflict("审核后源配置已变化")
+		}
+		if scope.SourceID != "" && (current.ID != scope.SourceID || current.ConfigRevision != scope.ExpectedConfigRevision) {
+			return conflict("接管来源或配置已漂移")
+		}
+		if localPointer != nil {
+			var locked model.Article
+			if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&locked, articleID).Error; e != nil {
+				return e
+			}
+			if article.ArticleFingerprint(&locked) != article.ArticleFingerprint(localPointer) {
+				return conflict("写入前本地文章已变化")
+			}
+		}
+		var currentPage model.NotionPageBinding
+		if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("page_id = ?", pageID).First(&currentPage).Error; e != nil {
+			return e
+		}
+		if currentPage.SourceID != src.ID || currentPage.Revision != p.Revision {
+			return conflict("写入前页面绑定已变化")
+		}
+		if desired == model.ArticleStatusPublished {
+			return article.ValidateReviewedPublication(ds, &current, reviewedPublicationInput(fresh, cfg, currentPage, localPointer))
 		}
 		return nil
 	}); e != nil {
@@ -573,12 +643,21 @@ func (s *Service) bootstrapOne(ctx context.Context, run model.NotionSyncRun, tok
 	if readErr != nil {
 		return ItemDTO{}, fmt.Errorf("接管写入结果待核验: %w", readErr)
 	}
+	if normalizePageID(verifiedPage.ID) != pageID {
+		return ItemDTO{}, conflict("Notion回读页面身份不一致")
+	}
+	if scope.SourceID != "" && (verifiedPage.Parent.Type != "data_source_id" || normalizeID(verifiedPage.Parent.DataSourceID) != scope.SourceID) {
+		return ItemDTO{}, conflict("页面已移出已审核接管来源")
+	}
 	verified, e := snapshotOf(verifiedPage, p.SourceID, cfg)
 	if e != nil {
 		return ItemDTO{}, e
 	}
 	verifiedSchema, e := s.client.RetrieveDataSource(ctx, src.ID)
 	if e != nil {
+		return ItemDTO{}, e
+	}
+	if e := validateSchemaIdentity(verifiedSchema, src.ID); e != nil {
 		return ItemDTO{}, e
 	}
 	if e := validateConfig(verifiedSchema, cfg); e != nil {

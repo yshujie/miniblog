@@ -167,7 +167,9 @@ type BootstrapConfirm struct {
 	ConfirmedBy         string `json:"confirmed_by"`
 }
 type BootstrapInput struct {
-	Confirmations []BootstrapConfirm `json:"confirmations"`
+	SourceID               string             `json:"source_id,omitempty"`
+	ExpectedConfigRevision uint64             `json:"expected_config_revision,omitempty"`
+	Confirmations          []BootstrapConfirm `json:"confirmations"`
 }
 
 type Error struct {

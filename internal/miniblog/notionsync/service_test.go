@@ -255,6 +255,7 @@ func TestBootstrapUsesExistingStatusAndPreservesHistoricalFields(t *testing.T) {
 	if _, e := s.UpdateSource(context.Background(), srcID, SourceInput{ModuleCode: "m1"}); e != nil {
 		t.Fatal(e)
 	}
+	preparePublishedFixtureCatalog(t, s, db, srcID)
 	preview, e := s.BootstrapPreview(context.Background())
 	if e != nil {
 		t.Fatal(e)

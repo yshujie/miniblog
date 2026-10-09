@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
@@ -320,7 +321,7 @@ func TestMySQLHistoricalTakeoverPreservesHistoryAndFencesWriters(t *testing.T) {
 	stamp := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	db.Model(&model.Article{}).Where("id=?", id).UpdateColumns(map[string]interface{}{"created_at": stamp, "updated_at": stamp})
 	db.First(&row, id)
-	src := model.NotionSyncSource{ID: sourceID, DataSourceID: sourceID, ModuleCode: "m1", ConfigRevision: 1}
+	src := model.NotionSyncSource{ID: sourceID, DataSourceID: sourceID, ModuleCode: "m1", ConfigRevision: 1, Enabled: true, PropertyMappingJSON: `{"topic_property_id":"topic"}`}
 	if err := db.Create(&src).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +331,12 @@ func TestMySQLHistoricalTakeoverPreservesHistoryAndFencesWriters(t *testing.T) {
 	}
 	state := 2
 	public := "https://fixture.notion.site/" + pageID
-	binding := model.NotionPageBinding{PageID: pageID, ArticleID: &row.ID, SourceID: sourceID, ManagementState: model.NotionManagementBaselinePending, Revision: 3, DesiredState: 2, PublicURL: &public, BootstrapState: "verified", BootstrapExpectedState: &state, BootstrapExpectedFingerprint: "approved-review", LocalBeforeJSON: beforeJSON}
+	sectionCode := "s1"
+	if err := db.Create(&model.NotionCatalogBinding{SourceID: sourceID, DataSourceID: sourceID, ThemePropertyID: "topic", OptionID: "reviewed", OptionName: "One", SectionCode: &sectionCode, Status: model.NotionCatalogBound}).Error; err != nil {
+		t.Fatal(err)
+	}
+	snapshot, _ := json.Marshal(map[string]interface{}{"page_id": pageID, "source_id": sourceID, "desired_state": 2, "title": "History", "tags": []string{"Go", "旧标签"}, "topic_option_id": "reviewed", "topic_option_name": "One", "public_url": public})
+	binding := model.NotionPageBinding{PageID: pageID, ArticleID: &row.ID, SourceID: sourceID, ManagementState: model.NotionManagementBaselinePending, Revision: 3, DesiredState: 2, PublicURL: &public, BootstrapState: "verified", BootstrapExpectedState: &state, BootstrapExpectedFingerprint: "approved-review", LocalBeforeJSON: beforeJSON, SnapshotJSON: string(snapshot)}
 	if err := db.Create(&binding).Error; err != nil {
 		t.Fatal(err)
 	}

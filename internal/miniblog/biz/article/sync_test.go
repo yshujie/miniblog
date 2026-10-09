@@ -2,6 +2,7 @@ package article
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/yshujie/miniblog/internal/miniblog/biz/catalog"
 	"github.com/yshujie/miniblog/internal/miniblog/biz/reading"
@@ -355,7 +356,8 @@ func TestAdoptAliasPreservesHistoryAndAllDuplicateWriters(t *testing.T) {
 		t.Fatal(e)
 	}
 	state := a.Status
-	p := model.NotionPageBinding{PageID: syncPageID, SourceID: "a", ArticleID: &id, ManagementState: model.NotionManagementBaselinePending, BootstrapState: "verified", BootstrapExpectedState: &state, BootstrapExpectedFingerprint: "confirmed", LocalBeforeJSON: beforeJSON, DesiredState: state, PageURL: r.PageURL, PublicURL: r.PublicURL}
+	p := model.NotionPageBinding{PageID: syncPageID, SourceID: "a", ArticleID: &id, ManagementState: model.NotionManagementBaselinePending, BootstrapState: "verified", BootstrapExpectedState: &state, BootstrapExpectedFingerprint: "confirmed", LocalBeforeJSON: beforeJSON, DesiredState: state, PageURL: r.PageURL, PublicURL: r.PublicURL, SnapshotJSON: reviewedAdoptSnapshot(r)}
+	db.Model(&model.NotionSyncSource{}).Where("source_id = ?", "a").Update("property_mapping_json", `{"topic_property_id":"topic"}`)
 	if e = db.Create(&p).Error; e != nil {
 		t.Fatal(e)
 	}
@@ -445,7 +447,8 @@ func TestAdoptRequiresPauseAndFreshSyncForPublication(t *testing.T) {
 	a := syncArticle(t, db, id)
 	raw, _ := ArticleBeforeJSON(&a)
 	state := a.Status
-	p := model.NotionPageBinding{PageID: syncPageID, ArticleID: &id, SourceID: "a", ManagementState: model.NotionManagementBaselinePending, LocalBeforeJSON: raw, BootstrapState: "verified", BootstrapExpectedState: &state, BootstrapExpectedFingerprint: "confirmed", DesiredState: state, PageURL: r.PageURL, PublicURL: r.PublicURL}
+	p := model.NotionPageBinding{PageID: syncPageID, ArticleID: &id, SourceID: "a", ManagementState: model.NotionManagementBaselinePending, LocalBeforeJSON: raw, BootstrapState: "verified", BootstrapExpectedState: &state, BootstrapExpectedFingerprint: "confirmed", DesiredState: state, PageURL: r.PageURL, PublicURL: r.PublicURL, SnapshotJSON: reviewedAdoptSnapshot(r)}
+	db.Model(&model.NotionSyncSource{}).Where("source_id = ?", "a").Update("property_mapping_json", `{"topic_property_id":"topic"}`)
 	if e := db.Create(&p).Error; e != nil {
 		t.Fatal(e)
 	}
@@ -690,4 +693,9 @@ func TestAdoptCannotConfirmNewPageOverKnownManualSlugOwner(t *testing.T) {
 	if ArticleFingerprint(&before) != ArticleFingerprint(&after) || p.ManagementState != model.NotionManagementBaselinePending || p.BootstrapState != "verified" {
 		t.Fatal(after, p)
 	}
+}
+
+func reviewedAdoptSnapshot(r SyncInput) string {
+	raw, _ := json.Marshal(map[string]interface{}{"page_id": r.PageID, "source_id": r.SourceID, "desired_state": r.DesiredState, "title": r.Title, "tags": r.Tags, "topic_option_id": r.ThemeOptionID, "topic_option_name": r.ThemeOptionName, "public_url": r.PublicURL, "native_archived": r.NativeArchived, "in_trash": r.InTrash})
+	return string(raw)
 }
