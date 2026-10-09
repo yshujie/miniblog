@@ -2,7 +2,7 @@
 @use "element-plus/theme-chalk/src/dark/css-vars.scss" as *;
 @use "./element-variables.scss";
 @use "./element-ui.scss";
-@use './sidebar.scss';
+@use './admin.scss';
 
 // :root {
 //   --ep-color-primary: red;
@@ -58,10 +58,7 @@ code {
 
 
 
-a:focus,
-a:active {
-  outline: none;
-}
+
 
 a,
 a:focus,
@@ -71,9 +68,7 @@ a:hover {
   text-decoration: none;
 }
 
-div:focus {
-  outline: none;
-}
+
 
 .fr {
   float: right;
@@ -114,35 +109,12 @@ div:focus {
   }
 }
 
-aside {
-  background: #eef1f6;
-  padding: 8px 24px;
-  margin-bottom: 20px;
-  border-radius: 2px;
-  display: block;
-  line-height: 32px;
-  font-size: 16px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-  color: #2c3e50;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  a {
-    color: #337ab7;
-    cursor: pointer;
-
-    &:hover {
-      color: rgb(32, 160, 255);
-    }
-  }
-}
-
 //main-container全局样式
 .app-container {
   padding: 20px;
   width: 100%;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
+  overflow: visible;
 }
 
 .components-container {

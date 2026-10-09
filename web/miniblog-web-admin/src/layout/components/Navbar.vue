@@ -1,177 +1,19 @@
 <template>
-  <div class="navbar">
-    <hamburger id="hamburger-container" :is-active="sidebar.opened" class="hamburger-container"
-               @toggleClick="toggleSidebar" />
-
-    <breadcrumb id="breadcrumb-container" class="breadcrumb-container" />
-
-    <div class="right-menu">
-      <template v-if="device !== 'mobile'">
-        <search id="header-search" class="right-menu-item" />
-
-        <error-log class="errLog-container right-menu-item hover-effect" />
-
-        <screenfull id="screenfull" class="right-menu-item hover-effect" />
-
-        <el-tooltip content="全局组件尺寸" effect="dark" placement="bottom">
-          <size-select id="size-select" class="right-menu-item hover-effect" />
-        </el-tooltip>
-
-      </template>
-
-      <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="click">
-        <div class="avatar-wrapper">
-          <img :src="avatar + '?imageView2/1/w/80/h/80'" class="user-avatar">
-          <el-icon class="el-icon-caret-bottom" size="small">
-            <CaretBottom />
-          </el-icon>
-        </div>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <router-link to="/">
-              <el-dropdown-item>首页</el-dropdown-item>
-            </router-link>
-            <a target="_blank" href="https://github.com/midfar/vue3-element-admin">
-              <el-dropdown-item>项目地址</el-dropdown-item>
-            </a>
-            <a target="_blank" href="https://vue3-element-admin-site.midfar.com/">
-              <el-dropdown-item>文档地址</el-dropdown-item>
-            </a>
-            <el-dropdown-item divided @click="logout">
-              <span style="display:block;">退出登录</span>
-            </el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
-    </div>
-  </div>
+  <header class="admin-header">
+    <button class="navigation-toggle" type="button" aria-label="打开导航" :aria-expanded="navigationOpen" @click="$emit('navigation')"><svg-icon icon-class="list" /></button>
+    <div class="admin-location"><span>管理端</span><span aria-hidden="true">/</span><strong>{{ String(route.meta.title || '内容管理') }}</strong></div>
+    <a href="https://www.yangshujie.com" target="_blank" rel="noopener noreferrer" class="blog-link">查看博客 <svg-icon icon-class="link" /></a>
+  </header>
 </template>
-
-<script>
-import { mapState } from 'pinia';
-import store from '@/store';
-import Breadcrumb from '@/components/Breadcrumb';
-import Hamburger from '@/components/Hamburger';
-import ErrorLog from '@/components/ErrorLog';
-import Screenfull from '@/components/Screenfull';
-import SizeSelect from '@/components/SizeSelect';
-import Search from '@/components/HeaderSearch';
-import { defineComponent } from 'vue';
-import { CaretBottom } from '@element-plus/icons-vue';
-
-export default defineComponent({
-  components: {
-    Breadcrumb,
-    Hamburger,
-    ErrorLog,
-    Screenfull,
-    SizeSelect,
-    Search,
-    CaretBottom
-  },
-  computed: {
-    ...mapState(store.app, [
-      'sidebar',
-      'device'
-    ]),
-    ...mapState(store.user, [
-      'avatar'
-    ])
-  },
-  methods: {
-    toggleSidebar() {
-      store.app().toggleSidebar();
-    },
-    async logout() {
-      await store.user().logout();
-      this.$router.push(`/login?redirect=${this.$route.fullPath}`);
-    }
-  }
-});
+<script setup lang="ts">
+import { useRoute } from 'vue-router';
+defineProps<{ navigationOpen: boolean }>(); defineEmits<{ navigation: [] }>();
+const route = useRoute();
 </script>
-
-<style lang="scss" scoped>
-.navbar {
-  height: 50px;
-  overflow: hidden;
-  position: relative;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, .08);
-
-  .hamburger-container {
-    line-height: 46px;
-    height: 100%;
-    float: left;
-    cursor: pointer;
-    transition: background .3s;
-    -webkit-tap-highlight-color: transparent;
-
-    &:hover {
-      background: rgba(0, 0, 0, .025)
-    }
-  }
-
-  .breadcrumb-container {
-    float: left;
-  }
-
-  .errLog-container {
-    display: inline-block;
-    vertical-align: top;
-  }
-
-  .right-menu {
-    float: right;
-    height: 100%;
-    line-height: 50px;
-
-    &:focus {
-      outline: none;
-    }
-
-    .right-menu-item {
-      display: inline-block;
-      padding: 0 8px;
-      height: 100%;
-      line-height: 50px;
-      font-size: 18px;
-      color: #5a5e66;
-      vertical-align: text-bottom;
-
-      &.hover-effect {
-        cursor: pointer;
-        transition: background .3s;
-
-        &:hover {
-          background: rgba(0, 0, 0, .025)
-        }
-      }
-    }
-
-    .avatar-container {
-      margin-right: 30px;
-
-      .avatar-wrapper {
-        margin-top: 5px;
-        position: relative;
-        height: 45px;
-
-        .user-avatar {
-          cursor: pointer;
-          width: 40px;
-          height: 40px;
-          border-radius: 10px;
-        }
-
-        .el-icon-caret-bottom {
-          cursor: pointer;
-          position: absolute;
-          right: -20px;
-          top: 25px;
-          font-size: 12px;
-        }
-      }
-    }
-  }
-}
+<style scoped>
+.admin-header { height:60px; position:sticky; top:0; display:flex; align-items:center; gap:14px; padding:0 32px; background:white; border-bottom:1px solid var(--admin-line); z-index:10; }
+.admin-location { display:flex; gap:16px; align-items:center; min-width:0; font-size:13px; }.admin-location span { color:var(--admin-muted); }.admin-location strong { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.blog-link { margin-left:auto; min-height:44px; display:flex; gap:8px; align-items:center; white-space:nowrap; font-size:13px; color:var(--admin-muted); }.navigation-toggle { display:none; }
+@media(max-width:780px) { .admin-header { padding:0 16px; gap:8px; }.navigation-toggle { display:grid; place-items:center; width:44px; height:44px; background:white; border:1px solid var(--admin-line); border-radius:6px; }.admin-location { gap:8px; }.admin-location > span { display:none; }.blog-link { font-size:12px; } }
+@media(max-width:360px) { .admin-header { padding:0 12px; } }
 </style>

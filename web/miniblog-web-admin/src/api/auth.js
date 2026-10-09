@@ -11,6 +11,7 @@ export function login(data) {
 export function logout() {
   return request({
     url: '/auth/logout',
-    method: 'post'
+    method: 'post',
+    data: {}
   });
 }

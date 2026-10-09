@@ -9,19 +9,19 @@ interface ISettings {
 }
 
 const settings:ISettings = {
-  title: 'Vue3 Element Admin',
+  title: "Shujie's Blog · 内容管理",
 
   /**
    * @type {boolean} true | false
    * @description Whether show the settings right-panel
    */
-  showSettings: true,
+  showSettings: false,
 
   /**
    * @type {boolean} true | false
    * @description Whether need tagsView
    */
-  tagsView: true,
+  tagsView: false,
 
   /**
    * @type {boolean} true | false

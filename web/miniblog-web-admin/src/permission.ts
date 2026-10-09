@@ -4,7 +4,7 @@ import permissionStore from './store/modules/permission';
 import NProgress from 'nprogress'; // progress bar
 import 'nprogress/nprogress.css'; // progress bar style
 import { ElMessage } from 'element-plus';
-import { getToken } from './utils/auth'; // get token from cookie
+import { getToken } from './utils/auth'; // get token from local storage
 import getPageTitle from './utils/get-page-title';
 
 NProgress.configure({ showSpinner: false }); // NProgress Configuration
@@ -68,7 +68,7 @@ router.beforeEach(async (to, from, next) => {
           await userStore().resetToken();
           ElMessage.error(error.message || 'Has Error');
           NProgress.done();
-          next(`/login?redirect=${to.path}`);
+          next({ path: '/login', query: { redirect: to.redirectedFrom?.fullPath || to.fullPath }});
         }
       }
     }
@@ -80,7 +80,7 @@ router.beforeEach(async (to, from, next) => {
     } else {
       // other pages that do not have permission to access are redirected to the login page.
       NProgress.done();
-      next(`/login?redirect=${to.path}`);
+      next({ path: '/login', query: { redirect: to.redirectedFrom?.fullPath || to.fullPath }});
     }
   }
 });

@@ -1,59 +1,11 @@
 <template>
-  <section class="app-main">
-    <router-view v-slot="{ Component, route }">
-      <transition name="fade-transform" mode="out-in">
-        <keep-alive :include="cachedViews">
-          <component :is="Component" :key="route.fullPath" />
-        </keep-alive>
-      </transition>
-    </router-view>
-  </section>
+  <main id="main-content" class="app-main" tabindex="-1">
+    <router-view v-slot="{ Component, route }"><component :is="Component" :key="route.path" /></router-view>
+  </main>
 </template>
-
-<script>
-import { defineComponent } from 'vue';
-import store from '@/store';
-
-export default defineComponent({
-  name: 'AppMain',
-  computed: {
-    cachedViews() {
-      return store.tagsView().cachedViews;
-    }
-  }
-});
-</script>
-
-<style lang="scss" scoped>
-.app-main {
-  /* 50= navbar  50  */
-  min-height: calc(100vh - 50px);
-  width: 100%;
-  position: relative;
-  overflow: hidden;
-}
-
-.fixed-header+.app-main {
-  padding-top: 50px;
-}
-
-.hasTagsView {
-  .app-main {
-    /* 84 = navbar + tags-view = 50 + 34 */
-    min-height: calc(100vh - 84px);
-  }
-
-  .fixed-header+.app-main {
-    padding-top: 84px;
-  }
-}
-</style>
-
-<style lang="scss">
-// fix css style bug in open el-dialog
-.el-popup-parent--hidden {
-  .fixed-header {
-    padding-right: 15px;
-  }
-}
+<style scoped>
+.app-main { min-height:calc(100dvh - 60px); min-width:0; padding:32px; }
+@media(max-width:1200px) { .app-main { padding:26px 24px; } }
+@media(max-width:780px) { .app-main { padding:22px 16px; } }
+@media(max-width:360px) { .app-main { padding:20px 12px; } }
 </style>
