@@ -50,6 +50,28 @@ func sameArticleValues(a, b *model.Article) bool {
 	y.UpdatedAt = time.Time{}
 	return reflect.DeepEqual(x, y)
 }
+
+// updateSyncedArticle writes only fields owned by the observed operation. A string
+// model cannot distinguish a legacy SQL NULL from an empty subsection code, so
+// unchanged placement and local fields must never be rewritten from that model.
+func updateSyncedArticle(ds store.IStore, a *model.Article, values map[string]interface{}) error {
+	a.UpdatedAt = time.Now()
+	values["updated_at"] = a.UpdatedAt
+	return ds.DB().Model(&model.Article{}).Where("id = ?", a.ID).Updates(values).Error
+}
+
+func saveSyncedState(ds store.IStore, a *model.Article) error {
+	return updateSyncedArticle(ds, a, map[string]interface{}{"status": a.Status})
+}
+
+func saveSyncedProjection(ds store.IStore, a *model.Article, moved bool) error {
+	values := map[string]interface{}{"title": a.Title, "tags": a.Tags, "tags_json": a.TagsJSON, "status": a.Status}
+	if moved {
+		values["section_code"], values["subsection_code"], values["pos"] = a.SectionCode, a.SubsectionCode, a.Pos
+	}
+	return updateSyncedArticle(ds, a, values)
+}
+
 func pagePublishReason(p *model.NotionPageBinding) string {
 	if p.NativeArchived {
 		return "native_archived"
@@ -244,7 +266,7 @@ func (b *articleBiz) ApplySyncedSource(ctx context.Context, r SyncInput) (result
 					p.DesiredState = r.DesiredState
 					if r.DesiredState != model.ArticleStatusPublished && r.MetadataError != "out_of_scope" && a.Status != r.DesiredState {
 						a.Status = r.DesiredState
-						if e = save(ds, a); e != nil {
+						if e = saveSyncedState(ds, a); e != nil {
 							return e
 						}
 					}
@@ -296,7 +318,7 @@ func (b *articleBiz) ApplySyncedSource(ctx context.Context, r SyncInput) (result
 			if a != nil && r.DesiredState >= 1 && r.DesiredState <= 4 && r.DesiredState != model.ArticleStatusPublished && r.MetadataError != "out_of_scope" {
 				if a.Status != r.DesiredState {
 					a.Status = r.DesiredState
-					if e = save(ds, a); e != nil {
+					if e = saveSyncedState(ds, a); e != nil {
 						return e
 					}
 				}
@@ -377,7 +399,7 @@ func (b *articleBiz) ApplySyncedSource(ctx context.Context, r SyncInput) (result
 			} else if r.DesiredState != model.ArticleStatusPublished {
 				a.Status = r.DesiredState
 				if !sameArticleValues(a, before) {
-					if e = save(ds, a); e != nil {
+					if e = saveSyncedState(ds, a); e != nil {
 						return e
 					}
 				}
@@ -411,14 +433,15 @@ func (b *articleBiz) ApplySyncedSource(ctx context.Context, r SyncInput) (result
 			result = &SyncResult{ArticleID: id, PageID: p.PageID, Outcome: "state_only", Reason: p.LastError, AppliedState: state, BindingRevision: p.Revision}
 			return nil
 		}
+		moved := false
 		if !archivedUnchanged {
 			a.Title = r.Title
 			if e = model.SetArticleTags(a, r.Tags); e != nil {
 				return e
 			}
-			moved := old == nil || old.Section.ID != placement.Section.ID
-			canonicalPlacement(a, placement)
+			moved = old == nil || old.Section.ID != placement.Section.ID
 			if moved {
+				canonicalPlacement(a, placement)
 				a.Pos, e = nextPos(ds, a.SectionCode, a.SubsectionCode)
 				if e != nil {
 					return e
@@ -433,7 +456,7 @@ func (b *articleBiz) ApplySyncedSource(ctx context.Context, r SyncInput) (result
 			}
 			outcome = "created"
 		} else if !sameArticleValues(a, before) {
-			if e = save(ds, a); e != nil {
+			if e = saveSyncedProjection(ds, a, moved); e != nil {
 				return e
 			}
 			outcome = "updated"

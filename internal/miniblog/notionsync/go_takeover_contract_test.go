@@ -2,6 +2,7 @@ package notionsync
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -48,6 +49,7 @@ func TestGoFourteenHistoricalAndTwentyFourDraftsTakeover(t *testing.T) {
 				}
 			}
 			originals := map[uint64]model.Article{}
+			var legacyNullID uint64
 			historyIDs := map[string]uint64{}
 			managedIDs := map[uint64]bool{}
 			for i := 0; i < 38; i++ {
@@ -66,6 +68,12 @@ func TestGoFourteenHistoricalAndTwentyFourDraftsTakeover(t *testing.T) {
 					a.Provider, a.CanonicalURL, a.SourceKey = &identity.Provider, &identity.CanonicalURL, &identity.SourceKey
 					if err := db.Create(&a).Error; err != nil {
 						t.Fatal(err)
+					}
+					if i == 0 {
+						legacyNullID = a.ID
+						if err := db.Model(&model.Article{}).Where("id = ?", a.ID).UpdateColumn("subsection_code", nil).Error; err != nil {
+							t.Fatal(err)
+						}
 					}
 					if err := db.First(&a, a.ID).Error; err != nil {
 						t.Fatal(err)
@@ -208,6 +216,17 @@ func TestGoFourteenHistoricalAndTwentyFourDraftsTakeover(t *testing.T) {
 					t.Fatalf("takeover changed preserved historical fields for %s", strconv.FormatUint(id, 10))
 				}
 			}
+			requireLegacyNull := func() {
+				t.Helper()
+				var raw sql.NullString
+				if err := db.Raw("SELECT subsection_code FROM article WHERE id = ?", legacyNullID).Row().Scan(&raw); err != nil {
+					t.Fatal(err)
+				}
+				if raw.Valid {
+					t.Fatal("takeover or sync normalized legacy NULL subsection")
+				}
+			}
+			requireLegacyNull()
 			if _, err = s.UpdateControl(ctx, ControlInput{Paused: &off, SourceWritesPaused: &off}); err != nil {
 				t.Fatal(err)
 			}
@@ -228,6 +247,7 @@ func TestGoFourteenHistoricalAndTwentyFourDraftsTakeover(t *testing.T) {
 			if articleCount != 20 {
 				t.Fatal(articleCount)
 			}
+			requireLegacyNull()
 			var visible int64
 			store.PublishedArticles(ctx, db).Where("module.code = ?", "m1").Count(&visible)
 			if visible != 19 {
