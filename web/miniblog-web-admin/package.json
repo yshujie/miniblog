@@ -11,14 +11,15 @@
     "preview": "vite preview --port 4173",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
     "type-check": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
-    "lint:check": "eslint src/api/content.ts src/api/content.test.ts src/api/notion-sync.ts src/api/notion-sync.test.ts src/api/article.js src/components/content src/composables src/stores src/store/index.ts src/store/modules/module.ts src/store/modules/section.ts src/store/modules/subsection.ts src/store/modules/contentWorkspace.ts src/store/modules/section.test.ts src/store/modules/subsection.test.ts src/types/content.ts src/types/notion-sync.ts src/utils/article-actions.ts src/utils/article-actions.test.ts src/utils/api-error.ts src/utils/content-flags.ts src/utils/content-flags.test.ts src/utils/request.js src/router/index.ts src/permission.ts src/permission.test.ts src/views/content src/views/article src/views/home/index.vue src/views/section/index.vue src/views/subsection/index.vue vite.config.ts vitest.config.ts scripts/browser-fixture.mjs scripts/sync-browser-fixture.mjs scripts/sync-fixture-data.mjs scripts/sync-fixture-server.mjs src/layout/index.vue src/layout/components/AppMain.vue src/layout/components/Navbar.vue src/layout/components/Sidebar/index.vue src/views/login/index.vue src/utils/admin-navigation.ts src/utils/admin-navigation.test.ts src/utils/login-redirect.ts src/utils/login-redirect.test.ts src/api/auth.js src/api/auth.test.ts",
+    "lint:check": "eslint src/api/content.ts src/api/content.test.ts src/api/notion-sync.ts src/api/notion-sync.test.ts src/api/article.js src/components/content src/composables src/stores src/store/index.ts src/store/modules/module.ts src/store/modules/section.ts src/store/modules/subsection.ts src/store/modules/contentWorkspace.ts src/store/modules/section.test.ts src/store/modules/subsection.test.ts src/types/content.ts src/types/notion-sync.ts src/utils/article-actions.ts src/utils/article-actions.test.ts src/utils/api-error.ts src/utils/content-flags.ts src/utils/content-flags.test.ts src/utils/request.js src/router/index.ts src/permission.ts src/permission.test.ts src/views/content src/views/article src/views/home/index.vue src/views/section/index.vue src/views/subsection/index.vue vite.config.ts vitest.config.ts scripts/browser-fixture.mjs scripts/sync-browser-fixture.mjs scripts/sync-fixture-data.mjs scripts/sync-fixture-server.mjs src/layout/index.vue src/layout/components/AppMain.vue src/layout/components/Navbar.vue src/layout/components/Sidebar/index.vue src/views/login/index.vue src/utils/admin-navigation.ts src/utils/admin-navigation.test.ts src/utils/login-redirect.ts src/utils/login-redirect.test.ts src/api/auth.js src/api/auth.test.ts src/main.ts scripts/gate-browser-fixture.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run",
     "build": "vite build --mode build_prod",
     "test:browser:fixture": "node scripts/browser-fixture.mjs",
     "test:browser:sync": "node scripts/sync-browser-fixture.mjs",
-    "test:browser:serve": "node scripts/sync-fixture-server.mjs"
+    "test:browser:serve": "node scripts/sync-fixture-server.mjs",
+    "test:browser:gate": "node scripts/gate-browser-fixture.mjs"
   },
   "dependencies": {
     "axios": "^1.11.0",
