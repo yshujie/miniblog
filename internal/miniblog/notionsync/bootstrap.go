@@ -281,7 +281,7 @@ func (s *Service) BootstrapPreview(ctx context.Context, review ...BootstrapRevie
 				id := selected.ID
 				matchedID = &id
 			}
-			if e := s.recordItem(ctx, token, run.ID, p.PageID, matchedID, "bootstrap_preview", c.Reason, "", nil, map[string]interface{}{"bootstrap_preview": c}); e != nil {
+			if e := s.recordItem(ctx, token, run.ID, p.PageID, matchedID, "bootstrap_preview", c.Reason, "", p, map[string]interface{}{"bootstrap_preview": c, "snapshot": snap}); e != nil {
 				return e
 			}
 			result.Items = append(result.Items, c)

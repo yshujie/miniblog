@@ -278,6 +278,41 @@ func TestBootstrapPreviewCLISuccessGate(t *testing.T) {
 			if name == "public_url_missing_candidate" && (result.Items[0].PublishBlockReason != "public_url_missing" || result.Items[0].ExpectedFingerprint == "") {
 				t.Fatal("public candidate lost", result)
 			}
+			if name == "public_url_missing_candidate" {
+				var report struct {
+					Run      *notionsync.RunDTO   `json:"run"`
+					RunItems []notionsync.ItemDTO `json:"run_items"`
+				}
+				if err := json.Unmarshal(out.Bytes(), &report); err != nil || report.Run == nil || report.Run.Status != "completed" || report.Run.RunID != result.RunID {
+					t.Fatal("CLI omitted verified run", err)
+				}
+				pageRows := 0
+				for _, item := range report.RunItems {
+					if item.PageID != page.ID {
+						continue
+					}
+					pageRows++
+					after, ok := item.After.(map[string]interface{})
+					if !ok {
+						t.Fatal("CLI audit missing")
+					}
+					snap, ok := after["snapshot"].(map[string]interface{})
+					if !ok || snap["page_id"] != page.ID {
+						t.Fatal("CLI lost latest snapshot")
+					}
+					candidate, ok := after["bootstrap_preview"].(map[string]interface{})
+					if !ok || candidate["expected_fingerprint"] != result.Items[0].ExpectedFingerprint {
+						t.Fatal("CLI mismatched candidate")
+					}
+					before, ok := item.Before.(map[string]interface{})
+					if !ok || before["management_state"] != "baseline_pending" {
+						t.Fatal("CLI omitted reviewed binding")
+					}
+				}
+				if pageRows != 1 {
+					t.Fatal("CLI duplicated or omitted page audit", pageRows)
+				}
+			}
 		})
 	}
 }

@@ -211,3 +211,56 @@ func TestBootstrapPublishedAdoptRechecksCatalogAfterSuccessfulRemoteWrite(t *tes
 		t.Fatal("catalog drift allowed adoption or lost recoverable journal", p)
 	}
 }
+
+func TestBootstrapPreviewRetainsLatestSnapshotAndBindingAudit(t *testing.T) {
+	s, _, f := syncFixture(t)
+	ctx := context.Background()
+	const pageID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"
+	sourceID := AllowedSources()[0]
+	off := false
+	for _, id := range AllowedSources() {
+		if _, err := s.UpdateSource(ctx, id, SourceInput{ModuleCode: "m1", Enabled: &off}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.pages[pageID] = fixturePage(pageID, sourceID, "")
+	preview, err := s.BootstrapPreview(ctx)
+	if err != nil || len(preview.Items) != 1 {
+		t.Fatal(preview, err)
+	}
+	items, err := s.Items(ctx, preview.RunID, ListQuery{Page: 1, Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var item ItemDTO
+	pageRows := 0
+	for _, row := range items.Items {
+		if row.PageID == pageID {
+			item = row
+			pageRows++
+		}
+	}
+	if pageRows != 1 {
+		t.Fatalf("expected one retained page audit, got %d", pageRows)
+	}
+	before, ok := item.Before.(map[string]interface{})
+	if !ok || before["management_state"] != model.NotionManagementBaselinePending {
+		t.Fatal("missing audited binding state", item.Before)
+	}
+	after, ok := item.After.(map[string]interface{})
+	if !ok {
+		t.Fatal("missing audit object")
+	}
+	snap, ok := after["snapshot"].(map[string]interface{})
+	if !ok || snap["page_id"] != pageID || snap["source_id"] != sourceID || snap["desired_state"] != float64(0) || snap["state_option_id"] != "" {
+		t.Fatal("missing latest audited snapshot", snap)
+	}
+	candidate, ok := after["bootstrap_preview"].(map[string]interface{})
+	if !ok || candidate["expected_fingerprint"] != preview.Items[0].ExpectedFingerprint || item.Outcome != "bootstrap_preview" {
+		t.Fatal("candidate contract changed", candidate)
+	}
+	run, err := s.Run(ctx, preview.RunID)
+	if err != nil || run.Status != "completed" || run.Counts.Seen != 1 {
+		t.Fatal(run, err)
+	}
+}
