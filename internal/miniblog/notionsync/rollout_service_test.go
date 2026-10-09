@@ -236,9 +236,11 @@ func TestRolloutSuccessfulPilotDoesNotClaimDisabledLibrariesApplied(t *testing.T
 
 func TestRolloutJournalRepreviewRequiresFreshReadAndAtomicReview(t *testing.T) {
 	s, db, f := syncFixture(t)
-	id := AllowedSources()[0]
-	if _, err := s.UpdateSource(context.Background(), id, SourceInput{ModuleCode: "m1"}); err != nil {
-		t.Fatal(err)
+	id, target := AllowedSources()[0], AllowedSources()[1]
+	for _, sourceID := range []string{id, target} {
+		if _, err := s.UpdateSource(context.Background(), sourceID, SourceInput{ModuleCode: "m1"}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	f.pages[firstPage] = fixturePage(firstPage, id, "")
 	preview, err := s.BootstrapPreview(context.Background())
@@ -258,6 +260,7 @@ func TestRolloutJournalRepreviewRequiresFreshReadAndAtomicReview(t *testing.T) {
 	var before model.NotionPageBinding
 	db.First(&before, "page_id = ?", firstPage)
 	page := f.pages[firstPage]
+	page.Parent.DataSourceID = target
 	title := page.Properties["标题"]
 	title.Title[0].PlainText = "Newly reviewed title"
 	page.Properties["标题"] = title
@@ -279,12 +282,42 @@ func TestRolloutJournalRepreviewRequiresFreshReadAndAtomicReview(t *testing.T) {
 	if reviewed.Items[0].Title != "Newly reviewed title" || reviewed.Items[0].ExpectedFingerprint == confirm.ExpectedFingerprint {
 		t.Fatal("new review did not expose fresh metadata")
 	}
+	items, err := s.Items(context.Background(), reviewed.RunID, ListQuery{Page: 1, Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pageRows := 0
+	for _, item := range items.Items {
+		if item.PageID != firstPage {
+			continue
+		}
+		pageRows++
+		beforeAudit, ok := item.Before.(map[string]interface{})
+		if !ok || beforeAudit["source_id"] != id {
+			t.Fatal("cross-library review lost original binding source", item.Before)
+		}
+		afterAudit, ok := item.After.(map[string]interface{})
+		if !ok {
+			t.Fatal("missing cross-library review audit")
+		}
+		snapshotAudit, ok := afterAudit["snapshot"].(map[string]interface{})
+		if !ok || snapshotAudit["source_id"] != target {
+			t.Fatal("review snapshot lost current source", afterAudit["snapshot"])
+		}
+		candidateAudit, ok := afterAudit["bootstrap_preview"].(map[string]interface{})
+		if !ok || candidateAudit["source_id"] != target {
+			t.Fatal("review candidate lost current source", afterAudit["bootstrap_preview"])
+		}
+	}
+	if pageRows != 1 {
+		t.Fatalf("expected one cross-library page audit, got %d", pageRows)
+	}
 	db.First(&after, "page_id = ?", firstPage)
 	var snap Snapshot
 	if err = json.Unmarshal([]byte(after.SnapshotJSON), &snap); err != nil {
 		t.Fatal(err)
 	}
-	if snap.Title != reviewed.Items[0].Title || after.BootstrapExpectedFingerprint != reviewed.Items[0].ExpectedFingerprint {
+	if snap.Title != reviewed.Items[0].Title || snap.SourceID != target || after.SourceID != target || after.BootstrapExpectedFingerprint != reviewed.Items[0].ExpectedFingerprint {
 		t.Fatal("review snapshot and fingerprint not saved together")
 	}
 	f.writeErr = nil
