@@ -56,7 +56,7 @@ func TestMySQLScopedCLIMaintenance(t *testing.T) {
 		t.Fatal("fixture connection unavailable")
 	}
 	defer pool.Close()
-	if err = gdb.AutoMigrate(&model.Module{}, &model.Section{}, &model.Subsection{}, &model.Article{}, &model.NotionSyncControl{}, &model.NotionSyncSource{}, &model.NotionPageBinding{}, &model.NotionCatalogBinding{}, &model.NotionSyncRun{}, &model.NotionSyncRunItem{}); err != nil {
+	if err = gdb.AutoMigrate(&model.Module{}, &model.Section{}, &model.Subsection{}, &model.Article{}, &model.NotionSyncControl{}, &model.NotionSyncSource{}, &model.NotionPageBinding{}, &model.NotionCatalogBinding{}, &model.NotionSyncRun{}, &model.NotionSyncRunItem{}, &model.UserM{}); err != nil {
 		t.Fatal("fixture schema unavailable")
 	}
 	if err = gdb.Create(&model.Module{Code: "go", Title: "Go", Status: 1}).Error; err != nil {
@@ -110,5 +110,8 @@ func TestMySQLScopedCLIMaintenance(t *testing.T) {
 				t.Fatal("maintenance lease not released")
 			}
 		})
+	}
+	for _, test := range authorResolutionCases() {
+		t.Run("author_"+test.name, func(t *testing.T) { assertAuthorResolutionCase(t, gdb, test) })
 	}
 }

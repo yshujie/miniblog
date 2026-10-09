@@ -283,7 +283,7 @@ def validate_recovery_scope(evidence, confirmations):
 
 
 def scheduler_content(original, enabled, author):
-    if not isinstance(author, str) or not author.strip() or len(author) > 255 or any(c in author for c in "\r\n\x00\\"):
+    if not isinstance(author, str) or not author.strip() or len(author) > 128 or any(c in author for c in "\r\n\x00\\"):
         raise SafeError("resolved default author is unsupported")
     # Compose single quotes prevent interpolation. Backslash is rejected to avoid
     # escape ambiguity; a literal apostrophe is supported by Compose's quote escape.

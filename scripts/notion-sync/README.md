@@ -8,7 +8,7 @@
 - `--mode source_update|catalog_bind|catalog_activate --source-id … --expected-config-revision … --input …`：受限来源配置、绑定和已审核目录启用。目录启用清单须包含旧名称、状态、排序和精确新增公开文章 ID 集合；变化原子拒绝。来源、绑定和目录启用的 CLI 命令在独立租约事务内复核双暂停、冻结基线和无未决回填日志，排空预检不能代替提交时守卫。
 - `--mode drain_status`：输出当前任务、租约及未决回填日志数量与 Page ID 集合；仅数据库租约为空不证明 HTTP 或容器已经排空。
 - `--mode run_status --run-id …`：读取特定 UUID 运行证据。
-- `--mode author_resolve`：只读取唯一启用管理员昵称，不读取密码；CLI 默认作者来自 MINIBLOG_NOTION_SYNC_AUTHOR，显式 --author 优先。
+- `--mode author_resolve`：只读取唯一账号的有效昵称（最多 128 字符），不按未定义的历史 status 筛选，也不读取密码；多个账号或昵称无效时拒绝自动选择；CLI 默认作者来自 MINIBLOG_NOTION_SYNC_AUTHOR，显式 --author 优先。
 - `--mode status`：查看本地运行状态，不请求 Notion。CLI 的 enabled 仅反映本次 --enable-sync 选项，不代表常驻定时器；常驻总开关从后台 HTTP 状态与部署配置核验。
 - `--mode dry_run`：重新读取官方 API，生成审计运行。
 - `--mode sync --enable-sync`：重新读取并应用；要求基线已冻结、源已配置并启用、暂停已解除。

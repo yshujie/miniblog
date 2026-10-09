@@ -23,7 +23,7 @@
 - MINIBLOG_NOTION_TOKEN：运行只读内部连接，仅服务端安全环境注入，并授权五库读取。禁止日志、浏览器、构建参数和仓库存储凭据。
 - MINIBLOG_NOTION_SYNC_ENABLED：运行总开关，默认 false。后台暂停与来源启用独立控制。
 - MINIBLOG_NOTION_SYNC_INTERVAL：默认 5m，最低 1m；整轮最多四分钟。
-- MINIBLOG_NOTION_SYNC_AUTHOR：新文章本地默认作者，可空；已有作者保持原值。
+- MINIBLOG_NOTION_SYNC_AUTHOR：新文章本地默认作者，可空；已有作者保持原值。 受控 CLI 与定时器从唯一账号读取有效昵称（最多 128 个字符）；不将未定义的历史用户 status 值解释为管理员身份，多账号或空昵称时拒绝自动选择。
 
 同步版本固定 2026-03-11，串行每秒最多一次请求，单次十秒、最多三次只读尝试。429/529 遵守 Retry-After；超过本轮时限保存冷却退出。标题预览保留原五秒超时及不重试行为。
 

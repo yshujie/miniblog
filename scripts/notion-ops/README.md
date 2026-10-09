@@ -46,7 +46,7 @@ GitHub Actions 的 **Notion read operations (manual)** 仅允许 `main`，输入
 | source_update | `label/module_code/enabled/config/expected_config_revision` 的明确修改 | 同上；内部 revision 必须等于 envelope，业务 CAS 成功后版本更新。 |
 | bootstrap_preview | `{}` 或 `manual_matches` | 双暂停、冻结基线、排空；允许未知 journal 的显式重新审阅。当前 CLI 仍返回五库候选，envelope 来源用于当前审核版本核验。 |
 | bootstrap_apply | `confirmations` | 双暂停、冻结基线、排空；每页包含最新 fingerprint、文章/新页身份、expected_state、confirmed_by 等既有确认字段。当前存在未知 journal 时仅允许该未决 PageID 集合内的确认，不接受扩展范围；业务层还会 fresh GET 校验旧指纹、状态和本地快照。 |
-| sync | `{}` | 控制已恢复、冻结基线、来源已启用、无当前租约/任务和未知 journal。显式 `--enable-sync`，作者由唯一有效管理员昵称解析；任务仍扫描固定五库，只有来源配置允许的投影会应用。 |
+| sync | `{}` | 控制已恢复、冻结基线、来源已启用、无当前租约/任务和未知 journal。显式 `--enable-sync`，作者由唯一账号的有效昵称（最多 128 字符）解析；任务仍扫描固定五库，只有来源配置允许的投影会应用。 |
 | scheduler_on | `validated_sync_run_id` | 重新双暂停并排空、无未知 journal、当前来源已启用；完成且无 Failed/Blocked 的近期即时 sync、来源 LastSuccessAt 和不可覆盖的版本/image 成功 receipt 全部匹配。 |
 | scheduler_off | `{}` | 双暂停、冻结基线、排空；允许未决 journal，便于回退运行开关。 |
 
@@ -56,7 +56,7 @@ GitHub Actions 的 **Notion read operations (manual)** 仅允许 `main`，输入
 
 首次放行顺序：双暂停 → 目录复用/绑定和受审核祖先启用 → 修改来源配置/启用 → fresh 最终预览 → 人工核对带指纹确认 → 分库 bootstrap_apply → 确认所有未知 journal 已解决 → resume → 一次 sync 并核对文章/公开阅读效果 → pause 排空 → 以该 sync 证明 scheduler_on → 再 resume。scheduler_on 本身保持数据库暂停，不能把健康重启视作定时任务已经开始；最后 resume 后才允许下一轮定时同步。
 
-开关动作只原子修改 `.env` 的 `MINIBLOG_NOTION_SYNC_ENABLED` 和 `MINIBLOG_NOTION_SYNC_AUTHOR`（由当前唯一有效管理员昵称解析），保留其余原行；去除 writer。备份、恢复文件和 `.env` 均 0600。只对当前审核镜像执行 `compose up --no-deps --no-build --pull never miniblog-backend`；重启后核验 image/tag、实际 Docker env、Docker healthy 和本机/公网 health。开启核验失败时仅恢复总开关 false 并尝试重启，数据库保持暂停，不重试 Notion、不自动 resume；若恢复重启也失败，按受限报告人工处理。关闭失败保持 false 目标配置，不重新打开开关。
+开关动作只原子修改 `.env` 的 `MINIBLOG_NOTION_SYNC_ENABLED` 和 `MINIBLOG_NOTION_SYNC_AUTHOR`（由当前唯一账号的有效昵称（最多 128 字符）解析），保留其余原行；去除 writer。备份、恢复文件和 `.env` 均 0600。只对当前审核镜像执行 `compose up --no-deps --no-build --pull never miniblog-backend`；重启后核验 image/tag、实际 Docker env、Docker healthy 和本机/公网 health。开启核验失败时仅恢复总开关 false 并尝试重启，数据库保持暂停，不重试 Notion、不自动 resume；若恢复重启也失败，按受限报告人工处理。关闭失败保持 false 目标配置，不重新打开开关。
 
 writer Secret 只出现在 bootstrap-apply 独立 job 的 apply 步骤，进入私有传输文件及该次 apply 容器的临时 env；status/drain/preview 等任务都不拿 writer，常驻 `.env`、镜像、备份无 writer。普通操作只在确需 Notion 读取的动作注入 reader。任务 `.env` 在 finally 删除。取消 workflow 的 always cleanup 依私有 run 容器 receipt，核验 exact 随机 owner label 后只删除本次容器/临时 env，不删除审计报告或其他任务；SSH/服务器失联或 SIGKILL 仍须人工核验当前 run 遗留，禁止全局 prune。
 

@@ -298,6 +298,11 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("MINIBLOG_NOTION_SYNC_AUTHOR='O\\'Brien $昵称'", result)
         self.assertNotIn("BOOTSTRAP", result)
 
+    def test_scheduler_author_uses_article_rune_limit(self):
+        self.assertIn("MINIBLOG_NOTION_SYNC_AUTHOR=", rollout.scheduler_content("", True, "名" * 128))
+        with self.assertRaises(rollout.SafeError):
+            rollout.scheduler_content("", True, "名" * 129)
+
     def test_scheduler_restart_health_failure_recovers_off_env_without_external_retry(self):
         target = self.app / ".env"
         target.write_text("MYSQL_PASSWORD=keep\nMINIBLOG_NOTION_SYNC_ENABLED=false\n")
