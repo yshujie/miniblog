@@ -6,7 +6,7 @@ GitHub Actions 的 **Notion read operations (manual)** 仅允许 `main`，输入
 
 仓库 Secret `MINIBLOG_NOTION_TOKEN` 是专用只读内部连接，必须授权固定五库。仅部署和手动维护步骤读取它；不会进入 build/test 环境、构建参数、浏览器或 SSH export 命令。runner 将 token 写入临时 0600 文件，通过原生 SCP 传至服务器 0700 独立目录；SSH 参数只含固定脚本、公开运行 ID 和路径。脚本只接受单行字母、数字、`_`、`-`，拒绝 CR/LF、引号和 Compose `$` 插值。临时文件在正常完成或失败时清理；workflow 的 always 清理步骤再回收当前运行的上传目录。SIGKILL 或服务器失联后，操作者只核验该 run_id 的私有残留，不进行全局清理。
 
-`SVRD_HOST/USERNAME（或 USER）/SSH_KEY/SSH_PORT` 沿用现有部署连接。可选 `SVRD_HOST_FINGERPRINT` 为 `SHA256:…`，配置后严格核验主机密钥；未配置沿用首次信任主机的现有契约。服务器需 Python 3.9+、Docker、flock，deploy 用户需可读取当前 backend 元数据、执行任务并写 `/opt/miniblog`。
+`SVRB_HOST/USERNAME（或 USER）/SSH_KEY/SSH_PORT` 沿用现有部署连接。可选 `SVRB_HOST_FINGERPRINT` 为 `SHA256:…`，配置后严格核验主机密钥；未配置沿用首次信任主机的现有契约。服务器需 Python 3.9+、Docker、flock，deploy 用户需可读取当前 backend 元数据、执行任务并写 `/opt/miniblog`。
 
 普通 CI 在部署步骤原子生成 `/opt/miniblog/.env`（0600），保留已有同步开关、间隔、作者与手工登记开关。只读 Secret 非空时替换 token，未配置时保留旧 token；不自动开启同步。备份 `.env.previous` 也是 0600。维护任务不改 `.env`，任务环境只含只读 token；需要数据库时追加当前运行容器的 MySQL 字段。优先核对实际 `MINIBLOG_DATABASE_*` 映射，两套别名不一致即阻止，不复制 JWT、Redis 或其他运行凭据。
 

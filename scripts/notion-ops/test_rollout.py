@@ -774,7 +774,7 @@ class RunnerTests(unittest.TestCase):
 class TransportRolloutTests(unittest.TestCase):
     def env(self, action):
         return {"GITHUB_REF": "refs/heads/main", "GITHUB_RUN_ID": "1234", "GITHUB_RUN_ATTEMPT": "1",
-                "SVRD_HOST": "example.test", "SVRD_USER": "operator", "SVRD_SSH_KEY": "fake",
+                "SVRB_HOST": "example.test", "SVRB_USER": "operator", "SVRB_SSH_KEY": "fake",
                 "MINIBLOG_NOTION_TOKEN": TOKEN, "MINIBLOG_NOTION_BOOTSTRAP_TOKEN": WRITER if action == "bootstrap_apply" else "",
                 "NOTION_ROLLOUT_ACTION": action, "NOTION_MANIFEST_ID": "go-review", "NOTION_MANIFEST_SHA256": "a" * 64,
                 "NOTION_EXPECTED_IMAGE_SHA": SHA, "NOTION_EXPECTED_CONFIG_REVISION": "7"}

@@ -96,7 +96,7 @@ docker exec -it mysql mysql -uminiblog -p miniblog -e "SELECT COUNT(*) FROM user
 ### 2. GitHub Actions 手动数据库操作
 
 在 **Actions → DB Operations (manual)** 中设置 `skip_db_seed=false` 后，
-`Load seed data on ServerD` 步骤应该成功：
+`Load seed data on ServerB` 步骤应该成功：
 
 ```
 Loading user.sql...
