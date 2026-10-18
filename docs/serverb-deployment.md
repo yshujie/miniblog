@@ -21,3 +21,7 @@ CI/CD、db-ops、Notion read operations 和 reviewed maintenance 统一使用仓
 检查三个域名、后端 health、公共文章目录与文章详情、前端静态资源、Notion 单实例运行、镜像版本和环境标志。核对 serverB 原 IAM/运营后台以及 serverD MQ/worker 的 ID、启动时间和挂载未变。短时资源快照不替代完整峰值压测或业务账号人工验收。
 
 回滚前先停新后台的定时任务和写入口，确认共享数据库兼容及迁移后 uploads 的最新写入；不能只启动旧卷而丢失新文件。恢复 serverD 原配置、服务名和 serverA upstream 后再恢复入口。后续 GitHub 工作流仍以 serverB 为默认目标，回滚主机需要独立调整，不得通过误配 `SVRB_HOST` 指向其他主机绕过 hostname/fingerprint 检查。
+
+## 2026-10-18 切换记录
+
+原版本 7163e0a8b2c83c05cee3a405136b86730ef99c8a 的三个镜像已在 serverB 启动。数据库只读 schema gate 和禁用 scheduler 的隔离候选验证通过；正式端保持原 Notion 同步开关，先停止旧后台后再启动新后台。博客首页、管理端首页和公共 modules 响应与迁移前 SHA256 完全一致，后台 healthy。短时检查约 794 MiB available，未做完整峰值压测；IAM/运营后台不因迁移重启。旧 SVRD 仓库部署 Secrets 已移除，回滚使用受控运维入口和保留数据。后续 CI/CD 的实际部署 SHA/结果需单独验证，不能由这次原版本搬迁推断。

@@ -4,7 +4,8 @@ name: CI/CD (miniblog - production, linux runner)
 # GitHub Secrets 配置指引
 # ----------------------------------------------------------------------------
 # 必需（main push / workflow_dispatch 才强制）：
-#   SVRB_HOST, SVRB_USERNAME, SVRB_SSH_KEY, SVRB_SSH_PORT (可选，默认 22)
+#   SVRB_HOST, SVRB_USERNAME, SVRB_SSH_KEY, SVRB_HOST_FINGERPRINT
+#   SVRB_SSH_PORT (可选，默认 22)
 #   MYSQL_HOST, MYSQL_DBNAME, MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_PORT (可选，默认 3306)
 #   REDIS_HOST, REDIS_PASSWORD, REDIS_PORT (可选，默认 6379), REDIS_DB (可选，默认 0)
 #   JWT_SECRET
