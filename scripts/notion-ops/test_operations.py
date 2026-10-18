@@ -311,8 +311,8 @@ class SSHKeyTests(unittest.TestCase):
                 path.unlink()
     def test_invalid_key_is_rejected_before_network_with_constant_message(self):
         env={'GITHUB_REF':'refs/heads/main','GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1',
-             'SVRD_HOST':'host.private.test','SVRD_USER':'deploy','SVRD_PORT':'22','SVRD_SSH_KEY':TOKEN,
-             'SVRD_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
+             'SVRB_HOST':'host.private.test','SVRB_USER':'deploy','SVRB_PORT':'22','SVRB_SSH_KEY':TOKEN,
+             'SVRB_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
         output=io.StringIO()
         actual=subprocess.run
         calls=[]
@@ -415,8 +415,8 @@ class TransportAndWorkflowTests(unittest.TestCase):
                 if source.name == 'credential': self.assertEqual(source.read_text(), TOKEN)
             return subprocess.CompletedProcess(command,0,stdout=b'',stderr=b'')
         env = {'GITHUB_REF':'refs/heads/main','GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1',
-               'SVRD_HOST':'example.test','SVRD_USER':'deploy','SVRD_PORT':'22','SVRD_SSH_KEY':'PRIVATEKEY',
-               'SVRD_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
+               'SVRB_HOST':'example.test','SVRB_USER':'deploy','SVRB_PORT':'22','SVRB_SSH_KEY':'PRIVATEKEY',
+               'SVRB_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
         output = io.StringIO()
         with mock.patch.dict(os.environ, env), mock.patch.object(transport.subprocess,'run',side_effect=run), \
              mock.patch.object(transport.sys,'argv',['transport.py','--mode','schema_check']), contextlib.redirect_stdout(output):
@@ -426,8 +426,8 @@ class TransportAndWorkflowTests(unittest.TestCase):
         self.assertTrue(any('shutil.rmtree(stage)' in ' '.join(c) for c in commands))
     def test_ssh_authentication_failure_is_classified_without_raw_output(self):
         env={'GITHUB_REF':'refs/heads/main','GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1',
-             'SVRD_HOST':'host.private.test','SVRD_USER':'deploy','SVRD_PORT':'22','SVRD_SSH_KEY':'PRIVATEKEY',
-             'SVRD_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
+             'SVRB_HOST':'host.private.test','SVRB_USER':'deploy','SVRB_PORT':'22','SVRB_SSH_KEY':'PRIVATEKEY',
+             'SVRB_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
         def run(command,**kwargs):
             if command[0]=='ssh':
                 return subprocess.CompletedProcess(command,255,stdout=b'',stderr=('Permission denied (publickey) '+TOKEN+' host.private.test').encode())
@@ -441,8 +441,8 @@ class TransportAndWorkflowTests(unittest.TestCase):
         self.assertNotIn(TOKEN,output.getvalue());self.assertNotIn('host.private.test',output.getvalue())
     def test_stage_creation_failure_does_not_automatically_cleanup(self):
         env={'GITHUB_REF':'refs/heads/main','GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1',
-             'SVRD_HOST':'server','SVRD_USER':'deploy','SVRD_PORT':'22','SVRD_SSH_KEY':'PRIVATEKEY',
-             'SVRD_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
+             'SVRB_HOST':'server','SVRB_USER':'deploy','SVRB_PORT':'22','SVRB_SSH_KEY':'PRIVATEKEY',
+             'SVRB_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
         calls=[]
         def run(command,**kwargs):
             calls.append(command)
@@ -466,8 +466,8 @@ class TransportAndWorkflowTests(unittest.TestCase):
                 raise transport.SafeError('operation cancelled')
             return subprocess.CompletedProcess(command,0,stdout=b'',stderr=b'')
         env={'GITHUB_REF':'refs/heads/main','GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1',
-             'SVRD_HOST':'server','SVRD_USER':'deploy','SVRD_PORT':'22','SVRD_SSH_KEY':'PRIVATEKEY',
-             'SVRD_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
+             'SVRB_HOST':'server','SVRB_USER':'deploy','SVRB_PORT':'22','SVRB_SSH_KEY':'PRIVATEKEY',
+             'SVRB_HOST_FINGERPRINT':'','MINIBLOG_NOTION_TOKEN':TOKEN}
         output=io.StringIO()
         with mock.patch.dict(os.environ,env), mock.patch.object(transport.subprocess,'run',side_effect=run), \
              mock.patch.object(transport.sys,'argv',['transport.py','--mode','schema_check']), \
@@ -478,7 +478,7 @@ class TransportAndWorkflowTests(unittest.TestCase):
     def test_invalid_transport_never_connects_or_echoes_secret(self):
         for env in ({'GITHUB_REF':'refs/heads/feature'},
                     {'GITHUB_REF':'refs/heads/main','MINIBLOG_NOTION_TOKEN':TOKEN+'\nBAD=true',
-                     'SVRD_HOST':'server','SVRD_USER':'deploy','GITHUB_RUN_ID':'1','GITHUB_RUN_ATTEMPT':'1'}):
+                     'SVRB_HOST':'server','SVRB_USER':'deploy','GITHUB_RUN_ID':'1','GITHUB_RUN_ATTEMPT':'1'}):
             output = io.StringIO()
             with mock.patch.dict(os.environ,env), mock.patch.object(transport.subprocess,'run') as run, \
                  mock.patch.object(transport.sys,'argv',['transport.py','--mode','schema_check']), contextlib.redirect_stderr(output):
@@ -507,7 +507,7 @@ class TransportAndWorkflowTests(unittest.TestCase):
         self.assertIn('debug: false',cicd)
         self.assertIn('runtime-env --app-dir',cicd)
         # Secrets belong to env mappings, never to runnable shell/action script bodies.
-        self.assertNotIn('secrets.MINIBLOG_NOTION_TOKEN',cicd[cicd.index('          script: |',cicd.index('Deploy on ServerD')):])
+        self.assertNotIn('secrets.MINIBLOG_NOTION_TOKEN',cicd[cicd.index('          script: |',cicd.index('Deploy on ServerB')):])
         for workflow in (cicd,readonly):
             for line in workflow.splitlines():
                 if 'secrets.MINIBLOG_NOTION_TOKEN' in line:

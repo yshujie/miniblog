@@ -159,9 +159,9 @@ def main():
             signal.signal(signum, cancelled)
         if os.environ.get("GITHUB_REF") != "refs/heads/main":
             raise SafeError("server operations require the main branch")
-        host = os.environ.get("SVRD_HOST", "")
-        user = os.environ.get("SVRD_USER", "")
-        port = os.environ.get("SVRD_PORT", "22")
+        host = os.environ.get("SVRB_HOST", "")
+        user = os.environ.get("SVRB_USER", "")
+        port = os.environ.get("SVRB_PORT", "22")
         run = os.environ.get("GITHUB_RUN_ID", "") + "-" + os.environ.get("GITHUB_RUN_ATTEMPT", "")
         if (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,252}", host)
                 or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]{0,63}", user)
@@ -193,7 +193,7 @@ def main():
             raise SafeError("invalid read credential format")
         if args.mode in ("schema_check", "dry_run", "bootstrap_preview") and not token:
             raise SafeError("dedicated read credential is not configured")
-        key = os.environ.get("SVRD_SSH_KEY", "")
+        key = os.environ.get("SVRB_SSH_KEY", "")
         if not key:
             raise SafeError("SSH credential is not configured")
         os.umask(0o077)
@@ -204,7 +204,7 @@ def main():
             destination = user + "@" + host
             # Current deployment actions do not require a fingerprint. An optional
             # SHA256 fingerprint upgrades this TOFU contract without a new required secret.
-            fingerprint = os.environ.get("SVRD_HOST_FINGERPRINT", "")
+            fingerprint = os.environ.get("SVRB_HOST_FINGERPRINT", "")
             if fingerprint:
                 if not re.fullmatch(r"SHA256:[A-Za-z0-9+/]{43}", fingerprint):
                     raise SafeError("SSH fingerprint format is invalid")

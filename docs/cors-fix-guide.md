@@ -106,7 +106,7 @@ if ($http_origin ~* "^https://(www|admin)\.yangshujie\.com$") {
 ### 方法 1：通过 GitHub Actions 发布应用
 
 1. 提交代码到 Git
-2. `.github/workflows/cicd.yml` 自动构建并部署到 ServerD
+2. `.github/workflows/cicd.yml` 自动构建并部署到 ServerB
 3. workflow 在部署成功后重新加载 ServerA 上已有的 Nginx 配置
 
 注意：当前 workflow 不会上传新的 Nginx 配置文件。修改 Nginx 配置时，仍需先按下面的

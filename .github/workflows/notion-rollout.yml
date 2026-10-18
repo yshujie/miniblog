@@ -54,11 +54,11 @@ jobs:
         run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/notion-ops -p 'test_*.py'
       - name: Run reviewed maintenance
         env:
-          SVRD_HOST: ${{ secrets.SVRD_HOST }}
-          SVRD_USER: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          SVRD_PORT: ${{ secrets.SVRD_SSH_PORT || 22 }}
-          SVRD_SSH_KEY: ${{ secrets.SVRD_SSH_KEY }}
-          SVRD_HOST_FINGERPRINT: ${{ secrets.SVRD_HOST_FINGERPRINT }}
+          SVRB_HOST: ${{ secrets.SVRB_HOST }}
+          SVRB_USER: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          SVRB_PORT: ${{ secrets.SVRB_SSH_PORT || 22 }}
+          SVRB_SSH_KEY: ${{ secrets.SVRB_SSH_KEY }}
+          SVRB_HOST_FINGERPRINT: ${{ secrets.SVRB_HOST_FINGERPRINT }}
           MINIBLOG_NOTION_TOKEN: ${{ contains(fromJSON('["catalog_prepare","bootstrap_preview","sync","scheduler_on"]'), inputs.action) && secrets.MINIBLOG_NOTION_TOKEN || '' }}
           NOTION_ROLLOUT_ACTION: ${{ inputs.action }}
           NOTION_MANIFEST_ID: ${{ inputs.manifest_id }}
@@ -69,11 +69,11 @@ jobs:
       - name: Remove only this run's private staging and owned task containers
         if: ${{ always() }}
         env:
-          SVRD_HOST: ${{ secrets.SVRD_HOST }}
-          SVRD_USER: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          SVRD_PORT: ${{ secrets.SVRD_SSH_PORT || 22 }}
-          SVRD_SSH_KEY: ${{ secrets.SVRD_SSH_KEY }}
-          SVRD_HOST_FINGERPRINT: ${{ secrets.SVRD_HOST_FINGERPRINT }}
+          SVRB_HOST: ${{ secrets.SVRB_HOST }}
+          SVRB_USER: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          SVRB_PORT: ${{ secrets.SVRB_SSH_PORT || 22 }}
+          SVRB_SSH_KEY: ${{ secrets.SVRB_SSH_KEY }}
+          SVRB_HOST_FINGERPRINT: ${{ secrets.SVRB_HOST_FINGERPRINT }}
         run: python3 scripts/notion-ops/transport.py --mode cleanup_rollout
 
   # The writer secret appears only in this job and only in the apply step.
@@ -87,11 +87,11 @@ jobs:
         run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/notion-ops -p 'test_*.py'
       - name: Apply explicitly reviewed per-page bootstrap confirmations
         env:
-          SVRD_HOST: ${{ secrets.SVRD_HOST }}
-          SVRD_USER: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          SVRD_PORT: ${{ secrets.SVRD_SSH_PORT || 22 }}
-          SVRD_SSH_KEY: ${{ secrets.SVRD_SSH_KEY }}
-          SVRD_HOST_FINGERPRINT: ${{ secrets.SVRD_HOST_FINGERPRINT }}
+          SVRB_HOST: ${{ secrets.SVRB_HOST }}
+          SVRB_USER: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          SVRB_PORT: ${{ secrets.SVRB_SSH_PORT || 22 }}
+          SVRB_SSH_KEY: ${{ secrets.SVRB_SSH_KEY }}
+          SVRB_HOST_FINGERPRINT: ${{ secrets.SVRB_HOST_FINGERPRINT }}
           MINIBLOG_NOTION_TOKEN: ${{ secrets.MINIBLOG_NOTION_TOKEN }}
           MINIBLOG_NOTION_BOOTSTRAP_TOKEN: ${{ secrets.MINIBLOG_NOTION_BOOTSTRAP_TOKEN }}
           NOTION_ROLLOUT_ACTION: ${{ inputs.action }}
@@ -103,9 +103,9 @@ jobs:
       - name: Remove only this run's temporary writer and owned task containers
         if: ${{ always() }}
         env:
-          SVRD_HOST: ${{ secrets.SVRD_HOST }}
-          SVRD_USER: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          SVRD_PORT: ${{ secrets.SVRD_SSH_PORT || 22 }}
-          SVRD_SSH_KEY: ${{ secrets.SVRD_SSH_KEY }}
-          SVRD_HOST_FINGERPRINT: ${{ secrets.SVRD_HOST_FINGERPRINT }}
+          SVRB_HOST: ${{ secrets.SVRB_HOST }}
+          SVRB_USER: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          SVRB_PORT: ${{ secrets.SVRB_SSH_PORT || 22 }}
+          SVRB_SSH_KEY: ${{ secrets.SVRB_SSH_KEY }}
+          SVRB_HOST_FINGERPRINT: ${{ secrets.SVRB_HOST_FINGERPRINT }}
         run: python3 scripts/notion-ops/transport.py --mode cleanup_rollout

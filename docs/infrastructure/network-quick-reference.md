@@ -12,7 +12,7 @@ MiniBlog 的当前 `docker-compose.yml` 使用两个外部网络：
 | `miniblog-network` | MiniBlog 后端、博客前端和管理后台之间的业务通信 |
 | `infra-network` | MiniBlog 服务访问由基础设施侧提供的依赖 |
 
-GitHub Actions 部署会在 ServerD 上按需创建 `miniblog-network`，但要求
+GitHub Actions 部署会在 ServerB 上按需创建 `miniblog-network`，但要求
 `infra-network` 已经由基础设施侧创建。仓库内不再提供修改基础设施网络拓扑的一键脚本。
 
 ## 部署前检查
@@ -50,12 +50,12 @@ docker inspect miniblog-backend \
 
 出现 Nginx 502 时，按请求链路检查：
 
-1. ServerA Nginx upstream 配置指向的 ServerD 地址和端口是否正确。
-2. ServerD 上 `miniblog-backend` 是否运行并监听发布端口。
-3. ServerA 到 ServerD 的网络连通性是否正常。
+1. ServerA Nginx upstream 配置指向的 ServerB 地址和端口是否正确。
+2. ServerB 上 `miniblog-backend` 是否运行并监听发布端口。
+3. ServerA 到 ServerB 的网络连通性是否正常。
 4. 后端日志中是否存在启动失败、数据库或 Redis 连接错误。
 
-不要通过把 ServerA Nginx 随意加入 ServerD 的 Docker 网络来修复跨主机链路。
+不要通过把 ServerA Nginx 随意加入 ServerB 的 Docker 网络来修复跨主机链路。
 
 ## 事实来源
 

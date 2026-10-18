@@ -18,7 +18,7 @@
 
 - `.github/workflows/db-ops.yml` 可分别执行 DB Init、DB Migrate 和 DB Seed
 - 三个 `skip_*` 输入默认都是 `true`，避免误写生产数据库
-- workflow 通过 `SVRD_*` 凭据在 ServerD 执行，并读取 `/opt/miniblog/.env`
+- workflow 通过 `SVRB_*` 凭据在 ServerB 执行，并读取 `/opt/miniblog/.env`
 
 ### 4. 创建了示例迁移文件
 

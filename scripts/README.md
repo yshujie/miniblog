@@ -253,15 +253,15 @@ unset ENABLE_DB_SEED
 ## GitHub Actions 数据库操作
 
 生产数据库操作通过 GitHub 仓库的 **Actions → DB Operations (manual)** 手动触发。
-三个输入默认全部跳过，只有明确取消对应的 `skip_*` 选项才会在 ServerD 执行：
+三个输入默认全部跳过，只有明确取消对应的 `skip_*` 选项才会在 ServerB 执行：
 
 - `skip_db_init=false`：执行数据库和应用账号初始化，需要 `MYSQL_ROOT_PASSWORD` secret。
 - `skip_db_migrate=false`：执行所有尚未应用的 `up` 迁移。
 - `skip_db_seed=false`：加载种子数据；仅应在确认目标数据允许覆盖时使用。
 
-workflow 使用与生产部署相同的 `SVRD_HOST`、`SVRD_USERNAME`（或 `SVRD_USER`）、
-`SVRD_SSH_KEY`、`SVRD_SSH_PORT`。它会把当前 Git 提交中的 Makefile、数据库脚本和迁移文件
-上传到本次运行专属的 ServerD 临时目录，读取 `/opt/miniblog/.env` 后执行，并在结束时删除
+workflow 使用与生产部署相同的 `SVRB_HOST`、`SVRB_USERNAME`（或 `SVRB_USER`）、
+`SVRB_SSH_KEY`、`SVRB_SSH_PORT`。它会把当前 Git 提交中的 Makefile、数据库脚本和迁移文件
+上传到本次运行专属的 ServerB 临时目录，读取 `/opt/miniblog/.env` 后执行，并在结束时删除
 临时目录。触发前仍需完成本 README 的目标确认与备份检查。三个操作共享 concurrency
 group，不会并发执行多次。
 

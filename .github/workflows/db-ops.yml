@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: miniblog-db-operations
+  group: miniblog-prod
   cancel-in-progress: false
 
 env:
@@ -38,31 +38,34 @@ jobs:
         if: ${{ !inputs.skip_db_init || !inputs.skip_db_migrate || !inputs.skip_db_seed }}
         uses: actions/checkout@v4
 
-      - name: Upload database operation files to ServerD
+      - name: Upload database operation files to ServerB
         if: ${{ !inputs.skip_db_init || !inputs.skip_db_migrate || !inputs.skip_db_seed }}
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SVRD_HOST }}
-          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          key: ${{ secrets.SVRD_SSH_KEY }}
-          port: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          host: ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          key: ${{ secrets.SVRB_SSH_KEY }}
+          port: ${{ secrets.SVRB_SSH_PORT || 22 }}
+          fingerprint: ${{ secrets.SVRB_HOST_FINGERPRINT }}
           source: Makefile,scripts/db-init.sh,scripts/db-migrate.sh,scripts/load-seed-data.sh,db/migrations
           target: ${{ env.DB_OPS_DIR }}
 
-      - name: Initialize database on ServerD
+      - name: Initialize database on ServerB
         if: ${{ !inputs.skip_db_init }}
         uses: appleboy/ssh-action@v1.0.0
         env:
           DB_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
         with:
-          host: ${{ secrets.SVRD_HOST }}
-          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          key: ${{ secrets.SVRD_SSH_KEY }}
-          port: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          host: ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          key: ${{ secrets.SVRB_SSH_KEY }}
+          port: ${{ secrets.SVRB_SSH_PORT || 22 }}
+          fingerprint: ${{ secrets.SVRB_HOST_FINGERPRINT }}
           envs: DB_ROOT_PASSWORD
           command_timeout: 10m
           script: |
             set -Eeuo pipefail
+            test "$(hostname -s)" = serverB || { echo "Unexpected database operation host" >&2; exit 1; }
             cd "${{ env.DB_OPS_DIR }}"
             test -f /opt/miniblog/.env
 
@@ -70,17 +73,19 @@ jobs:
             export ENABLE_DB_INIT=true
             ./scripts/db-init.sh
 
-      - name: Migrate database on ServerD
+      - name: Migrate database on ServerB
         if: ${{ !inputs.skip_db_migrate }}
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SVRD_HOST }}
-          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          key: ${{ secrets.SVRD_SSH_KEY }}
-          port: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          host: ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          key: ${{ secrets.SVRB_SSH_KEY }}
+          port: ${{ secrets.SVRB_SSH_PORT || 22 }}
+          fingerprint: ${{ secrets.SVRB_HOST_FINGERPRINT }}
           command_timeout: 10m
           script: |
             set -Eeuo pipefail
+            test "$(hostname -s)" = serverB || { echo "Unexpected database operation host" >&2; exit 1; }
             cd "${{ env.DB_OPS_DIR }}"
             test -f /opt/miniblog/.env
 
@@ -88,17 +93,19 @@ jobs:
             export DOCKER_NETWORK=infra-network
             ./scripts/db-migrate.sh
 
-      - name: Load seed data on ServerD
+      - name: Load seed data on ServerB
         if: ${{ !inputs.skip_db_seed }}
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SVRD_HOST }}
-          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          key: ${{ secrets.SVRD_SSH_KEY }}
-          port: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          host: ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          key: ${{ secrets.SVRB_SSH_KEY }}
+          port: ${{ secrets.SVRB_SSH_PORT || 22 }}
+          fingerprint: ${{ secrets.SVRB_HOST_FINGERPRINT }}
           command_timeout: 20m
           script: |
             set -Eeuo pipefail
+            test "$(hostname -s)" = serverB || { echo "Unexpected database operation host" >&2; exit 1; }
             cd "${{ env.DB_OPS_DIR }}"
             test -f /opt/miniblog/.env
 
@@ -106,15 +113,17 @@ jobs:
             export ENABLE_DB_SEED=true
             ./scripts/load-seed-data.sh
 
-      - name: Remove database operation files from ServerD
+      - name: Remove database operation files from ServerB
         if: ${{ always() && (!inputs.skip_db_init || !inputs.skip_db_migrate || !inputs.skip_db_seed) }}
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SVRD_HOST }}
-          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          key: ${{ secrets.SVRD_SSH_KEY }}
-          port: ${{ secrets.SVRD_SSH_PORT || 22 }}
+          host: ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          key: ${{ secrets.SVRB_SSH_KEY }}
+          port: ${{ secrets.SVRB_SSH_PORT || 22 }}
+          fingerprint: ${{ secrets.SVRB_HOST_FINGERPRINT }}
           command_timeout: 2m
           script: |
             set -Eeuo pipefail
+            test "$(hostname -s)" = serverB || { echo "Unexpected database operation host" >&2; exit 1; }
             rm -rf -- "${{ env.DB_OPS_DIR }}"

@@ -4,7 +4,7 @@ name: CI/CD (miniblog - production, linux runner)
 # GitHub Secrets 配置指引
 # ----------------------------------------------------------------------------
 # 必需（main push / workflow_dispatch 才强制）：
-#   SVRD_HOST, SVRD_USERNAME, SVRD_SSH_KEY, SVRD_SSH_PORT (可选，默认 22)
+#   SVRB_HOST, SVRB_USERNAME, SVRB_SSH_KEY, SVRB_SSH_PORT (可选，默认 22)
 #   MYSQL_HOST, MYSQL_DBNAME, MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_PORT (可选，默认 3306)
 #   REDIS_HOST, REDIS_PASSWORD, REDIS_PORT (可选，默认 6379), REDIS_DB (可选，默认 0)
 #   JWT_SECRET
@@ -19,7 +19,7 @@ name: CI/CD (miniblog - production, linux runner)
 # 说明：
 # - PR 只做 lint/test，不使用部署 Secrets。
 # - main push / workflow_dispatch 缺必需项会直接失败。
-# - ServerD 部署用户需要：
+# - ServerB 部署用户需要：
 #   1. 拥有 /opt/miniblog 写权限；
 #   2. 可以直接执行 docker / docker compose；
 #   3. 可以写入 /data/logs/miniblog 目录，或该目录已提前创建并授权。
@@ -55,10 +55,11 @@ jobs:
     steps:
       - name: Check Required Secrets
         env:
-          SVRD_HOST:      ${{ secrets.SVRD_HOST }}
-          SVRD_USERNAME:  ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          SVRD_SSH_KEY:   ${{ secrets.SVRD_SSH_KEY }}
-          SVRD_SSH_PORT:  ${{ secrets.SVRD_SSH_PORT }}
+          SVRB_HOST:      ${{ secrets.SVRB_HOST }}
+          SVRB_USERNAME:  ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          SVRB_SSH_KEY:   ${{ secrets.SVRB_SSH_KEY }}
+          SVRB_SSH_PORT:  ${{ secrets.SVRB_SSH_PORT }}
+          SVRB_HOST_FINGERPRINT: ${{ secrets.SVRB_HOST_FINGERPRINT }}
 
           MYSQL_HOST:     ${{ secrets.MYSQL_HOST }}
           MYSQL_PORT:     ${{ secrets.MYSQL_PORT }}
@@ -87,9 +88,10 @@ jobs:
           echo "🔍 Validating required secrets..."
 
           REQUIRED_APP=(
-            SVRD_HOST
-            SVRD_USERNAME
-            SVRD_SSH_KEY
+            SVRB_HOST
+            SVRB_USERNAME
+            SVRB_SSH_KEY
+            SVRB_HOST_FINGERPRINT
             MYSQL_HOST
             MYSQL_DBNAME
             MYSQL_USERNAME
@@ -100,7 +102,7 @@ jobs:
           )
 
           OPTIONAL_APP=(
-            SVRD_SSH_PORT
+            SVRB_SSH_PORT
             MYSQL_PORT
             REDIS_PORT
             REDIS_DB
@@ -291,7 +293,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy-app:
-    name: Deploy to ServerD (app)
+    name: Deploy to ServerB (app)
     runs-on: ubuntu-latest
     needs: [build-and-push]
     permissions:
@@ -320,10 +322,11 @@ jobs:
       - name: Upload compose files
         uses: appleboy/scp-action@v0.1.7
         with:
-          host:     ${{ secrets.SVRD_HOST }}
-          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          key:      ${{ secrets.SVRD_SSH_KEY }}
-          port:     ${{ secrets.SVRD_SSH_PORT || 22 }}
+          host:     ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          key:      ${{ secrets.SVRB_SSH_KEY }}
+          port:     ${{ secrets.SVRB_SSH_PORT || 22 }}
+          fingerprint: ${{ secrets.SVRB_HOST_FINGERPRINT }}
           source:   "docker-compose.yml,docker-compose.prod.yml"
           target:   "/tmp/miniblog-deploy"
           rm: true
@@ -332,15 +335,15 @@ jobs:
       # The Notion runtime credential never enters build/test jobs or SSH exports.
       - name: Stage read-only Notion credential privately
         env:
-          SVRD_HOST: ${{ secrets.SVRD_HOST }}
-          SVRD_USER: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          SVRD_PORT: ${{ secrets.SVRD_SSH_PORT || 22 }}
-          SVRD_SSH_KEY: ${{ secrets.SVRD_SSH_KEY }}
-          SVRD_HOST_FINGERPRINT: ${{ secrets.SVRD_HOST_FINGERPRINT }}
+          SVRB_HOST: ${{ secrets.SVRB_HOST }}
+          SVRB_USER: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          SVRB_PORT: ${{ secrets.SVRB_SSH_PORT || 22 }}
+          SVRB_SSH_KEY: ${{ secrets.SVRB_SSH_KEY }}
+          SVRB_HOST_FINGERPRINT: ${{ secrets.SVRB_HOST_FINGERPRINT }}
           MINIBLOG_NOTION_TOKEN: ${{ secrets.MINIBLOG_NOTION_TOKEN }}
         run: python3 scripts/notion-ops/transport.py --mode deploy_token
 
-      - name: Deploy on ServerD (docker compose)
+      - name: Deploy on ServerB (docker compose)
         uses: appleboy/ssh-action@v1.0.0
         env:
           _IMG_BACKEND:     ${{ env.BACKEND_IMAGE }}:${{ env.TAG }}
@@ -368,10 +371,11 @@ jobs:
           _FEISHU_SECRET:   ${{ secrets.FEISHU_DOCREADER_APPSECRET }}
 
         with:
-          host:     ${{ secrets.SVRD_HOST }}
-          username: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          key:      ${{ secrets.SVRD_SSH_KEY }}
-          port:     ${{ secrets.SVRD_SSH_PORT || 22 }}
+          host:     ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          key:      ${{ secrets.SVRB_SSH_KEY }}
+          port:     ${{ secrets.SVRB_SSH_PORT || 22 }}
+          fingerprint: ${{ secrets.SVRB_HOST_FINGERPRINT }}
           envs: _IMG_BACKEND,_IMG_FE_BLOG,_IMG_FE_ADMIN,_GH_USER,_GHCR_USERNAME,_GHCR_TOKEN,_MYSQL_HOST,_MYSQL_PORT,_MYSQL_DBNAME,_MYSQL_USERNAME,_MYSQL_PASSWORD,_REDIS_HOST,_REDIS_PORT,_REDIS_DB,_REDIS_PASSWORD,_JWT_SECRET,_FEISHU_APPID,_FEISHU_SECRET
           debug: false
           script_stop: true
@@ -381,6 +385,7 @@ jobs:
             set +x
             umask 077
 
+            test "$(hostname -s)" = serverB || { echo "Unexpected deployment host" >&2; exit 1; }
             APP_DIR="/opt/miniblog"
             STAGE_DIR="/tmp/miniblog-deploy"
             NOTION_STAGE="/tmp/miniblog-notion-deploy-${{ github.run_id }}-${{ github.run_attempt }}"
@@ -388,7 +393,7 @@ jobs:
             trap 'test -z "$ENV_CANDIDATE" || rm -f -- "$ENV_CANDIDATE"; rm -rf -- "$NOTION_STAGE"' EXIT
             COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml --env-file .env"
 
-            echo "🚀 Deploying miniblog to ServerD..."
+            echo "🚀 Deploying miniblog to ServerB..."
             echo "📌 APP_DIR=${APP_DIR}"
 
             # ----------------------------------------------------------------
@@ -625,11 +630,11 @@ jobs:
       - name: Remove private Notion deployment staging
         if: ${{ always() }}
         env:
-          SVRD_HOST: ${{ secrets.SVRD_HOST }}
-          SVRD_USER: ${{ secrets.SVRD_USERNAME || secrets.SVRD_USER }}
-          SVRD_PORT: ${{ secrets.SVRD_SSH_PORT || 22 }}
-          SVRD_SSH_KEY: ${{ secrets.SVRD_SSH_KEY }}
-          SVRD_HOST_FINGERPRINT: ${{ secrets.SVRD_HOST_FINGERPRINT }}
+          SVRB_HOST: ${{ secrets.SVRB_HOST }}
+          SVRB_USER: ${{ secrets.SVRB_USERNAME || secrets.SVRB_USER }}
+          SVRB_PORT: ${{ secrets.SVRB_SSH_PORT || 22 }}
+          SVRB_SSH_KEY: ${{ secrets.SVRB_SSH_KEY }}
+          SVRB_HOST_FINGERPRINT: ${{ secrets.SVRB_HOST_FINGERPRINT }}
         run: python3 scripts/notion-ops/transport.py --mode cleanup_deploy
 
       - name: Reload nginx on ServerA
